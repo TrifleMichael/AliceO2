@@ -57,3 +57,11 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseEmptyResponse)
   std::cout << "Subfolders: " << response.getSubFolders().size() << " ";
   BOOST_CHECK(response.getSubFolders().size() == 0);
 }
+
+BOOST_AUTO_TEST_CASE(TestCCDBResponseUniqueObjects)
+{
+  auto response = parse(fullResponse);
+
+  std::cout << "Unique Objects: " << response.getUniqueObjects().size() << " ";
+  BOOST_CHECK(response.getUniqueObjects().size() == 3);
+}

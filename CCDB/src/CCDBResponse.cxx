@@ -20,6 +20,32 @@ std::vector<CCDBObjectDescription> CCDBResponse::getObjects()
   return objects;
 }
 
+std::vector<CCDBObjectDescription> CCDBResponse::getUniqueObjects()
+{
+  std::vector<int> unique;
+  for(int i = 0; i < objects.size(); i++) {
+    unique.push_back(1);
+  }
+
+  for(int i = 0; i < objects.size(); i++) {
+    for(int j = i+1; j < objects.size(); j++) {
+      if (objects[i].getProperty("id").compare(objects[j].getProperty("id")) && i != j) {
+        unique[i] = 0;
+        unique[j] = 0;
+      }
+    }
+  }
+
+  std::vector<CCDBObjectDescription> result;
+  for(int i = 0; i < objects.size(); i++) {
+    if (unique[i]) {
+      result.push_back(objects[i]);
+    }
+  }
+
+  return result;
+}
+
 std::string CCDBObjectDescription::getProperty(const std::string& propertyName)
 {
   return stringValues[propertyName];
@@ -29,15 +55,15 @@ CCDBResponse::CCDBResponse(const std::string& responseAsString)
 {
   using namespace rapidjson;
   Document jsonDocument;
-  jsonDocument.Parse(responseAsString.c_str());
-  auto objectsArray = jsonDocument["objects"].GetArray();
+  jsonDocument.Parse(responseAsString.c_str()); 
+  auto objectsArray = jsonDocument["objects"].GetArray(); // creates array of object descriptions
   if (objectsArray.Size() > 0) {
     for (Value::ConstValueIterator object = objectsArray.begin(); object != objectsArray.end(); object++) {
       objects.push_back(CCDBObjectDescription(object));
     }
   }
 
-  auto subfoldersArray = jsonDocument["subfolders"].GetArray();
+  auto subfoldersArray = jsonDocument["subfolders"].GetArray(); // creates array of subforlder paths
   if (subfoldersArray.Size() > 0) {
     for (Value::ConstValueIterator subfolder = subfoldersArray.begin(); subfolder != subfoldersArray.end(); subfolder++) {
       assert(subfolder->IsString());
