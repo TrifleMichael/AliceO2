@@ -29,7 +29,7 @@ std::vector<CCDBObjectDescription> CCDBResponse::getUniqueObjects()
 
   for(int i = 0; i < objects.size(); i++) {
     for(int j = i+1; j < objects.size(); j++) {
-      if (objects[i].getProperty("id").compare(objects[j].getProperty("id")) && i != j) {
+      if (objects[i].getProperty("id").compare(objects[j].getProperty("id")) == 0 && i != j) {
         unique[i] = 0;
         unique[j] = 0;
       }
