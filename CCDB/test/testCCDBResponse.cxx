@@ -62,6 +62,14 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseUniqueObjects)
 {
   auto response = parse(fullResponse);
 
-  std::cout << "Unique Objects: " << response.getUniqueObjects().size() << " ";
-  BOOST_CHECK(response.getUniqueObjects().size() == 3);
+  std::cout << "Unique Objects: " << response.browseObjects().size() << " ";
+  BOOST_CHECK(response.browseObjects().size() == 3);
+}
+
+BOOST_AUTO_TEST_CASE(TestCCDBResponseLatestObjects)
+{
+  auto response = parse(fullResponse);
+
+  std::cout << "Latest Objects: " << response.latestObjects().size() << " ";
+  BOOST_CHECK(response.latestObjects().size() == 1);
 }

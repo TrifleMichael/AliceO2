@@ -53,7 +53,9 @@ class CCDBResponse
   std::vector<std::string> getSubFolders();
 
   std::vector<CCDBObjectDescription> getObjects();
-  std::vector<CCDBObjectDescription> getUniqueObjects();
+  std::vector<CCDBObjectDescription> browseObjects();
+  std::vector<CCDBObjectDescription> latestObjects();
+  
 
   // std::string toString();
 

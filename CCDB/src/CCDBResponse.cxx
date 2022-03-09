@@ -20,7 +20,8 @@ std::vector<CCDBObjectDescription> CCDBResponse::getObjects()
   return objects;
 }
 
-std::vector<CCDBObjectDescription> CCDBResponse::getUniqueObjects()
+// Returns vector of objects of unique id's
+std::vector<CCDBObjectDescription> CCDBResponse::browseObjects()
 {
   std::vector<int> unique;
   for(int i = 0; i < objects.size(); i++) {
@@ -29,8 +30,7 @@ std::vector<CCDBObjectDescription> CCDBResponse::getUniqueObjects()
 
   for(int i = 0; i < objects.size(); i++) {
     for(int j = i+1; j < objects.size(); j++) {
-      if (objects[i].getProperty("id").compare(objects[j].getProperty("id")) == 0 && i != j) {
-        unique[i] = 0;
+      if (objects[i].getProperty("id").compare(objects[j].getProperty("id")) == 0) {
         unique[j] = 0;
       }
     }
@@ -45,6 +45,37 @@ std::vector<CCDBObjectDescription> CCDBResponse::getUniqueObjects()
 
   return result;
 }
+
+// Returns vector of latest objects for each directory path
+std::vector<CCDBObjectDescription> CCDBResponse::latestObjects()
+{
+  std::vector<int> latest;
+  std::vector<CCDBObjectDescription> uniqueObjects = CCDBResponse::browseObjects();
+
+  for(int i = 0; i < uniqueObjects.size(); i++) {
+    latest.push_back(1);
+  }
+
+  for(int i = 0; i < uniqueObjects.size(); i++) {
+    for(int j = i+1; j < uniqueObjects.size(); j++) {
+      if (uniqueObjects[i].getProperty("path").compare(uniqueObjects[j].getProperty("path")) == 0) {
+        if (uniqueObjects[i].getProperty("validFrom").compare(uniqueObjects[j].getProperty("validFrom")) >= 0) {
+          latest[j] = 0;
+        }
+      }
+    }
+  }
+
+  std::vector<CCDBObjectDescription> result;
+  for(int i = 0; i < uniqueObjects.size(); i++) {
+    if (latest[i]) {
+      result.push_back(uniqueObjects[i]);
+    }
+  }
+
+  return result;
+}
+
 
 std::string CCDBObjectDescription::getProperty(const std::string& propertyName)
 {
