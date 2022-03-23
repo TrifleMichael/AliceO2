@@ -17,6 +17,7 @@
 #include <CCDB/CCDBResponse.h>
 #include <boost/test/unit_test.hpp>
 #include <string>
+#include "rapidjson/document.h"
 
 using namespace o2::ccdb;
 
@@ -72,4 +73,14 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseLatestObjects)
 
   std::cout << "Latest Objects: " << response.latestObjects().size() << " ";
   BOOST_CHECK(response.latestObjects().size() == 1);
+}
+
+
+BOOST_AUTO_TEST_CASE(TestCCDBResponseRapidjson)
+{
+  auto response = parse(fullResponse);
+  auto document = response.toRapidJsonDocument(response.getObjects());
+
+  std::cout << "RapidJSON path " << document["path"] << std::endl;
+  BOOST_CHECK(2 == 1);
 }

@@ -21,7 +21,7 @@ std::vector<CCDBObjectDescription> CCDBResponse::getObjects()
 }
 
 // Returns vector of objects of unique id's
-std::vector<CCDBObjectDescription> CCDBResponse::browseObjects()
+std::vector<CCDBObjectDescription> CCDBResponse::browseObjects() // TODO: Rapidjson variant without going through string
 {
   std::vector<int> unique;
   for(int i = 0; i < objects.size(); i++) {
@@ -46,8 +46,8 @@ std::vector<CCDBObjectDescription> CCDBResponse::browseObjects()
   return result;
 }
 
-// Returns vector of latest objects for each directory path
-std::vector<CCDBObjectDescription> CCDBResponse::latestObjects()
+// Returns vector of latest objects for each directory path, only if unique ID
+std::vector<CCDBObjectDescription> CCDBResponse::latestObjects() // TODO: Rapidjson variant without going through string
 {
   std::vector<int> latest;
   std::vector<CCDBObjectDescription> uniqueObjects = CCDBResponse::browseObjects();
@@ -59,7 +59,7 @@ std::vector<CCDBObjectDescription> CCDBResponse::latestObjects()
   for(int i = 0; i < uniqueObjects.size(); i++) {
     for(int j = i+1; j < uniqueObjects.size(); j++) {
       if (uniqueObjects[i].getProperty("path").compare(uniqueObjects[j].getProperty("path")) == 0) {
-        if (uniqueObjects[i].getProperty("validFrom").compare(uniqueObjects[j].getProperty("validFrom")) >= 0) {
+        if (uniqueObjects[i].getProperty("validFrom").compare(uniqueObjects[j].getProperty("validFrom")) >= 0) { // double check if the newest is taken
           latest[j] = 0;
         }
       }
@@ -76,6 +76,33 @@ std::vector<CCDBObjectDescription> CCDBResponse::latestObjects()
   return result;
 }
 
+rapidjson::Document CCDBResponse::toRapidJsonDocument(std::vector<CCDBObjectDescription> descriptions)
+{
+  std::string descriptionsToString = "{\n";
+  for(int i = 0; i < objects.size(); i++) {
+    descriptionsToString += descriptions[i].toString();
+  }
+  descriptionsToString += "}";
+
+  rapidjson::Document document;
+  document.Parse(descriptionsToString.c_str());
+  return document;
+}
+
+std::string CCDBObjectDescription::toString() // tested and works as intended
+{
+  std::string result = "";
+  for (auto it = stringValues.begin(); it != stringValues.end(); it++)
+  {
+    result += "\"" + it->first + "\": \"" + it->second + "\",\n";
+    // "first": "second",
+  }
+  if (!result.empty()) {
+    result.pop_back();
+    result.pop_back(); // removing trailing comma and newline
+  }
+  return result;
+}
 
 std::string CCDBObjectDescription::getProperty(const std::string& propertyName)
 {
@@ -94,7 +121,7 @@ CCDBResponse::CCDBResponse(const std::string& responseAsString)
     }
   }
 
-  auto subfoldersArray = jsonDocument["subfolders"].GetArray(); // creates array of subforlder paths
+  auto subfoldersArray = jsonDocument["subfolders"].GetArray(); // creates array of subfolder paths
   if (subfoldersArray.Size() > 0) {
     for (Value::ConstValueIterator subfolder = subfoldersArray.begin(); subfolder != subfoldersArray.end(); subfolder++) {
       assert(subfolder->IsString());

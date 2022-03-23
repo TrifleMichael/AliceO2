@@ -29,7 +29,7 @@ class CCDBObjectDescription
   ~CCDBObjectDescription() = default;
 
   std::string getProperty(const std::string &propertyName);
-  // std::string toString();
+  std::string toString();
 
   std::map<std::string, std::string> stringValues{};
   std::map<std::string, int64_t> intValues{};
@@ -52,6 +52,7 @@ class CCDBResponse
 
   std::vector<std::string> getSubFolders();
 
+  rapidjson::Document toRapidJsonDocument(std::vector<CCDBObjectDescription> descriptions);
   std::vector<CCDBObjectDescription> getObjects();
   std::vector<CCDBObjectDescription> browseObjects();
   std::vector<CCDBObjectDescription> latestObjects();
