@@ -20,26 +20,45 @@ std::vector<CCDBObjectDescription> CCDBResponse::getObjects()
   return objects;
 }
 
+// Concatenates otherResponse into this response according to  /latest/. this.objects take priority in case of duplicate id's
+std::vector<CCDBObjectDescription> CCDBResponse::concatenateLatest(CCDBResponse otherResponse) {
+  std::vector<CCDBResponse> newObjects = objects;
+  newObjects.insert(objects.end(), otherResponse.getObjects.begin(), otherResponse.getObjects.end());
+  newObjects = latestObjects();
+}
+
+
+// Concatenates otherResponse into this response according to  /browse/. this.objects take priority in case of duplicate id's
+std::vector<CCDBObjectDescription> CCDBResponse::concatenateBrowse(CCDBResponse otherResponse) {
+  std::vector<CCDBResponse> newObjects = objects;
+  newObjects.insert(objects.end(), otherResponse.getObjects.begin(), otherResponse.getObjects.end());
+  newObjects = browseObjects();
+}
+
 // Returns vector of objects of unique id's
-std::vector<CCDBObjectDescription> CCDBResponse::browseObjects() // TODO: Rapidjson variant without going through string
+std::vector<CCDBObjectDescription> CCDBResponse::browseObjects() {
+  return CCDBResponse::browseObjects(objects);
+}
+
+std::vector<CCDBObjectDescription> CCDBResponse::browseObjects(std::vector<CCDBObjectDescription> objectsToParse) // TODO: Rapidjson variant without going through string
 {
   std::vector<int> unique;
-  for(int i = 0; i < objects.size(); i++) {
+  for(int i = 0; i < objectsToParse.size(); i++) {
     unique.push_back(1);
   }
 
-  for(int i = 0; i < objects.size(); i++) {
-    for(int j = i+1; j < objects.size(); j++) {
-      if (objects[i].getProperty("id").compare(objects[j].getProperty("id")) == 0) {
+  for(int i = 0; i < objectsToParse.size(); i++) {
+    for(int j = i+1; j < objectsToParse.size(); j++) {
+      if (objectsToParse[i].getProperty("id").compare(objectsToParse[j].getProperty("id")) == 0) {
         unique[j] = 0;
       }
     }
   }
 
   std::vector<CCDBObjectDescription> result;
-  for(int i = 0; i < objects.size(); i++) {
+  for(int i = 0; i < objectsToParse.size(); i++) {
     if (unique[i]) {
-      result.push_back(objects[i]);
+      result.push_back(objectsToParse[i]);
     }
   }
 
@@ -47,10 +66,14 @@ std::vector<CCDBObjectDescription> CCDBResponse::browseObjects() // TODO: Rapidj
 }
 
 // Returns vector of latest objects for each directory path, only if unique ID
-std::vector<CCDBObjectDescription> CCDBResponse::latestObjects() // TODO: Rapidjson variant without going through string
+std::vector<CCDBObjectDescription> CCDBResponse::latestObjects() {
+  return CCDBResponse::latestObjects(objects);
+}
+
+std::vector<CCDBObjectDescription> CCDBResponse::latestObjects(CCDBResponse otherResponse) // TODO: Rapidjson variant without going through string
 {
   std::vector<int> latest;
-  std::vector<CCDBObjectDescription> uniqueObjects = CCDBResponse::browseObjects();
+  std::vector<CCDBObjectDescription> uniqueObjects = CCDBResponse::browseObjects(otherResponse);
 
   for(int i = 0; i < uniqueObjects.size(); i++) {
     latest.push_back(1);

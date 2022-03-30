@@ -52,11 +52,18 @@ class CCDBResponse
 
   std::vector<std::string> getSubFolders();
 
-  rapidjson::Document toRapidJsonDocument(std::vector<CCDBObjectDescription> descriptions);
-  std::vector<CCDBObjectDescription> getObjects();
-  std::vector<CCDBObjectDescription> browseObjects();
-  std::vector<CCDBObjectDescription> latestObjects();
+  rapidjson::Document toRapidJsonDocument(std::vector<CCDBObjectDescription> descriptions); // to be removed
+  std::vector<CCDBObjectDescription> getObjects(); // to be removed
+  std::vector<CCDBObjectDescription> browseObjects(); // to be removed
+  std::vector<CCDBObjectDescription> latestObjects(); // to be removed
   
+
+  // json impelemntation
+  // rapidjson::Document browse(); // to be implemented
+  // rapidjson::Document latest(); // to be implemented
+  // string toString() // to be implemented
+  // void concatenate(CCDBResponse) // to be implemented
+  // fin
 
   // std::string toString();
 
@@ -64,10 +71,16 @@ class CCDBResponse
   std::vector<CCDBObjectDescription> objects{};
   std::vector<std::string> subfolders{};
 
+  // json impelemntation
+  // rapidjson::Document objectsDocument; // to be implemented
+  // string toString(rapidjson::Document) // to be implemented
+  // fin
+
+  // MUST CHECK CCDBApi FOR THE FUNCTIONS BELOW
   static std::pair<std::string, std::string> splitResponseOnObjectsAndSubFolders(const std::string &response);
   static std::vector<std::string> matchObjects(const std::string &objectsListAsString);
   static std::vector<CCDBObjectDescription> parseObjects(const std::string &objectsListAsString);
-  static std::vector<std::string> parseSubfolders(const std::string &subfoldersAsString);
+  static std::vector<std::string> parseSubfolders(const std::string &subfoldersAsString); // THAT ONE IS USED IN CCDB
   static std::string sanitizeObjectName(const std::string& objectName);
 
   ClassDefNV(CCDBResponse, 1);
