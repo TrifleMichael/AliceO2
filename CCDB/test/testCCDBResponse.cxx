@@ -73,3 +73,23 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseLatestObjects)
   std::cout << "Latest Objects: " << response.latestObjects().size() << " ";
   BOOST_CHECK(response.latestObjects().size() == 1);
 }
+
+BOOST_AUTO_TEST_CASE(TestCCDBResponseConcatenateLatest)
+{
+  auto response1 = parse(fullResponse);
+  auto response2 = parse(fullResponse);
+  response1.concatenateLatest(response2);
+
+  std::cout << "Latest Objects: " << response1.latestObjects().size() << " ";
+  BOOST_CHECK(response1.latestObjects().size() == 1);
+}
+
+BOOST_AUTO_TEST_CASE(TestCCDBResponseConcatenateBrowse)
+{
+  auto response1 = parse(fullResponse);
+  auto response2 = parse(fullResponse);
+  response1.concatenateBrowse(response2);
+
+  std::cout << "Latest Objects: " << response1.browseObjects().size() << " ";
+  BOOST_CHECK(response1.browseObjects().size() == 3);
+}

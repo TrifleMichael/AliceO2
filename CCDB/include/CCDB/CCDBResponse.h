@@ -57,6 +57,8 @@ class CCDBResponse
   std::vector<CCDBObjectDescription> browseObjects(std::vector<CCDBObjectDescription>);
   std::vector<CCDBObjectDescription> latestObjects();
   std::vector<CCDBObjectDescription> latestObjects(std::vector<CCDBObjectDescription>);
+  void concatenateBrowse(CCDBResponse);
+  void concatenateLatest(CCDBResponse);
   
 
   // std::string toString();

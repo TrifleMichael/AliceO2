@@ -20,6 +20,18 @@ std::vector<CCDBObjectDescription> CCDBResponse::getObjects()
   return objects;
 }
 
+void CCDBResponse::concatenateBrowse(CCDBResponse other) {
+  auto otherObjects = other.getObjects();
+  objects.insert(objects.end(), otherObjects.begin(), otherObjects.end()); // placeholder, should return not overwrite
+  objects = browseObjects();
+}
+
+void CCDBResponse::concatenateLatest(CCDBResponse other) {
+  auto otherObjects = other.getObjects();
+  objects.insert(objects.end(), otherObjects.begin(), otherObjects.end()); // placeholder, should return not overwrite
+  objects = latestObjects();
+}
+
 std::vector<CCDBObjectDescription> CCDBResponse::browseObjects() {
   return browseObjects(objects);
 }
