@@ -54,7 +54,9 @@ class CCDBResponse
 
   std::vector<CCDBObjectDescription> getObjects();
   std::vector<CCDBObjectDescription> browseObjects();
+  std::vector<CCDBObjectDescription> browseObjects(std::vector<CCDBObjectDescription>);
   std::vector<CCDBObjectDescription> latestObjects();
+  std::vector<CCDBObjectDescription> latestObjects(std::vector<CCDBObjectDescription>);
   
 
   // std::string toString();

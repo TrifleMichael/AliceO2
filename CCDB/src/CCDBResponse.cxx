@@ -20,37 +20,45 @@ std::vector<CCDBObjectDescription> CCDBResponse::getObjects()
   return objects;
 }
 
+std::vector<CCDBObjectDescription> CCDBResponse::browseObjects() {
+  return browseObjects(objects);
+}
+
 // Returns vector of objects of unique id's
-std::vector<CCDBObjectDescription> CCDBResponse::browseObjects()
+std::vector<CCDBObjectDescription> CCDBResponse::browseObjects(std::vector<CCDBObjectDescription> objectVector)
 {
   std::vector<int> unique;
-  for(int i = 0; i < objects.size(); i++) {
+  for(int i = 0; i < objectVector.size(); i++) {
     unique.push_back(1);
   }
 
-  for(int i = 0; i < objects.size(); i++) {
-    for(int j = i+1; j < objects.size(); j++) {
-      if (objects[i].getProperty("id").compare(objects[j].getProperty("id")) == 0) {
+  for(int i = 0; i < objectVector.size(); i++) {
+    for(int j = i+1; j < objectVector.size(); j++) {
+      if (objectVector[i].getProperty("id").compare(objectVector[j].getProperty("id")) == 0) {
         unique[j] = 0;
       }
     }
   }
 
   std::vector<CCDBObjectDescription> result;
-  for(int i = 0; i < objects.size(); i++) {
+  for(int i = 0; i < objectVector.size(); i++) {
     if (unique[i]) {
-      result.push_back(objects[i]);
+      result.push_back(objectVector[i]);
     }
   }
 
   return result;
 }
 
+std::vector<CCDBObjectDescription> CCDBResponse::latestObjects() {
+  return latestObjects(objects);
+}
+
 // Returns vector of latest objects for each directory path
-std::vector<CCDBObjectDescription> CCDBResponse::latestObjects()
+std::vector<CCDBObjectDescription> CCDBResponse::latestObjects(std::vector<CCDBObjectDescription> objectVector)
 {
   std::vector<int> latest;
-  std::vector<CCDBObjectDescription> uniqueObjects = CCDBResponse::browseObjects();
+  std::vector<CCDBObjectDescription> uniqueObjects = CCDBResponse::browseObjects(objectVector);
 
   for(int i = 0; i < uniqueObjects.size(); i++) {
     latest.push_back(1);
