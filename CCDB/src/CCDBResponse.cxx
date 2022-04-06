@@ -20,13 +20,15 @@ std::vector<CCDBObjectDescription> CCDBResponse::getObjects()
   return objects;
 }
 
-void CCDBResponse::concatenateBrowse(CCDBResponse other) {
+void CCDBResponse::concatenateBrowse(CCDBResponse other)
+{
   auto otherObjects = other.getObjects();
   objects.insert(objects.end(), otherObjects.begin(), otherObjects.end()); // placeholder, should return not overwrite
   objects = browseObjects();
 }
 
-void CCDBResponse::concatenateLatest(CCDBResponse other) {
+void CCDBResponse::concatenateLatest(CCDBResponse other)
+{
   auto otherObjects = other.getObjects();
   objects.insert(objects.end(), otherObjects.begin(), otherObjects.end()); // placeholder, should return not overwrite
   objects = latestObjects();
@@ -146,6 +148,45 @@ CCDBObjectDescription::CCDBObjectDescription(rapidjson::Value::ConstValueIterato
     }
   }
 }
+
+std::string CCDBResponse::toString()
+{
+  return toString(objects);
+}
+
+std::string CCDBResponse::toString(std::vector<CCDBObjectDescription> descriptions)
+{
+  std::string descriptionsToString = "{\n";
+  for(int i = 0; i < objects.size(); i++) {
+    descriptionsToString += descriptions[i].toString();
+  }
+  descriptionsToString += "}";
+
+  return descriptionsToString;
+  // rapidjson::Document document;
+  // document.Parse(descriptionsToString.c_str());
+  // return document;
+}
+
+std::string CCDBObjectDescription::toString() // tested and works as intended
+{
+  std::string result = "";
+  for (auto it = stringValues.begin(); it != stringValues.end(); it++)
+  {
+    result += "\"" + it->first + "\": \"" + it->second + "\",\n";
+    // "first": "second",
+  }
+  if (!result.empty()) {
+    result.pop_back();
+    result.pop_back(); // removing trailing comma and newline
+  }
+  return result;
+}
+
+
+
+
+
 
 /**
  * Keep only the alphanumeric characters plus '_' plus '/' from the string passed in argument.

@@ -90,6 +90,6 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseConcatenateBrowse)
   auto response2 = parse(fullResponse);
   response1.concatenateBrowse(response2);
 
-  std::cout << "Latest Objects: " << response1.browseObjects().size() << " ";
+  std::cout << "Unique Objects: " << response1.browseObjects().size() << " ";
   BOOST_CHECK(response1.browseObjects().size() == 3);
 }

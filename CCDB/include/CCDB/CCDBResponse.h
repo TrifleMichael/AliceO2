@@ -29,7 +29,7 @@ class CCDBObjectDescription
   ~CCDBObjectDescription() = default;
 
   std::string getProperty(const std::string &propertyName);
-  // std::string toString();
+  std::string toString();
 
   std::map<std::string, std::string> stringValues{};
   std::map<std::string, int64_t> intValues{};
@@ -59,6 +59,8 @@ class CCDBResponse
   std::vector<CCDBObjectDescription> latestObjects(std::vector<CCDBObjectDescription>);
   void concatenateBrowse(CCDBResponse);
   void concatenateLatest(CCDBResponse);
+  std::string toString();
+  std::string toString(std::vector<CCDBObjectDescription>);
   
 
   // std::string toString();
