@@ -93,3 +93,13 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseConcatenateBrowse)
   std::cout << "Unique Objects: " << response1.browseObjects().size() << " ";
   BOOST_CHECK(response1.browseObjects().size() == 3);
 }
+
+BOOST_AUTO_TEST_CASE(TestCCDBResponseToString)
+{
+  auto response = parse(fullResponse);
+  std::string reponseString = response.toString();
+
+  std::cout << "CCDBReponse.toString(): " << reponseString << "\n\n\n\n\n\n\n";
+  std::cout << "Original String: " << fullResponse << "\n\n\n\n\n\n\n";
+  BOOST_CHECK(reponseString.compare(fullResponse) == 0);
+}
