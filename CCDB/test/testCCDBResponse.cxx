@@ -98,8 +98,9 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseToString)
 {
   auto response = parse(fullResponse);
   std::string reponseString = response.toString();
+  std::cout << "mikilo\n";
 
   std::cout << "CCDBReponse.toString(): " << reponseString << "\n\n\n\n\n\n\n";
   std::cout << "Original String: " << fullResponse << "\n\n\n\n\n\n\n";
-  BOOST_CHECK(reponseString.compare(fullResponse) == 0);
+  BOOST_CHECK(reponseString.compare(fullResponse) == 0); // only one object, no identation, different order, redundant quotes
 }

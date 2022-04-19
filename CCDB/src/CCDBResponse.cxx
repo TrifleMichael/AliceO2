@@ -156,11 +156,18 @@ std::string CCDBResponse::toString()
 
 std::string CCDBResponse::toString(std::vector<CCDBObjectDescription> descriptions)
 {
-  std::string descriptionsToString = "{\n";
+  std::string descriptionsToString = "({\n\t\"objects\": [\n\t\t{\n";
   for(int i = 0; i < objects.size(); i++) {
-    descriptionsToString += descriptions[i].toString();
+    descriptionsToString += "\t\t\t" + descriptions[i].toString();
+    descriptionsToString += "\n\t\t}";
+
+    if (i < objects.size()-1) {
+      descriptionsToString += "\n\t\t,{\n";
+    }
   }
-  descriptionsToString += "}";
+  
+  descriptionsToString += "\t]\n";
+  descriptionsToString += "}\n)";
 
   return descriptionsToString;
   // rapidjson::Document document;
