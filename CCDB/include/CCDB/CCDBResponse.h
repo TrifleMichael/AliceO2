@@ -21,50 +21,35 @@ namespace o2
 namespace ccdb
 {
 
-class CCDBObjectDescription
-{
- public:
-  CCDBObjectDescription() = default;
-  CCDBObjectDescription(rapidjson::Value::ConstValueIterator jsonObject);
-  ~CCDBObjectDescription() = default;
 
-  std::string getProperty(const std::string &propertyName);
-  // std::string toString();
-
-  std::map<std::string, std::string> stringValues{};
-  std::map<std::string, int64_t> intValues{};
-  std::map<std::string, double> doubleValues{};
-  std::map<std::string, bool> booleanValues{};
-
- private:
-
-  ClassDefNV(CCDBObjectDescription, 1);
-};
 
 class CCDBResponse
 {
  public:
   CCDBResponse() = default;
   CCDBResponse(const std::string &json);
-  CCDBResponse(std::vector<CCDBObjectDescription> _objects, std::vector<std::string> _subfolders)
-    : objects(_objects), subfolders(_subfolders){};
+  CCDBResponse(rapidjson::Document _document)
+    : document(_document){};
   ~CCDBResponse() = default;
 
-  std::vector<std::string> getSubFolders();
+  const char *JsonToString(rapidjson::Document *document);
+  void printObjectAttributes(rapidjson::Document *document);
 
-  std::vector<CCDBObjectDescription> getObjects();
+  void removeObject(rapidjson::Document *document, int ind);
+  int countObjects(rapidjson::Document *document);
+  bool mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &srcObject, rapidjson::Document::AllocatorType &allocator);
 
-  // std::string toString();
+  string getStringAttribute(rapidjson::Document *document, int ind, string attributeName);
+  long getLongAttribute(rapidjson::Document *document, int ind, string attributeName);
+  void browse(rapidjson::Document *document);
+  void latest(rapidjson::Document *document);
+  void latestFromTwoServers(rapidjson::Document *documentFirst, rapidjson::Document *documentSecond);
+  void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved)
+
 
  private:
-  std::vector<CCDBObjectDescription> objects{};
-  std::vector<std::string> subfolders{};
+  rapidjson::Document document{};
 
-  static std::pair<std::string, std::string> splitResponseOnObjectsAndSubFolders(const std::string &response);
-  static std::vector<std::string> matchObjects(const std::string &objectsListAsString);
-  static std::vector<CCDBObjectDescription> parseObjects(const std::string &objectsListAsString);
-  static std::vector<std::string> parseSubfolders(const std::string &subfoldersAsString);
-  static std::string sanitizeObjectName(const std::string& objectName);
 
   ClassDefNV(CCDBResponse, 1);
 };
