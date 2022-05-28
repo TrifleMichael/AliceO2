@@ -228,6 +228,10 @@ void CCDBResponse::latestFromTwoServers(rapidjson::Document *documentFirst, rapi
     mergeObjects(*documentFirst, *documentSecond, (*documentFirst).GetAllocator());
 }
 
+CCDBResponse::CCDBResponse(const std::string& responseAsString)
+{
+  document.Parse(responseAsString);
+}
 
 /**
  * Keep only the alphanumeric characters plus '_' plus '/' from the string passed in argument.

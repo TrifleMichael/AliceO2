@@ -28,8 +28,7 @@ class CCDBResponse
  public:
   CCDBResponse() = default;
   CCDBResponse(const std::string &json);
-  CCDBResponse(rapidjson::Document _document)
-    : document(_document){};
+  CCDBResponse(rapidjson::Document _document);
   ~CCDBResponse() = default;
 
   const char *JsonToString(rapidjson::Document *document);
@@ -44,11 +43,11 @@ class CCDBResponse
   void browse(rapidjson::Document *document);
   void latest(rapidjson::Document *document);
   void latestFromTwoServers(rapidjson::Document *documentFirst, rapidjson::Document *documentSecond);
-  void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved)
+  void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
 
 
  private:
-  rapidjson::Document document{};
+  rapidjson::Document document;
 
 
   ClassDefNV(CCDBResponse, 1);
