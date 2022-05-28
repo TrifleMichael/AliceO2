@@ -1140,11 +1140,11 @@ bool CcdbApi::isHostReachable() const
   return result;
 }
 
-std::vector<std::string> CcdbApi::parseSubFolders(std::string const& reply) const
-{
-  CCDBResponse response(reply);
-  return response.getSubFolders();
-}
+// std::vector<std::string> CcdbApi::parseSubFolders(std::string const& reply) const
+// {
+//   CCDBResponse response(reply);
+//   return response.getSubFolders();
+// }
 
 namespace
 {

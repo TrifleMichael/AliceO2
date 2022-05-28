@@ -14,6 +14,8 @@
 
 #include <Rtypes.h>
 #include <map>
+#include <vector>
+#include <string>
 #include "rapidjson/document.h"
 
 namespace o2
@@ -28,7 +30,7 @@ class CCDBResponse
  public:
   CCDBResponse() = default;
   CCDBResponse(const std::string &json);
-  CCDBResponse(rapidjson::Document _document);
+  //CCDBResponse(rapidjson::Document _document);
   ~CCDBResponse() = default;
 
   const char *JsonToString(rapidjson::Document *document);
@@ -38,16 +40,18 @@ class CCDBResponse
   int countObjects(rapidjson::Document *document);
   bool mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &srcObject, rapidjson::Document::AllocatorType &allocator);
 
-  string getStringAttribute(rapidjson::Document *document, int ind, string attributeName);
-  long getLongAttribute(rapidjson::Document *document, int ind, string attributeName);
+  std::string getStringAttribute(rapidjson::Document *document, int ind, std::string attributeName);
+  long getLongAttribute(rapidjson::Document *document, int ind, std::string attributeName);
   void browse(rapidjson::Document *document);
   void latest(rapidjson::Document *document);
   void latestFromTwoServers(rapidjson::Document *documentFirst, rapidjson::Document *documentSecond);
-  void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
+  void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
 
+  rapidjson::Document document; // should be moved to private
+
+  // UNCOMMENT SUBFOLDERS IN CCDBAPI
 
  private:
-  rapidjson::Document document;
 
 
   ClassDefNV(CCDBResponse, 1);
