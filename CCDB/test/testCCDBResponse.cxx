@@ -22,10 +22,10 @@ using namespace o2::ccdb;
 
 CCDBResponse parse(const char* reply)
 {
-  // std::string* responseAsStr = new std::string(reply);
-  // CCDBResponse ccdbResponse(*responseAsStr);
-  // free(responseAsStr);
-  // return ccdbResponse;
+  std::string* responseAsStr = new std::string(reply);
+  CCDBResponse::CCDBResponse ccdbResponse(*responseAsStr);
+  free(responseAsStr);
+  return ccdbResponse;
 }
 
 BOOST_AUTO_TEST_CASE(TestCCDBResponseFullResponse)

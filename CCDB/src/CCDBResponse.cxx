@@ -11,11 +11,10 @@ namespace o2
 namespace ccdb
 {
 
-CCDBResponse::CCDBResponse(const std::string& responseAsString)
+CCDBResponse::CCDBResponse(const std::string& jsonString)
 {
-  using namespace rapidjson;
-  Document jsonDocument;
-
+  rapidjson::Document jsonDocument;
+  jsonDocument.Parse(responseAsString.c_str());
 }
 
 const char* CCDBResponse::JsonToString(rapidjson::Document *document)
@@ -226,11 +225,6 @@ void CCDBResponse::latestFromTwoServers(rapidjson::Document *documentFirst, rapi
 
     removeObjects(documentSecond, toBeRemoved);
     mergeObjects(*documentFirst, *documentSecond, (*documentFirst).GetAllocator());
-}
-
-CCDBResponse::CCDBResponse(const std::string& responseAsString)
-{
-  document.Parse(responseAsString);
 }
 
 /**

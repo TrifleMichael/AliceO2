@@ -29,8 +29,7 @@ class CCDBResponse
 {
  public:
   CCDBResponse() = default;
-  CCDBResponse(const std::string &json);
-  //CCDBResponse(rapidjson::Document _document);
+  CCDBResponse(const std::string& jsonString);
   ~CCDBResponse() = default;
 
   const char *JsonToString(rapidjson::Document *document);
