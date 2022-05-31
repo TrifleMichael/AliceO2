@@ -28,27 +28,29 @@ namespace ccdb
 class CCDBResponse
 {
  public:
-  CCDBResponse() = default;
+  //CCDBResponse() = default;
   CCDBResponse(const std::string& jsonString);
+  //CCDBResponse(CCDBResponse& other);
   ~CCDBResponse() = default;
 
-  const char *JsonToString(rapidjson::Document *document);
-  void printObjectAttributes(rapidjson::Document *document);
+  //const char *JsonToString(rapidjson::Document *document);
+  //void printObjectAttributes(rapidjson::Document *document);
 
   void removeObject(rapidjson::Document *document, int ind);
-  int countObjects(rapidjson::Document *document);
+  int countObjects();
   bool mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &srcObject, rapidjson::Document::AllocatorType &allocator);
 
   std::string getStringAttribute(rapidjson::Document *document, int ind, std::string attributeName);
   long getLongAttribute(rapidjson::Document *document, int ind, std::string attributeName);
-  void browse(rapidjson::Document *document);
-  void latest(rapidjson::Document *document);
-  void latestFromTwoServers(rapidjson::Document *documentFirst, rapidjson::Document *documentSecond);
+  void browse();
+  void latest();
+  //void latestFromTwoServers(rapidjson::Document *documentFirst, rapidjson::Document *documentSecond);
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
+  std::string sanitizeObjectName(const std::string& objectName);
 
   rapidjson::Document document; // should be moved to private
 
-  // UNCOMMENT SUBFOLDERS IN CCDBAPI
+  // UNCOMMENT SUBFOLDERS AND PARSE SUBFOLDERS IN CCDBAPI
 
  private:
 

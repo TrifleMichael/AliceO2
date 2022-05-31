@@ -20,16 +20,23 @@
 
 using namespace o2::ccdb;
 
-CCDBResponse parse(const char* reply)
-{
-  std::string* responseAsStr = new std::string(reply);
-  CCDBResponse::CCDBResponse ccdbResponse(*responseAsStr);
-  free(responseAsStr);
-  return ccdbResponse;
-}
+// CCDBResponse parse(const char* reply)
+// {
+//   std::string* responseAsStr = new std::string(reply);
+//   CCDBResponse ccdbResponse(*responseAsStr);
+//   free(responseAsStr);
+//   return ccdbResponse;
+// }
 
 BOOST_AUTO_TEST_CASE(TestCCDBResponseFullResponse)
 {
+
+  std::string* responseAsStr = new std::string(fullResponse);
+  CCDBResponse ccdbResponse(*responseAsStr);
+  BOOST_CHECK(ccdbResponse.countObjects() == 3);
+  ccdbResponse.browse();
+  BOOST_CHECK(ccdbResponse.countObjects() == 1);
+
   // auto response = parse(fullResponse);
 
   // std::cout << "Objects: " << response.getObjects().size() << " ";
@@ -45,7 +52,6 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseFullResponse)
   // if (response.getSubFolders().size() == 1) {
   //   BOOST_CHECK(response.getSubFolders()[0] == "Users/g/grigoras/testing/grid");
   // }
-  BOOST_CHECK(1 == 1);
 }
 
 BOOST_AUTO_TEST_CASE(TestCCDBResponseEmptyResponse)

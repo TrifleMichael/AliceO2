@@ -1272,19 +1272,19 @@ namespace
 {
 void traverseAndFillFolders(CcdbApi const& api, std::string const& top, std::vector<std::string>& folders)
 {
-  // LOG(info) << "Querying " << top;
-  auto reply = api.list(top, true, "application/json");
-  folders.emplace_back(top);
-  // LOG(info) << reply;
-  auto subfolders = api.parseSubFolders(reply);
-  if (subfolders.size() > 0) {
-    // LOG(info) << subfolders.size() << " folders in " << top;
-    for (auto& sub : subfolders) {
-      traverseAndFillFolders(api, sub, folders);
-    }
-  } else {
-    // LOG(info) << "NO subfolders in " << top;
-  }
+  // // LOG(info) << "Querying " << top;
+  // auto reply = api.list(top, true, "application/json");
+  // folders.emplace_back(top);
+  // // LOG(info) << reply;
+  // auto subfolders = api.parseSubFolders(reply);
+  // if (subfolders.size() > 0) {
+  //   // LOG(info) << subfolders.size() << " folders in " << top;
+  //   for (auto& sub : subfolders) {
+  //     traverseAndFillFolders(api, sub, folders);
+  //   }
+  // } else {
+  //   // LOG(info) << "NO subfolders in " << top;
+  // }
 }
 } // namespace
 
