@@ -4,6 +4,8 @@
 #include <vector>
 #include <cstdio>
 #include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 #include <algorithm>
 
 using namespace rapidjson;
@@ -23,14 +25,14 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
 //   document.CopyFrom((*other).document, document.GetAllocator());
 // }
 
-// const char* CCDBResponse::JsonToString(rapidjson::Document *document)
-// {
-//   rapidjson::StringBuffer buffer;
-//   buffer.Clear();
-//   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-//   (*document).Accept(writer);
-//   return strdup( buffer.GetString() );
-// }
+const char* CCDBResponse::JsonToString(rapidjson::Document *document)
+{
+  rapidjson::StringBuffer buffer;
+  buffer.Clear();
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  (*document).Accept(writer);
+  return strdup( buffer.GetString() );
+}
 
 // void CCDBResponse::printObjectAttributes(rapidjson::Document *document)
 // {
@@ -136,9 +138,9 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
     }
 }
 
-std::string CCDBResponse::getStringAttribute(rapidjson::Document *document, int ind, std::string attributeName)
+std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 {
-    auto objArray = (*document)["objects"].GetArray();
+    auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
     if ( objArray.Size() <= ind )
     {
@@ -151,9 +153,9 @@ std::string CCDBResponse::getStringAttribute(rapidjson::Document *document, int 
     }
 }
 
-long CCDBResponse::getLongAttribute(rapidjson::Document *document, int ind, std::string attributeName)
+long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
 {
-    auto objArray = (*document)["objects"].GetArray();
+    auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
     if ( objArray.Size() <= ind )
     {
@@ -177,7 +179,7 @@ void CCDBResponse::browse()
     {
         for (int j = i + 1; j < length; j++)
         {
-            if (getStringAttribute(&document, i, "id").compare(getStringAttribute(&document, j, "id")) == 0)
+            if (getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
             {
                 toBeRemoved[j] = true;
             }
@@ -200,9 +202,9 @@ void CCDBResponse::latest()
     {
         for (int j = i + 1; j < length; j++)
         {
-            if (getStringAttribute(&document, i, "path").compare(getStringAttribute(&document, j, "path")) == 0)
+            if (getStringAttribute(i, "path").compare(getStringAttribute(j, "path")) == 0)
             {
-                if (getLongAttribute(&document, i, "createTime") > getLongAttribute(&document, j, "createTime"))
+                if (getLongAttribute(i, "createTime") > getLongAttribute(j, "createTime"))
                     toBeRemoved[j] = true;
                 else
                     toBeRemoved[i] = true;
@@ -212,26 +214,31 @@ void CCDBResponse::latest()
     removeObjects(&document, toBeRemoved);
 }
 
-// void CCDBResponse::latestFromTwoServers(rapidjson::Document *documentFirst, rapidjson::Document *documentSecond)
-// {
-//     latest(documentFirst);
-//     latest(documentSecond);
-//     int firstLength = (*documentFirst)["objects"].GetArray().Size();
-//     int secondLength = (*documentSecond)["objects"].GetArray().Size();
-//     std::vector<bool> toBeRemoved(secondLength, false);
+void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
+{
+    latest();
+    (*other).latest();
+    int thisLength = countObjects();
+    int otherLength = (*other).countObjects();
+    std::vector<bool> toBeRemoved(otherLength, false);
 
-//     for (int i = 0; i < firstLength; i++) {
-//         for (int j = 0; j < secondLength; j++) {
-//             if (getStringAttribute(documentFirst, i, "path").compare(getStringAttribute(documentSecond, j, "path")) == 0)
-//             {
-//                 toBeRemoved[j] = true;
-//             }
-//         }
-//     }
+    for (int i = 0; i < thisLength; i++) {
+        for (int j = 0; j < otherLength; j++) {
+            if (getStringAttribute(i, "path").compare((*other).getStringAttribute(j, "path")) == 0)
+            {
+                toBeRemoved[j] = true;
+            }
+        }
+    }
 
-//     removeObjects(documentSecond, toBeRemoved);
-//     mergeObjects(*documentFirst, *documentSecond, (*documentFirst).GetAllocator());
-// }
+    removeObjects(&((*other).getDocument()), toBeRemoved);
+    mergeObjects(document, &((*other).getDocument()), document.GetAllocator());
+}
+
+rapidjson::Document CCDBResponse::getDocument()
+{
+  return document;
+}
 
 /**
  * Keep only the alphanumeric characters plus '_' plus '/' from the string passed in argument.

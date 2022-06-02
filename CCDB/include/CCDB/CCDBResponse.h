@@ -33,19 +33,20 @@ class CCDBResponse
   //CCDBResponse(CCDBResponse& other);
   ~CCDBResponse() = default;
 
-  //const char *JsonToString(rapidjson::Document *document);
+  const char *JsonToString(rapidjson::Document *document);
   //void printObjectAttributes(rapidjson::Document *document);
 
   void removeObject(rapidjson::Document *document, int ind);
   int countObjects();
   bool mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &srcObject, rapidjson::Document::AllocatorType &allocator);
 
-  std::string getStringAttribute(rapidjson::Document *document, int ind, std::string attributeName);
-  long getLongAttribute(rapidjson::Document *document, int ind, std::string attributeName);
+  std::string getStringAttribute(int ind, std::string attributeName);
+  long getLongAttribute(int ind, std::string attributeName);
   void browse();
   void latest();
-  //void latestFromTwoServers(rapidjson::Document *documentFirst, rapidjson::Document *documentSecond);
+  void latestFromTwoServers(CCDBResponse* other);
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
+  rapidjson::Document getDocument();
   std::string sanitizeObjectName(const std::string& objectName);
 
   rapidjson::Document document; // should be moved to private
