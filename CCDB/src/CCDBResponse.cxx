@@ -215,6 +215,28 @@ void CCDBResponse::latest()
 }
 
 // concatenates other response into this response according to browse
+void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
+{
+    browse();
+    other->browse();
+    int thisLength = countObjects();
+    int otherLength = other->countObjects();
+    std::vector<bool> toBeRemoved(otherLength, false);
+
+    for (int i = 0; i < thisLength; i++) {
+        for (int j = 0; j < otherLength; j++) {
+            if (getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
+            {
+                toBeRemoved[j] = true;
+            }
+        }
+    }
+
+    removeObjects(other->getDocument(), toBeRemoved);
+    mergeObjects(document, *(other->getDocument()), document.GetAllocator());
+}
+
+// concatenates other response into this response according to latest
 void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 {
     latest();

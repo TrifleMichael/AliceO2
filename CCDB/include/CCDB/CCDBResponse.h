@@ -45,6 +45,7 @@ class CCDBResponse
   void browse();
   void latest();
   void latestFromTwoServers(CCDBResponse* other);
+  void browseFromTwoServers(CCDBResponse* other)
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
   rapidjson::Document *getDocument();
   std::string sanitizeObjectName(const std::string& objectName);
