@@ -53,18 +53,20 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseFullResponse)
   // ADD SUBFOLDER HANDLEING
 }
 
-BOOST_AUTO_TEST_CASE(TestCCDBResponseEmptyResponse)
+BOOST_AUTO_TEST_CASE(TestCCDBResponseConcatenate)
 {
-
   std::string* responseAsStr = new std::string(fullResponse);
-  CCDBResponse ccdbResponse(*responseAsStr);
-  BOOST_CHECK(ccdbResponse.countObjects() == 0);
-  
-  // auto response = parse(emptyResponse);
-
-  // std::cout << "Objects: " << response.getObjects().size() << " ";
-  // BOOST_CHECK(response.getObjects().size() == 0);
-
-  // std::cout << "Subfolders: " << response.getSubFolders().size() << " ";
-  // BOOST_CHECK(response.getSubFolders().size() == 0);
+  CCDBResponse ccdbResponse1(*responseAsStr);
+  ccdbResponse1.latest();
+  CCDBResponse ccdbResponse2(*responseAsStr);
+  ccdbResponse1.browseFromTwoServers(&ccdbResponse2);
+  BOOST_CHECK(ccdbResponse1.countObjects() == 3);
 }
+
+// BOOST_AUTO_TEST_CASE(TestCCDBResponseEmptyResponse)
+// {
+
+//   std::string* responseAsStr = new std::string(fullResponse);
+//   CCDBResponse ccdbResponse(*responseAsStr);
+//   BOOST_CHECK(ccdbResponse.countObjects() == 0);
+// }
