@@ -46,7 +46,7 @@ class CCDBResponse
   void latest();
   void latestFromTwoServers(CCDBResponse* other);
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
-  rapidjson::Document getDocument();
+  rapidjson::Document *getDocument();
   std::string sanitizeObjectName(const std::string& objectName);
 
   rapidjson::Document document; // should be moved to private

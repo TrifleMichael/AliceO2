@@ -214,30 +214,32 @@ void CCDBResponse::latest()
     removeObjects(&document, toBeRemoved);
 }
 
+// concatenates other response into this response according to browse
 void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 {
     latest();
-    (*other).latest();
+    other->latest();
     int thisLength = countObjects();
-    int otherLength = (*other).countObjects();
+    int otherLength = other->countObjects();
     std::vector<bool> toBeRemoved(otherLength, false);
 
     for (int i = 0; i < thisLength; i++) {
         for (int j = 0; j < otherLength; j++) {
-            if (getStringAttribute(i, "path").compare((*other).getStringAttribute(j, "path")) == 0)
+            if (getStringAttribute(i, "path").compare(other->getStringAttribute(j, "path")) == 0 
+                || getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
             {
                 toBeRemoved[j] = true;
             }
         }
     }
 
-    removeObjects(&((*other).getDocument()), toBeRemoved);
-    mergeObjects(document, &((*other).getDocument()), document.GetAllocator());
+    removeObjects(other->getDocument(), toBeRemoved);
+    mergeObjects(document, *(other->getDocument()), document.GetAllocator());
 }
 
-rapidjson::Document CCDBResponse::getDocument()
+rapidjson::Document *CCDBResponse::getDocument()
 {
-  return document;
+  return &document;
 }
 
 /**
