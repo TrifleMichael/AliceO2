@@ -14,8 +14,8 @@
 ///
 /// \author Philippe Pillot, Subatech
 
-#ifndef ALICEO2_MCH_TRACKFINDERSPEC_H_
-#define ALICEO2_MCH_TRACKFINDERSPEC_H_
+#ifndef O2_MCH_TRACKFINDERSPEC_H_
+#define O2_MCH_TRACKFINDERSPEC_H_
 
 #include "Framework/DataProcessorSpec.h"
 
@@ -24,9 +24,9 @@ namespace o2
 namespace mch
 {
 
-o2::framework::DataProcessorSpec getTrackFinderSpec(const char* specName = "mch-track-finder");
+o2::framework::DataProcessorSpec getTrackFinderSpec(const char* specName = "mch-track-finder", bool digits = false);
 
 } // end namespace mch
 } // end namespace o2
 
-#endif // ALICEO2_MCH_TRACKFINDERSPEC_H_
+#endif // O2_MCH_TRACKFINDERSPEC_H_

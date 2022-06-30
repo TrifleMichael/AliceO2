@@ -194,6 +194,13 @@ The writer will create a new CRU page with provided payload equipping it with th
 For further details see  ``ITSMFT/common/simulation/MC2RawEncoder`` class and the macro
 `Detectors/ITSMFT/ITS/macros/test/run_digi2rawVarPage_its.C` to steer the MC to raw data conversion.
 
+* Update: Use flag HBFUtils.obligatorySOR to start raw data from TF with SOX.
+
+If the HBFUtils.obligatorySOR==false (default) the MC->Raw converted data will start from the 1st TF containing data (i.e. corresponding to HBFUtils.firstOrbitSampled),
+the SOX in the RDH will be set only if this TF coincides with the 1st TF of the Run (defined by the HBFUtils.orbitFirst).
+With HBFUtils.obligatorySOR==true old behaviour will be preserved: the raw data will start from TF with HBFUtils.orbitFirst with SOX always set and for CRU detectors all HBFs/TFs between HBFUtils.orbitFirst and 1st non-empty HBF will be
+filled by dummy RDHs.
+
 ## RawFileReader
 
 A class for parsing raw data file(s) with "variable-size" CRU format.
@@ -365,13 +372,13 @@ Using `--cache-data` option one can force caching the data to memory during the 
 At every invocation of the device `processing` callback a full TimeFrame for every link will be added as a multi-part `FairMQ` message and relayed by the relevant channel.
 By default each HBF will start a new part in the multipart message. This behaviour can be changed by providing `part-per-sp` option, in which case there will be one part per superpage (Note that this is incompatible to the DPLRawSequencer).
 
-By the default the DataProcessingHeader of each message will have its creation time set to `now()`. This can be changed by passing an option `--start-time <t>`: in this case the creation time will be defined as `t + firstTForbir*orbit_duration` in milliseconds.
+By the default the DataProcessingHeader of each message will have its creation time set to `now()`. This can be changed by passing an option `--configKeyValues "HBFUtils.startTime=<t>"` with `t` being desired run start time in milliseconds: in this case the creation time will be defined as `t + (firstTForbit-HBFUtils.orbitFirst)*orbit_duration` in milliseconds.
 
 The standard use case of this workflow is to provide the input for other worfklows using the piping, e.g.
 ```cpp
 o2-raw-file-reader-workflow --input-conf myConf.cfg | o2-dpl-raw-parser
 ```
-Option `--raw-channel-config <confstring> forces the reader to send all data (single FairMQParts containing the whole TF) to raw FairMQ channel, emulating the messages from the DataDistribution.
+Option `--raw-channel-config <confstring> forces the reader to send all data (single `fair::mq::Parts` containing the whole TF) to raw FairMQ channel, emulating the messages from the DataDistribution.
 To inject such a data to DPL one should use a parallel process starting with `o2-dpl-raw-proxy`. An example (note `--session default` added to every executable):
 
 ```bash
@@ -527,6 +534,13 @@ list of detectors for which non-raw outputs (if any) are discarded.
 list of detectors for which raw outputs are discarded.
 
 The raw data will be propagated (if present) only if the detector is selected in `--onlyDet` and `NOT` selected in `--non-raw-only-det`. The non-raw data will be propagated (if defined for the given detector and present in the file) only if the detector is selected in `--onlyDet` and `NOT` selected in `--raw-only-det`.
+
+## TF rate limiting
+
+To apply TF rate limiting (i.e. make sure that no more than N TFs are in processing) provide `--timeframes-rate-limit <N> --timeframes-rate-limit-ipcid <IPCID>`
+too all workflows (e.g. via ARGS_ALL).
+The IPCID is the NUMA domain ID (usually 0 on non-EPN workflow).
+Additionally, one may throttle on the free SHM by providing an option to the reader `--timeframes-shm-limit <shm-size>`.
 
 ## Miscellaneous macros
 

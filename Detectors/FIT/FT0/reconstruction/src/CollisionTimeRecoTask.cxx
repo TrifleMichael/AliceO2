@@ -16,7 +16,7 @@
 #include "FairLogger.h" // for LOG
 #include "DataFormatsFT0/RecPoints.h"
 #include "FT0Base/Geometry.h"
-#include "FT0Simulation/DigitizationParameters.h"
+#include "FT0Base/FT0DigParam.h"
 #include <DataFormatsFT0/ChannelData.h>
 #include <DataFormatsFT0/Digit.h>
 #include <cmath>
@@ -37,13 +37,11 @@ o2::ft0::RecPoints CollisionTimeRecoTask::process(o2::ft0::Digit const& bcd,
   Int_t ndigitsC = 0, ndigitsA = 0;
 
   constexpr Int_t nMCPsA = 4 * Geometry::NCellsA;
-  //  constexpr Int_t nMCPsC = 4 * Geometry::NCellsC;
-  //  constexpr Int_t nMCPs = nMCPsA + nMCPsC;
 
   Float_t sideAtime = 0, sideCtime = 0;
 
   int nch = inChData.size();
-  const auto parInv = DigitizationParameters::Instance().mMV_2_NchannelsInverse;
+  const auto parInv = FT0DigParam::Instance().mMV_2_NchannelsInverse;
   for (int ich = 0; ich < nch; ich++) {
     int offsetChannel = getOffset(int(inChData[ich].ChId), inChData[ich].QTCAmpl);
     outChData[ich] = o2::ft0::ChannelDataFloat{inChData[ich].ChId,
@@ -52,7 +50,7 @@ o2::ft0::RecPoints CollisionTimeRecoTask::process(o2::ft0::Digit const& bcd,
                                                inChData[ich].ChainQTC};
 
     //  only signals with amplitude participate in collision time
-    if (outChData[ich].QTCAmpl > 0 && std::abs(outChData[ich].CFDTime) < 2000) {
+    if (outChData[ich].QTCAmpl > FT0DigParam::Instance().mAmpThresholdForReco && std::abs(outChData[ich].CFDTime) < FT0DigParam::Instance().mTimeThresholdForReco) {
       if (outChData[ich].ChId < nMCPsA) {
         sideAtime += outChData[ich].CFDTime;
         ndigitsA++;

@@ -12,15 +12,17 @@
 #ifndef FRAMEWORK_ANALYSISMANAGERS_H
 #define FRAMEWORK_ANALYSISMANAGERS_H
 #include "Framework/AnalysisHelpers.h"
+#include "Framework/DataSpecUtils.h"
 #include "Framework/GroupedCombinations.h"
-#include "Framework/Kernels.h"
 #include "Framework/ASoA.h"
 #include "Framework/ProcessingContext.h"
 #include "Framework/EndOfStreamContext.h"
 #include "Framework/HistogramRegistry.h"
+#include "Framework/CCDBParamSpec.h"
 #include "Framework/ConfigParamSpec.h"
 #include "Framework/ConfigParamRegistry.h"
 #include "Framework/ConfigurableHelpers.h"
+#include "Framework/Condition.h"
 #include "Framework/InitContext.h"
 #include "Framework/ConfigContext.h"
 #include "Framework/RootConfigParamHelpers.h"
@@ -38,17 +40,15 @@ struct GroupedCombinationManager {
   }
 };
 
-template <typename T1, typename GroupingPolicy, typename H, typename G, typename... Us, typename... As>
-struct GroupedCombinationManager<GroupedCombinationsGenerator<T1, GroupingPolicy, H, G, pack<Us...>, As...>> {
-  template <typename TH, typename TG, typename... T2s>
-  static void setGroupedCombination(GroupedCombinationsGenerator<T1, GroupingPolicy, H, G, pack<Us...>, As...>& comb, TH& hashes, TG& grouping, std::tuple<T2s...>& associated)
+template <typename T1, typename GroupingPolicy, typename BP, typename G, typename... As>
+struct GroupedCombinationManager<GroupedCombinationsGenerator<T1, GroupingPolicy, BP, G, As...>> {
+  template <typename TG, typename... T2s>
+  static void setGroupedCombination(GroupedCombinationsGenerator<T1, GroupingPolicy, BP, G, As...>& comb, TG& grouping, std::tuple<T2s...>& associated)
   {
     static_assert(sizeof...(T2s) > 0, "There must be associated tables in process() for a correct pair");
-    static_assert(!soa::is_soa_iterator_t<std::decay_t<H>>::value, "Only full tables can be in process(), no grouping");
-    if constexpr (std::conjunction_v<std::is_same<G, TG>, std::is_same<H, TH>>) {
-      // Take respective unique associated tables for grouping
-      auto associatedTuple = std::tuple<Us...>(std::get<Us>(associated)...);
-      comb.setTables(hashes, grouping, associatedTuple);
+    if constexpr (std::is_same_v<G, TG>) {
+      static_assert(std::conjunction_v<framework::has_type<As, pack<T2s...>>...>, "You didn't subscribed to all tables requested for mixing");
+      comb.setTables(grouping, associated);
     }
   }
 };
@@ -77,6 +77,11 @@ struct PartitionManager {
 
   static void updatePlaceholders(ANY&, InitContext&)
   {
+  }
+
+  static bool newDataframe(ANY&)
+  {
+    return false;
   }
 };
 
@@ -114,6 +119,12 @@ struct PartitionManager<Partition<T>> {
   {
     partition.updatePlaceholders(context);
   }
+
+  static bool newDataframe(Partition<T>& partition)
+  {
+    partition.dataframeChanged = true;
+    return true;
+  }
 };
 
 template <typename ANY>
@@ -140,6 +151,46 @@ struct FilterManager<expressions::Filter> {
   static bool updatePlaceholders(expressions::Filter& filter, InitContext& ctx)
   {
     expressions::updatePlaceholders(filter, ctx);
+    return true;
+  }
+};
+
+/// A manager which takes care of condition objects
+template <typename T>
+struct ConditionManager {
+  template <typename ANY>
+  static bool appendCondition(std::vector<InputSpec>& inputs, ANY& x)
+  {
+    if constexpr (std::is_base_of_v<ConditionGroup, ANY>) {
+      homogeneous_apply_refs<true>([&inputs](auto& y) { return ConditionManager<std::decay_t<decltype(y)>>::appendCondition(inputs, y); }, x);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  template <typename ANY>
+  static bool newDataframe(InputRecord& record, ANY& x)
+  {
+    if constexpr (std::is_base_of_v<ConfigurableGroup, ANY>) {
+      homogeneous_apply_refs<true>([&record](auto&& y) { return ConditionManager<std::decay_t<decltype(y)>>::newDataframe(record, y); }, x);
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+
+template <typename OBJ>
+struct ConditionManager<Condition<OBJ>> {
+  static bool appendCondition(std::vector<InputSpec>& inputs, Condition<OBJ>& what)
+  {
+    inputs.emplace_back(InputSpec{what.path, "AODC", compile_time_hash(what.path.c_str()), Lifetime::Condition, ccdbParamSpec(what.path)});
+    return true;
+  }
+  static bool newDataframe(InputRecord& inputs, Condition<OBJ>& what)
+  {
+    what.instance = (OBJ*)inputs.get<OBJ*>(what.path).get();
     return true;
   }
 };
@@ -250,13 +301,13 @@ struct OutputManager<OutputObj<T>> {
 
 /// Spawns specializations
 template <typename O>
-static auto extractOriginal(ProcessingContext& pc)
+static inline auto extractOriginal(ProcessingContext& pc)
 {
   return pc.inputs().get<TableConsumer>(aod::MetadataTrait<O>::metadata::tableLabel())->asArrowTable();
 }
 
 template <typename... Os>
-static std::vector<std::shared_ptr<arrow::Table>> extractOriginals(framework::pack<Os...>, ProcessingContext& pc)
+static inline std::vector<std::shared_ptr<arrow::Table>> extractOriginals(framework::pack<Os...>, ProcessingContext& pc)
 {
   return {extractOriginal<Os>(pc)...};
 }
@@ -271,14 +322,14 @@ struct OutputManager<Spawns<T>> {
 
   static bool prepare(ProcessingContext& pc, Spawns<T>& what)
   {
-    auto original_table = soa::ArrowHelpers::joinTables(extractOriginals(what.sources_pack(), pc));
-    if (original_table->schema()->fields().empty() == true) {
+    auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals(what.sources_pack(), pc));
+    if (originalTable->schema()->fields().empty() == true) {
       using base_table_t = typename Spawns<T>::base_table_t;
-      original_table = makeEmptyTable<base_table_t>(aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel());
+      originalTable = makeEmptyTable<base_table_t>(aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel());
     }
 
-    what.extension = std::make_shared<typename Spawns<T>::extension_t>(o2::framework::spawner(what.pack(), original_table.get(), aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel()));
-    what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), original_table}));
+    what.extension = std::make_shared<typename Spawns<T>::extension_t>(o2::framework::spawner(what.pack(), extractOriginals(what.sources_pack(), pc), aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel()));
+    what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), originalTable}));
     return true;
   }
 
@@ -400,15 +451,26 @@ struct ServiceManager<Service<T>> {
 template <typename T>
 struct OptionManager {
   template <typename ANY>
-  static bool appendOption(std::vector<ConfigParamSpec>&, ANY&)
+  static bool appendOption(std::vector<ConfigParamSpec>& options, ANY& x)
   {
-    return false;
+    /// Recurse, in case we are brace constructible
+    if constexpr (std::is_base_of_v<ConfigurableGroup, ANY>) {
+      homogeneous_apply_refs<true>([&options](auto& y) { return OptionManager<std::decay_t<decltype(y)>>::appendOption(options, y); }, x);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   template <typename ANY>
-  static bool prepare(InitContext&, ANY&)
+  static bool prepare(InitContext& ic, ANY& x)
   {
-    return false;
+    if constexpr (std::is_base_of_v<ConfigurableGroup, ANY>) {
+      homogeneous_apply_refs<true>([&ic](auto&& y) { return OptionManager<std::decay_t<decltype(y)>>::prepare(ic, y); }, x);
+      return true;
+    } else {
+      return false;
+    }
   }
 };
 
@@ -472,33 +534,14 @@ struct SpawnManager {
   static bool requestInputs(std::vector<InputSpec>&, T const&) { return false; }
 };
 
-namespace
-{
-void updateInputs(std::string type, bool value, std::vector<InputSpec>& inputs, InputSpec& spec)
-{
-  auto locate = std::find_if(inputs.begin(), inputs.end(), [&](InputSpec& input) { return input.binding == spec.binding; });
-  if (locate != inputs.end()) {
-    // amend entry
-    auto& entryMetadata = locate->metadata;
-    entryMetadata.push_back(ConfigParamSpec{std::string{"control:"} + type, VariantType::Bool, value, {"\"\""}});
-    std::sort(entryMetadata.begin(), entryMetadata.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name < b.name; });
-    auto new_end = std::unique(entryMetadata.begin(), entryMetadata.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name == b.name; });
-    entryMetadata.erase(new_end, entryMetadata.end());
-  } else {
-    //add entry
-    spec.metadata.push_back(ConfigParamSpec{std::string{"control:"} + type, VariantType::Bool, value, {"\"\""}});
-    inputs.emplace_back(spec);
-  }
-}
-} // namespace
-
 template <typename TABLE>
 struct SpawnManager<Spawns<TABLE>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
   {
     auto base_specs = spawns.base_specs();
-    for (auto& base_spec : base_specs) {
-      updateInputs("spawn", true, inputs, base_spec);
+    for (auto base_spec : base_specs) {
+      base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:spawn"}, VariantType::Bool, true, {"\"\""}});
+      DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
     }
     return true;
   }
@@ -515,13 +558,45 @@ struct IndexManager<Builds<IDX>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, Builds<IDX>& builds)
   {
     auto base_specs = builds.base_specs();
-    for (auto& base_spec : base_specs) {
-      updateInputs("build", true, inputs, base_spec);
+    for (auto base_spec : base_specs) {
+      base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:build"}, VariantType::Bool, true, {"\"\""}});
+      DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
     }
     return true;
   }
 };
 
+/// Manager template to handle slice caching
+template <typename T>
+struct PresliceManager {
+  template <typename T1>
+  static bool processTable(T&, T1&)
+  {
+    return false;
+  }
+
+  static bool setNewDF(T&) { return false; };
+};
+
+template <typename T>
+struct PresliceManager<Preslice<T>> {
+  template <typename T1>
+  static bool processTable(Preslice<T>& container, T1& table)
+  {
+    if constexpr (o2::soa::is_binding_compatible_v<T, std::decay_t<T1>>()) {
+      auto status = o2::framework::getSlices(container.index.name.c_str(), table.asArrowTable(), container.mValues, container.mCounts);
+      return status.ok();
+    } else {
+      return false;
+    }
+  }
+
+  static bool setNewDF(Preslice<T>& container)
+  {
+    container.setNewDF();
+    return true;
+  }
+};
 } // namespace o2::framework
 
 #endif // ANALYSISMANAGERS_H

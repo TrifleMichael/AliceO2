@@ -28,6 +28,7 @@
 #include "ITSMFTReconstruction/PixelReader.h"
 #include "DataFormatsITSMFT/ROFRecord.h"
 #include "ITSMFTReconstruction/PixelData.h"
+#include "ITSMFTReconstruction/GBTWord.h"
 
 namespace o2
 {
@@ -87,6 +88,7 @@ class RawPixelDecoder final : public PixelReader
   int getVerbosity() const { return mVerbosity; }
 
   void printReport(bool decstat = true, bool skipNoErr = true) const;
+  void produceRawDataDumps(int dump, const o2::header::DataHeader* dh);
 
   void clearStat();
 
@@ -102,6 +104,12 @@ class RawPixelDecoder final : public PixelReader
   void setNInstances(size_t n) { mNInstances = n; }
   auto getInstanceID() const { return mInstanceID; }
   auto getNInstances() const { return mNInstances; }
+
+  void setRawDumpDirectory(const std::string& s) { mRawDumpDirectory = s; }
+  auto getRawDumpDirectory() const { return mRawDumpDirectory; }
+
+  std::vector<GBTTrigger>& getExternalTriggers() { return mExtTriggers; }
+  const std::vector<GBTTrigger>& getExternalTriggers() const { return mExtTriggers; }
 
   struct LinkEntry {
     int entry = -1;
@@ -121,7 +129,9 @@ class RawPixelDecoder final : public PixelReader
   std::vector<RUDecodeData> mRUDecodeVec;                   // set of active RUs
   std::array<short, Mapping::getNRUs()> mRUEntry;           // entry of the RU with given SW ID in the mRUDecodeVec
   std::vector<ChipPixelData*> mOrderedChipsPtr;             // special ordering helper used for the MFT (its chipID is not contiguous in RU)
-  std::string mSelfName;                        // self name
+  std::vector<GBTTrigger> mExtTriggers;                     // external triggers
+  std::string mSelfName{};                                  // self name
+  std::string mRawDumpDirectory;                            // destination directory for dumps
   header::DataOrigin mUserDataOrigin = o2::header::gDataOriginInvalid; // alternative user-provided data origin to pick
   header::DataDescription mUserDataDescription = o2::header::gDataDescriptionInvalid; // alternative user-provided description to pick
   uint16_t mCurRUDecodeID = NORUDECODED;        // index of currently processed RUDecode container
@@ -138,6 +148,7 @@ class RawPixelDecoder final : public PixelReader
   uint32_t mNLinksDone = 0;                       // number of links reached end of data
   size_t mNChipsFired = 0;                        // global counter
   size_t mNPixelsFired = 0;                       // global counter
+  size_t mNExtTriggers = 0;                       // global counter
   size_t mInstanceID = 0;                         // pipeline instance
   size_t mNInstances = 1;                         // total number of pipelines
   TStopwatch mTimerTFStart;
@@ -181,14 +192,12 @@ int RawPixelDecoder<ChipMappingMFT>::fillDecodedDigits(DigitContainer& digits, R
   }
   mTimerFetchData.Start(false);
   int ref = digits.size();
-  while (!mOrderedChipsPtr.empty()) {
-    const auto& chipData = *mOrderedChipsPtr.back();
-    assert(mLastReadChipID < chipData.getChipID());
-    mLastReadChipID = chipData.getChipID();
-    for (const auto& hit : chipData.getData()) {
+  for (auto chipData = mOrderedChipsPtr.rbegin(); chipData != mOrderedChipsPtr.rend(); ++chipData) {
+    assert(mLastReadChipID < (*chipData)->getChipID());
+    mLastReadChipID = (*chipData)->getChipID();
+    for (const auto& hit : (*chipData)->getData()) {
       digits.emplace_back(mLastReadChipID, hit.getRow(), hit.getCol());
     }
-    mOrderedChipsPtr.pop_back();
   }
   int nFilled = digits.size() - ref;
   rofs.emplace_back(mInteractionRecord, mROFCounter, ref, nFilled);

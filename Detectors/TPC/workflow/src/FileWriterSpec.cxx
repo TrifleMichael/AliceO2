@@ -22,7 +22,7 @@
 
 #include "TTree.h"
 
-#include <FairMQDevice.h>
+#include <fairmq/Device.h>
 #include "Framework/Task.h"
 #include "Framework/RawDeviceService.h"
 #include "Framework/ControlService.h"
@@ -31,6 +31,7 @@
 #include "Framework/DataProcessorSpec.h"
 #include "Framework/WorkflowSpec.h"
 #include "Framework/InputRecordWalker.h"
+#include "Framework/DataTakingContext.h"
 
 #include "Headers/DataHeader.h"
 #include "CommonUtils/NameConf.h"
@@ -56,9 +57,10 @@ template <typename T>
 class FileWriterDevice : public Task
 {
  public:
-  FileWriterDevice(const BranchType branchType)
+  FileWriterDevice(const BranchType branchType, unsigned long sectorMask)
   {
     mBranchType = branchType;
+    mSectorMask = sectorMask;
   }
 
   void init(InitContext& ic) final
@@ -78,7 +80,7 @@ class FileWriterDevice : public Task
   {
     for (auto it = mCollectedData.begin(); it != mCollectedData.end();) {
       auto& dataStore = it->second;
-      if (!finalFill && !dataStore.received.all()) {
+      if (!finalFill && (dataStore.received.to_ulong() != mSectorMask)) {
         ++it;
         continue;
       }
@@ -88,16 +90,17 @@ class FileWriterDevice : public Task
       mFirstTForbit = dataStore.firstOrbit;
       mTFOrbits.emplace_back(mFirstTForbit);
 
-      LOGP(info, "Filling tree entry {} for run {}, tf {}, orbit {}, final {}, sectors {}", mNTFs, mRun, mPresentTF, mFirstTForbit, finalFill, dataStore.received.to_string());
+      LOGP(info, "Filling tree entry {} for run {}, tf {}, orbit {}, final {}, sectors {}, (expected: {})", mNTFs, mRun, mPresentTF, mFirstTForbit, finalFill, dataStore.received.to_string(), std::bitset<Sector::MAXSECTOR>(mSectorMask).to_string());
       auto& data = dataStore.data;
+      std::array<std::vector<T>*, Sector::MAXSECTOR> dataPtr;
       for (size_t sector = 0; sector < data.size(); ++sector) {
         auto& inData = data[sector];
-        auto dataPtr = &inData;
+        dataPtr[sector] = &inData;
 
         if (!mDataBranches[sector]) {
           mDataBranches[sector] = mTreeOut->Branch(fmt::format("{}_{}", BranchName.at(mBranchType), sector).data(), &inData);
         } else {
-          mDataBranches[sector]->SetAddress(&dataPtr);
+          mDataBranches[sector]->SetAddress(&dataPtr[sector]);
         }
       }
 
@@ -116,6 +119,12 @@ class FileWriterDevice : public Task
 
   void run(ProcessingContext& pc) final
   {
+    static bool initOnceDone = false;
+    if (!initOnceDone) {
+      initOnceDone = true;
+      mDataTakingContext = pc.services().get<DataTakingContext>();
+    }
+
     const std::string NAStr = "NA";
 
     const auto dh = DataRefUtils::getHeader<o2::header::DataHeader*>(pc.inputs().getFirstValid(true));
@@ -124,33 +133,6 @@ class FileWriterDevice : public Task
     mRun = processing_helpers::getRunNumber(pc);
     mPresentTF = dh->tfCounter;
     mFirstTForbit = dh->firstTForbit;
-
-    auto oldEnv = mEnvironmentID;
-    {
-      auto envN = pc.services().get<RawDeviceService>().device()->fConfig->GetProperty<std::string>("environment_id", NAStr);
-      if (envN != NAStr) {
-        mEnvironmentID = envN;
-      }
-    }
-    if ((oldRun != 0 && oldRun != mRun) || (!oldEnv.empty() && oldEnv != mEnvironmentID)) {
-      LOGP(warning, "RunNumber/Environment changed from {}/{} to {}/{}", oldRun, oldEnv, mRun, mEnvironmentID);
-      closeTreeAndFile();
-    }
-
-    // check for the LHCPeriod
-    if (mLHCPeriod.empty()) {
-      auto LHCPeriodStr = pc.services().get<RawDeviceService>().device()->fConfig->GetProperty<std::string>("LHCPeriod", NAStr);
-      if (LHCPeriodStr != NAStr) {
-        mLHCPeriod = LHCPeriodStr;
-      } else {
-        const char* months[12] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
-        time_t now = time(nullptr);
-        auto ltm = gmtime(&now);
-        mLHCPeriod = months[ltm->tm_mon];
-        LOG(warning) << "LHCPeriod is not available, using current month " << mLHCPeriod;
-      }
-      mLHCPeriod += fmt::format("_{}", DetID::getName(DetID::TPC));
-    }
 
     if (mWrite) {
       if (!mCollectedData.size() || mCollectedData.find(mPresentTF) == mCollectedData.end()) {
@@ -173,7 +155,9 @@ class FileWriterDevice : public Task
       if (dataStore.received.test(sector)) {
         LOGP(fatal, "data for sector {} and TF {} already received", sector, mPresentTF);
       }
-      dataStore.data[sector] = pc.inputs().get<std::vector<T>>(inputRef);
+      auto data = pc.inputs().get<std::vector<T>>(inputRef);
+      // LOGP(info, "Received data for sector {} with {} entries in TF {}, orbit {}", sector, data.size(), mPresentTF, mFirstTForbit);
+      dataStore.data[sector] = data;
       dataStore.received.set(sector);
       dataStore.firstOrbit = mFirstTForbit;
     }
@@ -205,14 +189,13 @@ class FileWriterDevice : public Task
   std::unique_ptr<TTree> mTreeOut;                         ///< output tree
   std::unique_ptr<FileMetaData> mFileMetaData;             ///< meta data file for eos and alien file creation
   std::string mOutDir{};                                   ///< file output direcotry
-  std::string mLHCPeriod{};                                ///< LHC period under which to register the data on eos and alien
   std::string mMetaFileDir{"/dev/null"};                   ///< output directory for meta data file
   std::string mCurrentFileName{};                          ///< current file name
   std::string mCurrentFileNameFull{};                      ///< current file name with full directory
-  std::string mEnvironmentID{};                            ///< partition env. id
   uint64_t mRun = 0;                                       ///< present run number
   uint32_t mPresentTF = 0;                                 ///< present TF number
   uint32_t mFirstTForbit = 0;                              ///< first orbit of present tf
+  unsigned long mSectorMask = 0xFFFFFFFFF;                 ///< mask of configured sectors
   size_t mNTFs = 0;                                        ///< total number of TFs accumulated in the current file
   size_t mNFiles = 0;                                      ///< total number of calibration files written
   int mMaxTFPerFile = 0;                                   ///< maximum number of TFs per file
@@ -220,7 +203,7 @@ class FileWriterDevice : public Task
   bool mWrite = true;                                      ///< write data
   bool mCreateRunEnvDir = true;                            ///< create the output directory structure?
   BranchType mBranchType;                                  ///< output branch type
-
+  o2::framework::DataTakingContext mDataTakingContext{};
   static constexpr std::string_view TMPFileEnding{".part"};
 
   void prepareTreeAndFile(const o2::header::DataHeader* dh);
@@ -255,8 +238,8 @@ void FileWriterDevice<T>::prepareTreeAndFile(const o2::header::DataHeader* dh)
     // ctfDir = mDirFallBack;
     // }
     // }
-    if (mCreateRunEnvDir && !mEnvironmentID.empty()) {
-      ctfDir += fmt::format("{}_{}/", mEnvironmentID, mRun);
+    if (mCreateRunEnvDir && !mDataTakingContext.envId.empty() && (mDataTakingContext.envId != o2::framework::DataTakingContext::UNKNOWN)) {
+      ctfDir += fmt::format("{}_{}/", mDataTakingContext.envId, mDataTakingContext.runNumber);
       if (!std::filesystem::exists(ctfDir)) {
         if (!std::filesystem::create_directories(ctfDir)) {
           throw std::runtime_error(fmt::format("Failed to create {} directory", ctfDir));
@@ -302,8 +285,7 @@ void FileWriterDevice<T>::closeTreeAndFile()
     // write  file metaFile data
     if (mStoreMetaFile) {
       mFileMetaData->fillFileData(mCurrentFileNameFull);
-      mFileMetaData->run = mRun;
-      mFileMetaData->LHCPeriod = mLHCPeriod;
+      mFileMetaData->setDataTakingContext(mDataTakingContext);
       mFileMetaData->type = "raw";
       auto metaFileNameTmp = fmt::format("{}{}.tmp", mMetaFileDir, mCurrentFileName);
       auto metaFileName = fmt::format("{}{}.done", mMetaFileDir, mCurrentFileName);
@@ -334,13 +316,13 @@ void FileWriterDevice<T>::closeTreeAndFile()
 }
 
 template <typename T>
-DataProcessorSpec getFileWriterSpec(const std::string inputSpec, const BranchType branchType)
+DataProcessorSpec getFileWriterSpec(const std::string inputSpec, const BranchType branchType, unsigned long sectorMask)
 {
   return DataProcessorSpec{
     "file-writer",
     select(inputSpec.data()),
     Outputs{},
-    AlgorithmSpec{adaptFromTask<FileWriterDevice<T>>(branchType)},
+    AlgorithmSpec{adaptFromTask<FileWriterDevice<T>>(branchType, sectorMask)},
     Options{
       {"output-dir", VariantType::String, "none", {" output directory, must exist"}},
       {"meta-output-dir", VariantType::String, "/dev/null", {" metadata output directory, must exist (if not /dev/null)"}},
@@ -350,6 +332,6 @@ DataProcessorSpec getFileWriterSpec(const std::string inputSpec, const BranchTyp
 }; // end DataProcessorSpec
 
 // template spacializations
-template o2::framework::DataProcessorSpec getFileWriterSpec<o2::tpc::Digit>(const std::string inputSpec, const BranchType branchType);
-template o2::framework::DataProcessorSpec getFileWriterSpec<o2::tpc::KrCluster>(const std::string inputSpec, const BranchType branchType);
+template o2::framework::DataProcessorSpec getFileWriterSpec<o2::tpc::Digit>(const std::string inputSpec, const BranchType branchType, unsigned long sectorMask);
+template o2::framework::DataProcessorSpec getFileWriterSpec<o2::tpc::KrCluster>(const std::string inputSpec, const BranchType branchType, unsigned long sectorMask);
 } // namespace o2::tpc

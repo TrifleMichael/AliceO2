@@ -20,6 +20,7 @@
 #include "CommonDataFormat/TimeStamp.h"
 #ifndef GPUCA_GPUCODE_DEVICE
 #include <iosfwd>
+#include <string>
 #include <type_traits>
 #endif
 
@@ -39,21 +40,21 @@ class VertexBase
                         kCovYZ,
                         kCovZZ };
   static constexpr int kNCov = 6;
-  GPUdDefault() VertexBase() = default;
-  GPUdDefault() ~VertexBase() = default;
+  GPUhdDefault() VertexBase() = default;
+  GPUhdDefault() ~VertexBase() = default;
   GPUd() VertexBase(const math_utils::Point3D<float>& pos, const gpu::gpustd::array<float, kNCov>& cov) : mPos(pos), mCov(cov)
   {
   }
 
-#ifndef GPUCA_GPUCODE_DEVICE
+#if !defined(GPUCA_NO_FMT) && !defined(GPUCA_GPUCODE_DEVICE)
   void print() const;
   std::string asString() const;
 #endif
 
   // getting the cartesian coordinates and errors
-  GPUd() float getX() const { return mPos.X(); }
-  GPUd() float getY() const { return mPos.Y(); }
-  GPUd() float getZ() const { return mPos.Z(); }
+  GPUhd() float getX() const { return mPos.X(); }
+  GPUhd() float getY() const { return mPos.Y(); }
+  GPUhd() float getZ() const { return mPos.Z(); }
   GPUd() float getSigmaX2() const { return mCov[kCovXX]; }
   GPUd() float getSigmaY2() const { return mCov[kCovYY]; }
   GPUd() float getSigmaZ2() const { return mCov[kCovZZ]; }
@@ -118,10 +119,10 @@ class Vertex : public VertexBase
     FlagsMask = 0xffff
   };
 
-  GPUdDefault() Vertex() = default;
-  GPUdDefault() ~Vertex() = default;
+  GPUhdDefault() Vertex() = default;
+  GPUhdDefault() ~Vertex() = default;
   GPUd() Vertex(const math_utils::Point3D<float>& pos, const gpu::gpustd::array<float, kNCov>& cov, ushort nCont, float chi2)
-    : VertexBase(pos, cov), mNContributors(nCont), mChi2(chi2)
+    : VertexBase(pos, cov), mChi2(chi2), mNContributors(nCont)
   {
   }
 
@@ -150,7 +151,7 @@ class Vertex : public VertexBase
   ClassDefNV(Vertex, 3);
 };
 
-#ifndef GPUCA_GPUCODE_DEVICE
+#if !defined(GPUCA_GPUCODE_DEVICE) && !defined(GPUCA_NO_FMT)
 std::ostream& operator<<(std::ostream& os, const o2::dataformats::VertexBase& v);
 #endif
 

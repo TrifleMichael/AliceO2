@@ -26,7 +26,7 @@
 #include "Headers/DataHeader.h"
 #include "TestClasses.h"
 #include "Framework/Logger.h"
-#include <fairmq/FairMQDevice.h>
+#include <fairmq/Device.h>
 #include <vector>
 #include <chrono>
 #include <cstring>
@@ -140,7 +140,7 @@ DataProcessorSpec getSourceSpec()
 
     // make a PMR std::vector, make it large to test the auto transport buffer resize funtionality as well
     Output pmrOutputSpec{"TST", "PMRTESTVECTOR", 0};
-    auto pmrvec = o2::vector<o2::test::TriviallyCopyable>(pc.outputs().getMemoryResource(pmrOutputSpec));
+    auto pmrvec = o2::pmr::vector<o2::test::TriviallyCopyable>(pc.outputs().getMemoryResource(pmrOutputSpec));
     pmrvec.reserve(100);
     pmrvec.emplace_back(o2::test::TriviallyCopyable{1, 2, 3});
     pc.outputs().adoptContainer(pmrOutputSpec, std::move(pmrvec));

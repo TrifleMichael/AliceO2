@@ -182,13 +182,15 @@ struct WorkflowHelpers {
   /// FIXME: moved here until we have proper plugin based amendment
   ///        of device injection
   static void addMissingOutputsToReader(std::vector<OutputSpec> const& providedOutputs,
-                                        std::vector<InputSpec> requestedInputs,
+                                        std::vector<InputSpec> const& requestedInputs,
                                         DataProcessorSpec& publisher);
-  static void addMissingOutputsToSpawner(std::vector<InputSpec>&& requestedDYNs,
+  static void addMissingOutputsToSpawner(std::vector<OutputSpec> const& providedSpecials,
+                                         std::vector<InputSpec> const& requestedSpecials,
                                          std::vector<InputSpec>& requestedAODs,
                                          DataProcessorSpec& publisher);
-  static void addMissingOutputsToBuilder(std::vector<InputSpec>&& requestedIDXs,
+  static void addMissingOutputsToBuilder(std::vector<InputSpec> const& requestedSpecials,
                                          std::vector<InputSpec>& requestedAODs,
+                                         std::vector<InputSpec>& requestedDYNs,
                                          DataProcessorSpec& publisher);
 
   // Final adjustments to @a workflow after service devices have been injected.

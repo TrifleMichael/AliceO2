@@ -7,14 +7,20 @@
 This is a top page for the MCH detector documentation.
 
 <!-- doxy
-\subpage refDetectorsMUONMCHContour
-\subpage refDetectorsMUONMCHClustering
 \subpage refDetectorsMUONMCHCTF
-\subpage refDetectorsMUONMCHRaw
-\subpage refDetectorsMUONMCHMapping
-\subpage refDetectorsMUONMCHTracking
-\subpage refDetectorsMUONMCHWorkflow
-\subpage refDetectorsMUONMCHGeometry
+\subpage refDetectorsMUONMCHCalibration
+\subpage refDetectorsMUONMCHClustering
 \subpage refDetectorsMUONMCHConditions
+\subpage refDetectorsMUONMCHContour
 \subpage refDetectorsMUONMCHDevIO
+\subpage refDetectorsMUONMCHDigitFiltering
+\subpage refDetectorsMUONMCHPreClustering
+\subpage refDetectorsMUONMCHROFFiltering
+\subpage refDetectorsMUONMCHTimeClustering
+\subpage refDetectorsMUONMCHGeometry
+\subpage refDetectorsMUONMCHMapping
+\subpage refDetectorsMUONMCHRaw
+\subpage refDetectorsMUONMCHTracking
+\subpage refDetectorsMUONMCHTriggering
+\subpage refDetectorsMUONMCHWorkflow
 /doxy -->

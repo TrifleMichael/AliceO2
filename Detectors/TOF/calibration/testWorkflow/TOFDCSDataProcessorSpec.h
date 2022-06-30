@@ -68,8 +68,6 @@ class TOFDCSDataProcessor : public o2::framework::Task
       std::string ccdbpath = ic.options().get<std::string>("ccdb-path");
       auto& mgr = CcdbManager::instance();
       mgr.setURL(ccdbpath);
-      CcdbApi api;
-      api.init(mgr.getURL());
       long ts = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
       std::unordered_map<DPID, std::string>* dpid2DataDesc = mgr.getForTimeStamp<std::unordered_map<DPID, std::string>>("TOF/Config/DCSDPconfig", ts);
       for (auto& i : *dpid2DataDesc) {
@@ -82,10 +80,10 @@ class TOFDCSDataProcessor : public o2::framework::Task
       std::vector<std::string> expaliases = o2::dcs::expandAliases(aliases);
       std::vector<std::string> expaliasesInt = o2::dcs::expandAliases(aliasesInt);
       for (const auto& i : expaliases) {
-        vect.emplace_back(i, o2::dcs::RAW_DOUBLE);
+        vect.emplace_back(i, o2::dcs::DPVAL_DOUBLE);
       }
       for (const auto& i : expaliasesInt) {
-        vect.emplace_back(i, o2::dcs::RAW_INT);
+        vect.emplace_back(i, o2::dcs::DPVAL_INT);
       }
     }
 
@@ -95,40 +93,89 @@ class TOFDCSDataProcessor : public o2::framework::Task
     }
 
     mProcessor = std::make_unique<o2::tof::TOFDCSProcessor>();
-    bool useVerboseMode = ic.options().get<bool>("use-verbose-mode");
-    LOG(info) << " ************************* Verbose?" << useVerboseMode;
-    if (useVerboseMode) {
-      mProcessor->useVerboseMode();
+    mVerboseModeDPs = ic.options().get<bool>("use-verbose-mode-DP");
+    mVerboseModeHVLV = ic.options().get<bool>("use-verbose-mode-HVLV");
+    LOG(info) << " ************************* Verbose DP?    " << mVerboseModeDPs;
+    LOG(info) << " ************************* Verbose HV/LV? " << mVerboseModeHVLV;
+    if (mVerboseModeDPs) {
+      mProcessor->useVerboseModeDP();
+    }
+    if (mVerboseModeHVLV) {
+      mProcessor->useVerboseModeHVLV();
     }
     mProcessor->init(vect);
     mTimer = HighResClock::now();
+    mReportTiming = ic.options().get<bool>("report-timing") || mVerboseModeDPs || mVerboseModeHVLV;
+    mStoreWhenAllDPs = ic.options().get<bool>("store-when-all-DPs-filled");
   }
 
   void run(o2::framework::ProcessingContext& pc) final
   {
-    auto tfid = o2::header::get<o2::framework::DataProcessingHeader*>(pc.inputs().get("input").header)->startTime;
-    auto dps = pc.inputs().get<gsl::span<DPCOM>>("input");
-    mProcessor->setTF(tfid);
-    mProcessor->process(dps);
+    TStopwatch sw;
     auto timeNow = HighResClock::now();
+
+    long dataTime = (long)(DataRefUtils::getHeader<DataProcessingHeader*>(pc.inputs().getFirstValid(true))->creation);
+    if (dataTime == 0xffffffffffffffff) {                                                                   // it means it is not set
+      dataTime = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow.time_since_epoch()).count(); // in ms
+    }
+    if (mProcessor->getStartValidityDPs() == o2::ccdb::CcdbObjectInfo::INFINITE_TIMESTAMP) {
+      if (mVerboseModeDPs) {
+        LOG(info) << "startValidity for DPs changed to = " << dataTime;
+      }
+      mProcessor->setStartValidityDPs(dataTime);
+    }
+    if (mProcessor->getStartValidityLV() == o2::ccdb::CcdbObjectInfo::INFINITE_TIMESTAMP) {
+      if (mVerboseModeHVLV) {
+        LOG(info) << "startValidity for LV changed to = " << dataTime;
+      }
+      mProcessor->setStartValidityLV(dataTime);
+    }
+    if (mProcessor->getStartValidityHV() == o2::ccdb::CcdbObjectInfo::INFINITE_TIMESTAMP) {
+      if (mVerboseModeHVLV) {
+        LOG(info) << "startValidity for HV changed to = " << dataTime;
+      }
+      mProcessor->setStartValidityHV(dataTime);
+    }
+    auto dps = pc.inputs().get<gsl::span<DPCOM>>("input");
+
+    mProcessor->process(dps);
     Duration elapsedTime = timeNow - mTimer; // in seconds
     if (elapsedTime.count() >= mDPsUpdateInterval) {
-      sendDPsoutput(pc.outputs());
-      mTimer = timeNow;
+      bool sendToCCDB = true;
+      if (mStoreWhenAllDPs) {
+        sendToCCDB = mProcessor->areAllDPsFilled();
+      }
+      if (sendToCCDB) {
+        sendDPsoutput(pc.outputs());
+        mTimer = timeNow;
+      } else {
+        LOG(debug) << "Not sending yet: mStoreWhenAllDPs = " << mStoreWhenAllDPs << ", mProcessor->areAllDPsFilled() = " << mProcessor->areAllDPsFilled() << ", sentToCCDB = " << sendToCCDB;
+      }
     }
     sendLVandHVoutput(pc.outputs());
+    sw.Stop();
+    if (mReportTiming) {
+      LOGP(info, "Timing CPU:{:.3e} Real:{:.3e} at slice {}", sw.CpuTime(), sw.RealTime(), pc.services().get<o2::framework::TimingInfo>().timeslice);
+    }
   }
 
   void endOfStream(o2::framework::EndOfStreamContext& ec) final
   {
+    if (!mProcessor->areAllDPsFilled()) {
+      LOG(debug) << "Not all DPs are filled, sending to CCDB what we have anyway";
+    }
     sendDPsoutput(ec.outputs());
     sendLVandHVoutput(ec.outputs());
   }
 
  private:
+  bool mReportTiming = false;
   std::unique_ptr<TOFDCSProcessor> mProcessor;
   HighResClock::time_point mTimer;
   int64_t mDPsUpdateInterval;
+  bool mStoreWhenAllDPs = false;
+  bool mVerboseModeDPs = false;
+  bool mVerboseModeHVLV = false;
 
   //________________________________________________________________
   void sendDPsoutput(DataAllocator& output)
@@ -143,6 +190,7 @@ class TOFDCSDataProcessor : public o2::framework::Task
     output.snapshot(Output{o2::calibration::Utils::gDataOriginCDBPayload, "TOF_DCSDPs", 0}, *image.get());
     output.snapshot(Output{o2::calibration::Utils::gDataOriginCDBWrapper, "TOF_DCSDPs", 0}, info);
     mProcessor->clearDPsinfo();
+    mProcessor->resetStartValidityDPs();
   }
 
   //________________________________________________________________
@@ -159,6 +207,7 @@ class TOFDCSDataProcessor : public o2::framework::Task
 
       output.snapshot(Output{o2::calibration::Utils::gDataOriginCDBPayload, "TOF_LVStatus", 0}, *image.get());
       output.snapshot(Output{o2::calibration::Utils::gDataOriginCDBWrapper, "TOF_LVStatus", 0}, info);
+      mProcessor->resetStartValidityLV();
     }
     if (mProcessor->isHVUpdated()) {
       const auto& payload = mProcessor->getHVStatus();
@@ -168,6 +217,7 @@ class TOFDCSDataProcessor : public o2::framework::Task
                 << " bytes, valid for " << info.getStartValidityTimestamp() << " : " << info.getEndValidityTimestamp();
       output.snapshot(Output{o2::calibration::Utils::gDataOriginCDBPayload, "TOF_HVStatus", 0}, *image.get());
       output.snapshot(Output{o2::calibration::Utils::gDataOriginCDBWrapper, "TOF_HVStatus", 0}, info);
+      mProcessor->resetStartValidityHV();
     }
   }
 
@@ -199,8 +249,11 @@ DataProcessorSpec getTOFDCSDataProcessorSpec()
     AlgorithmSpec{adaptFromTask<o2::tof::TOFDCSDataProcessor>()},
     Options{{"ccdb-path", VariantType::String, "http://localhost:8080", {"Path to CCDB"}},
             {"use-ccdb-to-configure", VariantType::Bool, false, {"Use CCDB to configure"}},
-            {"use-verbose-mode", VariantType::Bool, false, {"Use verbose mode"}},
-            {"DPs-update-interval", VariantType::Int64, 600ll, {"Interval (in s) after which to update the DPs CCDB entry"}}}};
+            {"use-verbose-mode-DP", VariantType::Bool, false, {"Use verbose mode for DPs"}},
+            {"use-verbose-mode-HVLV", VariantType::Bool, false, {"Use verbose mode for HV and LV"}},
+            {"report-timing", VariantType::Bool, false, {"Report timing for every slice"}},
+            {"DPs-update-interval", VariantType::Int64, 600ll, {"Interval (in s) after which to update the DPs CCDB entry"}},
+            {"store-when-all-DPs-filled", VariantType::Bool, false, {"Store CCDB entry only when all DPs have been filled (--> never re-use an old value)"}}}};
 }
 
 } // namespace framework

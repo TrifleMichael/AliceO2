@@ -11,14 +11,22 @@
 
 #include <vector>
 #include "Framework/ConfigParamSpec.h"
+#include "Framework/CompletionPolicyHelpers.h"
 #include "MCHWorkflow/TrackWriterSpec.h"
 
 using namespace o2::framework;
+
+void customize(std::vector<o2::framework::CompletionPolicy>& policies)
+{
+  // ordered policies for the writers
+  policies.push_back(CompletionPolicyHelpers::consumeWhenAllOrdered(".*(?:MCH|mch).*[W,w]riter.*"));
+}
 
 // we need to add workflow options before including Framework/runDataProcessing
 void customize(std::vector<ConfigParamSpec>& workflowOptions)
 {
   workflowOptions.emplace_back("enable-mc", VariantType::Bool, false, ConfigParamSpec::HelpString{"Propagate MC info"});
+  workflowOptions.emplace_back("digits", VariantType::Bool, false, ConfigParamSpec::HelpString{"Write associated digits"});
 }
 
 #include "Framework/runDataProcessing.h"
@@ -26,5 +34,6 @@ void customize(std::vector<ConfigParamSpec>& workflowOptions)
 WorkflowSpec defineDataProcessing(const ConfigContext& config)
 {
   bool useMC = config.options().get<bool>("enable-mc");
-  return WorkflowSpec{o2::mch::getTrackWriterSpec(useMC)};
+  bool digits = config.options().get<bool>("digits");
+  return WorkflowSpec{o2::mch::getTrackWriterSpec(useMC, "mch-track-writer", "mchtracks.root", digits)};
 }

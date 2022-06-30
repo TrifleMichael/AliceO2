@@ -31,9 +31,12 @@ struct TFReaderInp {
   std::string copyCmd{};
   std::string tffileRegex{};
   std::string remoteRegex{};
+  std::string metricChannel{};
   o2::detectors::DetID::mask_t detMask{};
   o2::detectors::DetID::mask_t detMaskRawOnly{};
   o2::detectors::DetID::mask_t detMaskNonRawOnly{};
+  size_t minSHM = 0;
+  int tfRateLimit = 0;
   int maxTFCache = 1;
   int maxFileCache = 1;
   int verbosity = 0;
@@ -41,6 +44,7 @@ struct TFReaderInp {
   int maxLoops = 0;
   int maxTFs = -1;
   bool sendDummyForMissing = true;
+  bool sup0xccdb = false;
   std::vector<o2::header::DataHeader> hdVec;
 };
 

@@ -22,13 +22,13 @@
 #include "SimulationDataFormat/MCTruthContainer.h"
 #include "DataFormatsParameters/GRPObject.h"
 #include "DataFormatsMID/ROFRecord.h"
-#include "MIDSimulation/ColumnDataMC.h"
+#include "DataFormatsMID/ColumnData.h"
 #include "MIDSimulation/Digitizer.h"
 #include "MIDSimulation/DigitsMerger.h"
 #include "MIDSimulation/ChamberResponse.h"
 #include "MIDSimulation/ChamberEfficiencyResponse.h"
 #include "MIDSimulation/Geometry.h"
-#include "MIDSimulation/MCLabel.h"
+#include "DataFormatsMID/MCLabel.h"
 
 using namespace o2::framework;
 using SubSpecificationType = o2::framework::DataAllocator::SubSpecificationType;
@@ -64,7 +64,7 @@ class MIDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     auto& irecords = context->getEventRecords();
 
     auto& eventParts = context->getEventParts();
-    std::vector<o2::mid::ColumnDataMC> digits, digitsAccum;
+    std::vector<o2::mid::ColumnData> digits, digitsAccum;
     std::vector<o2::mid::ROFRecord> rofRecords;
     o2::dataformats::MCTruthContainer<o2::mid::MCLabel> labels, labelsAccum;
 
@@ -91,9 +91,7 @@ class MIDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
         labelsAccum.mergeAtBack(labels);
       }
       auto nEntries = digitsAccum.size() - firstEntry;
-      if (nEntries > 0) {
-        rofRecords.emplace_back(irecords[collID], EventType::Standard, firstEntry, nEntries);
-      }
+      rofRecords.emplace_back(irecords[collID], EventType::Standard, firstEntry, nEntries);
     }
 
     mDigitsMerger.process(digitsAccum, labelsAccum, rofRecords);

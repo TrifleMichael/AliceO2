@@ -33,6 +33,7 @@ namespace o2
 namespace parameters
 {
 class GRPObject;
+class GRPMagField;
 }
 
 namespace dataformats
@@ -120,8 +121,10 @@ class PropagatorImpl
   PropagatorImpl& operator=(PropagatorImpl&&) = delete;
 
   // Bz at the origin
+  GPUd() void updateField();
   GPUd() value_type getNominalBz() const { return mBz; }
-
+  GPUd() void setTGeoFallBackAllowed(bool v) { mTGeoFallBackAllowed = v; }
+  GPUd() bool isTGeoFallBackAllowed() const { return mTGeoFallBackAllowed; }
   GPUd() void setMatLUT(const o2::base::MatLayerCylSet* lut) { mMatLUT = lut; }
   GPUd() const o2::base::MatLayerCylSet* getMatLUT() const { return mMatLUT; }
   GPUd() void setGPUField(const o2::gpu::GPUTPCGMPolynomialField* field) { mGPUField = field; }
@@ -136,6 +139,7 @@ class PropagatorImpl
     static PropagatorImpl instance(uninitialized);
     return &instance;
   }
+  static int initFieldFromGRP(const o2::parameters::GRPMagField* grp, bool verbose = false);
 
   static int initFieldFromGRP(const o2::parameters::GRPObject* grp, bool verbose = false);
   static int initFieldFromGRP(const std::string grpFileName = "", bool verbose = false);
@@ -160,6 +164,7 @@ class PropagatorImpl
   o2::field::MagneticField* mField = nullptr;          ///< External nominal field map
   value_type mBz = 0;                                  ///< nominal field
 
+  bool mTGeoFallBackAllowed = true;                            ///< allow fall back to TGeo if requested MatLUT is not available
   const o2::base::MatLayerCylSet* mMatLUT = nullptr;           // externally set LUT
   const o2::gpu::GPUTPCGMPolynomialField* mGPUField = nullptr; // externally set GPU Field
 
@@ -167,7 +172,7 @@ class PropagatorImpl
 };
 
 using PropagatorF = PropagatorImpl<float>;
-using PropatatorD = PropagatorImpl<double>;
+using PropagatorD = PropagatorImpl<double>;
 using Propagator = PropagatorF;
 
 } // namespace base

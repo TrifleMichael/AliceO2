@@ -16,8 +16,10 @@
 #include "ITSMFTReconstruction/RawPixelDecoder.h"
 #include "DPLUtils/DPLRawParser.h"
 #include "Framework/InputRecordWalker.h"
+#include "Framework/DataRefUtils.h"
 #include "CommonUtils/StringUtils.h"
 #include "CommonUtils/VerbosityConfig.h"
+#include <filesystem>
 
 #ifdef WITH_OPENMP
 #include <omp.h>
@@ -46,23 +48,23 @@ void RawPixelDecoder<Mapping>::printReport(bool decstat, bool skipNoErr) const
 {
   double cpu = 0, real = 0;
   auto& tmrS = const_cast<TStopwatch&>(mTimerTFStart);
-  LOGF(info, "%s Timing Start TF:  CPU = %.3e Real = %.3e in %d slots", mSelfName, tmrS.CpuTime(), tmrS.RealTime(), tmrS.Counter() - 1);
+  LOGP(info, "{} Timing Start TF:  CPU = {:.3e} Real = {:.3e} in {} slots", mSelfName, tmrS.CpuTime(), tmrS.RealTime(), tmrS.Counter() - 1);
   cpu += tmrS.CpuTime();
   real += tmrS.RealTime();
   auto& tmrD = const_cast<TStopwatch&>(mTimerDecode);
-  LOGF(info, "%s Timing Decode:    CPU = %.3e Real = %.3e in %d slots", mSelfName, tmrD.CpuTime(), tmrD.RealTime(), tmrD.Counter() - 1);
+  LOGP(info, "{} Timing Decode:    CPU = {:.3e} Real = {:.3e} in {} slots", mSelfName, tmrD.CpuTime(), tmrD.RealTime(), tmrD.Counter() - 1);
   cpu += tmrD.CpuTime();
   real += tmrD.RealTime();
   auto& tmrF = const_cast<TStopwatch&>(mTimerFetchData);
-  LOGF(info, "%s Timing FetchData: CPU = %.3e Real = %.3e in %d slots", mSelfName, tmrF.CpuTime(), tmrF.RealTime(), tmrF.Counter() - 1);
+  LOGP(info, "{} Timing FetchData: CPU = {:.3e} Real = {:.3e} in {} slots", mSelfName, tmrF.CpuTime(), tmrF.RealTime(), tmrF.Counter() - 1);
   cpu += tmrF.CpuTime();
   real += tmrF.RealTime();
-  LOGF(info, "%s Timing Total:     CPU = %.3e Real = %.3e in %d slots in %s mode", mSelfName, cpu, real, tmrS.Counter() - 1,
+  LOGP(info, "{} Timing Total:     CPU = {:.3e} Real = {:.3e} in {} slots in {} mode", mSelfName, cpu, real, tmrS.Counter() - 1,
        mDecodeNextAuto ? "AutoDecode" : "ExternalCall");
 
-  LOGF(important, "%s Decoded %zu hits in %zu non-empty chips in %u ROFs with %d threads", mSelfName, mNPixelsFired, mNChipsFired, mROFCounter, mNThreads);
+  LOGP(info, "{} decoded {} hits in {} non-empty chips in {} ROFs with {} threads, {} external triggers", mSelfName, mNPixelsFired, mNChipsFired, mROFCounter, mNThreads, mNExtTriggers);
   if (decstat) {
-    LOG(important) << "GBT Links decoding statistics" << (skipNoErr ? " (only links with errors are reported)" : "");
+    LOG(info) << "GBT Links decoding statistics" << (skipNoErr ? " (only links with errors are reported)" : "");
     for (auto& lnk : mGBTLinks) {
       lnk.statistics.print(skipNoErr);
       lnk.chipStat.print(skipNoErr);
@@ -80,11 +82,11 @@ int RawPixelDecoder<Mapping>::decodeNextTrigger()
   mNPixelsFiredROF = 0;
   mInteractionRecord.clear();
   int nLinksWithData = 0, nru = mRUDecodeVec.size();
+  size_t prevNTrig = mExtTriggers.size();
   do {
 #ifdef WITH_OPENMP
-    omp_set_num_threads(mNThreads);
-#pragma omp parallel for schedule(dynamic) reduction(+ \
-                                                     : nLinksWithData, mNChipsFiredROF, mNPixelsFiredROF)
+#pragma omp parallel for schedule(dynamic) num_threads(mNThreads) reduction(+ \
+                                                                            : nLinksWithData, mNChipsFiredROF, mNPixelsFiredROF)
 #endif
     for (int iru = 0; iru < nru; iru++) {
       nLinksWithData += decodeNextTrigger(iru);
@@ -115,7 +117,7 @@ int RawPixelDecoder<Mapping>::decodeNextTrigger()
     }
 
   } while (mNLinksDone < mGBTLinks.size());
-
+  mNExtTriggers += mExtTriggers.size() - prevNTrig;
   ensureChipOrdering();
   mTimerDecode.Stop();
   return nLinksWithData;
@@ -133,9 +135,11 @@ void RawPixelDecoder<Mapping>::startNewTF(InputRecord& inputs)
   }
   for (auto& ru : mRUDecodeVec) {
     ru.clear();
+    ru.linkHBFToDump.clear();
   }
   setupLinks(inputs);
   mNLinksDone = 0;
+  mExtTriggers.clear();
   mTimerTFStart.Stop();
 }
 
@@ -182,11 +186,12 @@ void RawPixelDecoder<Mapping>::setupLinks(InputRecord& inputs)
     std::vector<InputSpec> dummy{InputSpec{"dummy", ConcreteDataMatcher{origin, datadesc, 0xDEADBEEF}}};
     for (const auto& ref : InputRecordWalker(inputs, dummy)) {
       const auto dh = o2::framework::DataRefUtils::getHeader<o2::header::DataHeader*>(ref);
-      if (dh->payloadSize == 0) {
+      auto payloadSize = o2::framework::DataRefUtils::getPayloadSize(ref);
+      if (payloadSize == 0) {
         auto maxWarn = o2::conf::VerbosityConfig::Instance().maxWarnDeadBeef;
         if (++contDeadBeef <= maxWarn) {
-          LOGP(warning, "Found input [{}/{}/{:#x}] TF#{} 1st_orbit:{} Payload {} : assuming no payload for all links in this TF{}",
-               dh->dataOrigin.str, dh->dataDescription.str, dh->subSpecification, dh->tfCounter, dh->firstTForbit, dh->payloadSize,
+          LOGP(warn, "Found input [{}/{}/{:#x}] TF#{} 1st_orbit:{} Payload {} : assuming no payload for all links in this TF{}",
+               dh->dataOrigin.str, dh->dataDescription.str, dh->subSpecification, dh->tfCounter, dh->firstTForbit, payloadSize,
                contDeadBeef == maxWarn ? fmt::format(". {} such inputs in row received, stopping reporting", contDeadBeef) : "");
         }
         return;
@@ -197,7 +202,7 @@ void RawPixelDecoder<Mapping>::setupLinks(InputRecord& inputs)
 
   DPLRawParser parser(inputs, filter);
   uint32_t currSSpec = 0xffffffff; // dummy starting subspec
-  int linksAdded = 0;
+  int linksAdded = 0, linksSeen = 0;
   for (auto it = parser.begin(); it != parser.end(); ++it) {
     auto const* dh = it.o2DataHeader();
     auto& lnkref = mSubsSpec2LinkID[dh->subSpecification];
@@ -206,6 +211,7 @@ void RawPixelDecoder<Mapping>::setupLinks(InputRecord& inputs)
     if (lnkref.entry == -1) { // new link needs to be added
       lnkref.entry = int(mGBTLinks.size());
       auto& lnk = mGBTLinks.emplace_back(RDHUtils::getCRUID(rdh), RDHUtils::getFEEID(rdh), RDHUtils::getEndPointID(rdh), RDHUtils::getLinkID(rdh), lnkref.entry);
+      lnk.subSpec = dh->subSpecification;
       getCreateRUDecode(mMAP.FEEId2RUSW(RDHUtils::getFEEID(rdh))); // make sure there is a RU for this link
       lnk.verbosity = GBTLink::Verbosity(mVerbosity);
       lnk.format = mFormat;
@@ -216,13 +222,19 @@ void RawPixelDecoder<Mapping>::setupLinks(InputRecord& inputs)
     if (currSSpec != dh->subSpecification) { // this is the 1st part for this link in this TF, next parts must follow contiguously!!!
       link.clear(false, true);               // clear link data except statistics
       currSSpec = dh->subSpecification;
+      if (!linksSeen) { // designate 1st link to register triggers
+        link.extTrigVec = &mExtTriggers;
+      } else {
+        link.extTrigVec = nullptr;
+      }
     }
+    linksSeen++;
     link.cacheData(it.raw(), RDHUtils::getMemorySize(rdh));
   }
 
   if (linksAdded) { // new links were added, update link<->RU mapping, usually is done for 1st TF only
     if (nLinks) {
-      LOG(warning) << mSelfName << " New links appeared although the initialization was already done";
+      LOG(warn) << mSelfName << " New links appeared although the initialization was already done";
       for (auto& ru : mRUDecodeVec) { // reset RU->link references since they may have been changed
         memset(&ru.links[0], -1, RUDecodeData::MaxLinksPerRU * sizeof(int));
       }
@@ -405,6 +417,69 @@ void RawPixelDecoder<Mapping>::clearStat()
   // clear statistics
   for (auto& lnk : mGBTLinks) {
     lnk.clear(true, false);
+  }
+}
+
+///______________________________________________________________________
+template <class Mapping>
+void RawPixelDecoder<Mapping>::produceRawDataDumps(int dump, const o2::header::DataHeader* dh)
+{
+  bool dumpFullTF = false;
+  for (auto& ru : mRUDecodeVec) {
+    if (ru.linkHBFToDump.size()) {
+      if (dump == int(GBTLink::RawDataDumps::DUMP_TF)) {
+        dumpFullTF = true;
+        break;
+      }
+      for (auto it : ru.linkHBFToDump) {
+        if (dump == int(GBTLink::RawDataDumps::DUMP_HBF)) {
+          const auto& lnk = mGBTLinks[mSubsSpec2LinkID[it.first >> 32].entry];
+          int entry = it.first & 0xffffffff;
+          bool allHBFs = false;
+          std::string fnm;
+          if (entry >= lnk.rawData.getNPieces()) {
+            allHBFs = true;
+            entry = 0;
+            fnm = fmt::format("{}{}rawdump_{}_run{}_tf_orb{}_full_feeID{:#06x}.raw", mRawDumpDirectory, mRawDumpDirectory.empty() ? "" : "/",
+                              Mapping::getName(), dh->runNumber, dh->firstTForbit, lnk.feeID);
+          } else {
+            fnm = fmt::format("{}{}rawdump_{}_run{}_tf_orb{}_hbf_orb{}_feeID{:#06x}.raw", mRawDumpDirectory, mRawDumpDirectory.empty() ? "" : "/",
+                              Mapping::getName(), dh->runNumber, dh->firstTForbit, it.second, lnk.feeID);
+          }
+          std::ofstream ostrm(fnm, std::ios::binary);
+          if (!ostrm.good()) {
+            LOG(error) << "failed to open " << fnm;
+            continue;
+          }
+          while (entry < lnk.rawData.getNPieces()) {
+            const auto* piece = lnk.rawData.getPiece(entry);
+            if (!allHBFs && RDHUtils::getHeartBeatOrbit(reinterpret_cast<const RDH*>(piece->data)) != it.second) {
+              break;
+            }
+            ostrm.write(reinterpret_cast<const char*>(piece->data), piece->size);
+            entry++;
+          }
+          LOG(info) << "produced " << std::filesystem::current_path().c_str() << '/' << fnm;
+        }
+      }
+    }
+  }
+  while (dumpFullTF) {
+    std::string fnm = fmt::format("rawdump_{}_run{}_tf_orb{}_full.raw",
+                                  Mapping::getName(), dh->runNumber, dh->firstTForbit);
+    std::ofstream ostrm(fnm, std::ios::binary);
+    if (!ostrm.good()) {
+      LOG(error) << "failed to open " << fnm;
+      break;
+    }
+    for (const auto& lnk : mGBTLinks) {
+      for (size_t i = 0; i < lnk.rawData.getNPieces(); i++) {
+        const auto* piece = lnk.rawData.getPiece(i);
+        ostrm.write(reinterpret_cast<const char*>(piece->data), piece->size);
+      }
+    }
+    LOG(info) << "produced " << std::filesystem::current_path().c_str() << '/' << fnm;
+    break;
   }
 }
 

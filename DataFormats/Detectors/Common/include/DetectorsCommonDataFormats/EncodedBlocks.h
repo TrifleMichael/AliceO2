@@ -27,6 +27,7 @@
 #include "CommonUtils/StringUtils.h"
 #include "Framework/Logger.h"
 #include "DetectorsCommonDataFormats/CTFDictHeader.h"
+#include "DetectorsCommonDataFormats/CTFIOSize.h"
 
 namespace o2
 {
@@ -121,6 +122,8 @@ struct Metadata {
   int nDataWords = 0;
   int nLiteralWords = 0;
 
+  size_t getUncompressedSize() const { return messageLength * messageWordSize; }
+  size_t getCompressedSize() const { return (nDictWords + nDataWords + nLiteralWords) * streamSize; }
   void clear()
   {
     min = max = 0;
@@ -358,13 +361,12 @@ class EncodedBlocks
     return mBlocks[i];
   }
 
-  auto getFrequencyTable(int i) const
+  o2::rans::RenormedFrequencyTable getFrequencyTable(int i) const
   {
-    o2::rans::FrequencyTable ft;
-    const auto& bl = getBlock(i);
-    const auto& md = getMetadata(i);
-    ft.addFrequencies(bl.getDict(), bl.getDict() + bl.getNDict(), md.min, md.max);
-    return ft;
+    const auto& block = getBlock(i);
+    const auto& metadata = getMetadata(i);
+    rans::FrequencyTable frequencyTable{block.getDict(), block.getDict() + block.getNDict(), metadata.min};
+    return rans::renorm(std::move(frequencyTable), metadata.probabilityBits);
   }
 
   void setANSHeader(const ANSHeader& h) { mANSHeader = h; }
@@ -377,10 +379,10 @@ class EncodedBlocks
 
   /// cast arbitrary buffer head to container class. Head is supposed to respect the alignment
   static auto get(void* head) { return reinterpret_cast<EncodedBlocks*>(head); }
-  static const auto get(const void* head) { return reinterpret_cast<const EncodedBlocks*>(head); }
+  static auto get(const void* head) { return reinterpret_cast<const EncodedBlocks*>(head); }
 
   /// get const image of the container wrapper, with pointers in the image relocated to new head
-  static const auto getImage(const void* newHead);
+  static auto getImage(const void* newHead);
 
   /// create container from arbitrary buffer of predefined size (in bytes!!!). Head is supposed to respect the alignment
   static auto create(void* head, size_t sz);
@@ -433,22 +435,22 @@ class EncodedBlocks
 
   /// encode vector src to bloc at provided slot
   template <typename VE, typename buffer_T>
-  inline void encode(const VE& src, int slot, uint8_t symbolTablePrecision, Metadata::OptStore opt, buffer_T* buffer = nullptr, const void* encoderExt = nullptr, float memfc = 1.f)
+  inline o2::ctf::CTFIOSize encode(const VE& src, int slot, uint8_t symbolTablePrecision, Metadata::OptStore opt, buffer_T* buffer = nullptr, const void* encoderExt = nullptr, float memfc = 1.f)
   {
-    encode(std::begin(src), std::end(src), slot, symbolTablePrecision, opt, buffer, encoderExt, memfc);
+    return encode(std::begin(src), std::end(src), slot, symbolTablePrecision, opt, buffer, encoderExt, memfc);
   }
 
   /// encode vector src to bloc at provided slot
   template <typename input_IT, typename buffer_T>
-  void encode(const input_IT srcBegin, const input_IT srcEnd, int slot, uint8_t symbolTablePrecision, Metadata::OptStore opt, buffer_T* buffer = nullptr, const void* encoderExt = nullptr, float memfc = 1.f);
+  o2::ctf::CTFIOSize encode(const input_IT srcBegin, const input_IT srcEnd, int slot, uint8_t symbolTablePrecision, Metadata::OptStore opt, buffer_T* buffer = nullptr, const void* encoderExt = nullptr, float memfc = 1.f);
 
   /// decode block at provided slot to destination vector (will be resized as needed)
   template <class container_T, class container_IT = typename container_T::iterator>
-  void decode(container_T& dest, int slot, const void* decoderExt = nullptr) const;
+  o2::ctf::CTFIOSize decode(container_T& dest, int slot, const void* decoderExt = nullptr) const;
 
   /// decode block at provided slot to destination pointer, the needed space assumed to be available
   template <typename D_IT, std::enable_if_t<detail::is_iterator_v<D_IT>, bool> = true>
-  void decode(D_IT dest, int slot, const void* decoderExt = nullptr) const;
+  o2::ctf::CTFIOSize decode(D_IT dest, int slot, const void* decoderExt = nullptr) const;
 
   /// create a special EncodedBlocks containing only dictionaries made from provided vector of frequency tables
   static std::vector<char> createDictionaryBlocks(const std::vector<o2::rans::FrequencyTable>& vfreq, const std::vector<Metadata>& prbits);
@@ -691,7 +693,7 @@ void EncodedBlocks<H, N, W>::clear()
 ///_____________________________________________________________________________
 /// get const image of the container wrapper, with pointers in the image relocated to new head
 template <typename H, int N, typename W>
-const auto EncodedBlocks<H, N, W>::getImage(const void* newHead)
+auto EncodedBlocks<H, N, W>::getImage(const void* newHead)
 {
   auto image(*get(newHead)); // 1st make a shalow copy
   // now fix its pointers
@@ -733,7 +735,8 @@ void EncodedBlocks<H, N, W>::print(const std::string& prefix, int verbosity) con
   if (verbosity > 0) {
     LOG(info) << prefix << "Container of " << N << " blocks, size: " << size() << " bytes, unused: " << getFreeSize();
     for (int i = 0; i < N; i++) {
-      LOG(info) << "Block " << i << " for " << mMetadata[i].messageLength << " message words of " << mMetadata[i].messageWordSize << " bytes |"
+      LOG(info) << "Block " << i << " for " << static_cast<uint32_t>(mMetadata[i].messageLength) << " message words of "
+                << static_cast<uint32_t>(mMetadata[i].messageWordSize) << " bytes |"
                 << " NDictWords: " << mBlocks[i].getNDict() << " NDataWords: " << mBlocks[i].getNData()
                 << " NLiteralWords: " << mBlocks[i].getNLiterals();
     }
@@ -753,20 +756,20 @@ void EncodedBlocks<H, N, W>::print(const std::string& prefix, int verbosity) con
 ///_____________________________________________________________________________
 template <typename H, int N, typename W>
 template <class container_T, class container_IT>
-inline void EncodedBlocks<H, N, W>::decode(container_T& dest,            // destination container
-                                           int slot,                     // slot of the block to decode
-                                           const void* decoderExt) const // optional externally provided decoder
+inline o2::ctf::CTFIOSize EncodedBlocks<H, N, W>::decode(container_T& dest,            // destination container
+                                                         int slot,                     // slot of the block to decode
+                                                         const void* decoderExt) const // optional externally provided decoder
 {
   dest.resize(mMetadata[slot].messageLength); // allocate output buffer
-  decode(std::begin(dest), slot, decoderExt);
+  return decode(std::begin(dest), slot, decoderExt);
 }
 
 ///_____________________________________________________________________________
 template <typename H, int N, typename W>
 template <typename D_IT, std::enable_if_t<detail::is_iterator_v<D_IT>, bool>>
-void EncodedBlocks<H, N, W>::decode(D_IT dest,                    // iterator to destination
-                                    int slot,                     // slot of the block to decode
-                                    const void* decoderExt) const // optional externally provided decoder
+o2::ctf::CTFIOSize EncodedBlocks<H, N, W>::decode(D_IT dest,                    // iterator to destination
+                                                  int slot,                     // slot of the block to decode
+                                                  const void* decoderExt) const // optional externally provided decoder
 {
   // get references to the right data
   const auto& block = mBlocks[slot];
@@ -784,15 +787,13 @@ void EncodedBlocks<H, N, W>::decode(D_IT dest,                    // iterator to
       const o2::rans::LiteralDecoder64<dest_t>* decoder = reinterpret_cast<const o2::rans::LiteralDecoder64<dest_t>*>(decoderExt);
       std::unique_ptr<o2::rans::LiteralDecoder64<dest_t>> decoderLoc;
       if (block.getNDict()) { // if dictionaty is saved, prefer it
-        o2::rans::FrequencyTable frequencies;
-        frequencies.addFrequencies(block.getDict(), block.getDict() + block.getNDict(), md.min, md.max);
-        decoderLoc = std::make_unique<o2::rans::LiteralDecoder64<dest_t>>(frequencies, md.probabilityBits);
+        decoderLoc = std::make_unique<o2::rans::LiteralDecoder64<dest_t>>(this->getFrequencyTable(slot));
         decoder = decoderLoc.get();
       } else { // verify that decoded corresponds to stored metadata
-        if (md.min != decoder->getMinSymbol() || md.max != decoder->getMaxSymbol()) {
-          LOG(error) << "Mismatch between min=" << md.min << "/" << md.max << " symbols in metadata and those in external decoder "
-                     << decoder->getMinSymbol() << "/" << decoder->getMaxSymbol() << " for slot " << slot;
-          throw std::runtime_error("Mismatch between min/max symbols in metadata and those in external decoder");
+        if (md.min != decoder->getMinSymbol()) {
+          LOG(error) << "Mismatch between min=" << md.min << " symbol in metadata and those in external decoder "
+                     << decoder->getMinSymbol() << " for slot " << slot;
+          throw std::runtime_error("Mismatch between min symbol in metadata and the one in external decoder");
         }
       }
       // load incompressible symbols if they existed
@@ -809,22 +810,23 @@ void EncodedBlocks<H, N, W>::decode(D_IT dest,                    // iterator to
       destPtr_t srcBegin = reinterpret_cast<destPtr_t>(block.payload);
       destPtr_t srcEnd = srcBegin + md.messageLength * sizeof(dest_t);
       std::copy(srcBegin, srcEnd, dest);
-      //std::memcpy(dest, block.payload, md.messageLength * sizeof(dest_t));
+      // std::memcpy(dest, block.payload, md.messageLength * sizeof(dest_t));
     }
   }
+  return {0, md.getUncompressedSize(), md.getCompressedSize()};
 }
 
 ///_____________________________________________________________________________
 template <typename H, int N, typename W>
 template <typename input_IT, typename buffer_T>
-void EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator begin of source message
-                                    const input_IT srcEnd,        // iterator end of source message
-                                    int slot,                     // slot in encoded data to fill
-                                    uint8_t symbolTablePrecision, // encoding into
-                                    Metadata::OptStore opt,       // option for data compression
-                                    buffer_T* buffer,             // optional buffer (vector) providing memory for encoded blocks
-                                    const void* encoderExt,       // optional external encoder
-                                    float memfc)                  // memory allocation margin factor
+o2::ctf::CTFIOSize EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator begin of source message
+                                                  const input_IT srcEnd,        // iterator end of source message
+                                                  int slot,                     // slot in encoded data to fill
+                                                  uint8_t symbolTablePrecision, // encoding into
+                                                  Metadata::OptStore opt,       // option for data compression
+                                                  buffer_T* buffer,             // optional buffer (vector) providing memory for encoded blocks
+                                                  const void* encoderExt,       // optional external encoder
+                                                  float memfc)                  // memory allocation margin factor
 {
 
   using storageBuffer_t = W;
@@ -835,7 +837,7 @@ void EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator be
 
   // assert at compile time that output types align so that padding is not necessary.
   static_assert(std::is_same_v<storageBuffer_t, ransStream_t>);
-  static_assert(std::is_same_v<storageBuffer_t, typename rans::FrequencyTable::count_t>);
+  static_assert(std::is_same_v<storageBuffer_t, typename rans::count_t>);
 
   // fill a new block
   assert(slot == mRegistry.nFilledBlocks);
@@ -850,7 +852,7 @@ void EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator be
   // case 1: empty source message
   if (messageLength == 0) {
     mMetadata[slot] = Metadata{0, 0, sizeof(input_t), sizeof(ransState_t), sizeof(ransStream_t), symbolTablePrecision, Metadata::OptStore::NODATA, 0, 0, 0, 0, 0};
-    return;
+    return {};
   }
 
   auto* thisBlock = &mBlocks[slot];
@@ -882,9 +884,9 @@ void EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator be
       if (encoderExt) {
         return std::make_tuple(ransEncoder_t{}, rans::FrequencyTable{});
       } else {
-        rans::FrequencyTable frequencyTable{};
-        frequencyTable.addSamples(srcBegin, srcEnd);
-        return std::make_tuple(ransEncoder_t{frequencyTable, symbolTablePrecision}, frequencyTable);
+        rans::FrequencyTable frequencyTable = rans::makeFrequencyTableFromSamples(srcBegin, srcEnd);
+        RenormedFrequencyTable renormedFrequencyTable = rans::renorm(frequencyTable, symbolTablePrecision);
+        return std::make_tuple(ransEncoder_t{renormedFrequencyTable}, frequencyTable);
       }
     }();
     ransEncoder_t const* const encoder = encoderExt ? reinterpret_cast<ransEncoder_t const* const>(encoderExt) : &inplaceEncoder;
@@ -894,8 +896,8 @@ void EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator be
     // preliminary expansion of storage based on dict size + estimated size of encode buffer
     dataSize = SizeEstMarginAbs + int(SizeEstMarginRel * (dataSize / sizeof(storageBuffer_t))) + (sizeof(input_t) < sizeof(storageBuffer_t)); // size in words of output stream
     expandStorage(frequencyTable.size() + dataSize);
-    //store dictionary first
-    if (frequencyTable.size()) {
+    // store dictionary first
+    if (!frequencyTable.empty()) {
       thisBlock->storeDict(frequencyTable.size(), frequencyTable.data());
       LOGP(debug, "StoreDict {} bytes, offs: {}:{}", frequencyTable.size() * sizeof(W), thisBlock->getOffsDict(), thisBlock->getOffsDict() + frequencyTable.size() * sizeof(W));
     }
@@ -943,8 +945,8 @@ void EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator be
                              dataSize,
                              static_cast<int32_t>(nLiteralWords)};
   } else { // store original data w/o EEncoding
-    //FIXME(milettri): we should be able to do without an intermediate vector;
-    // provided iterator is not necessarily pointer, need to use intermediate vector!!!
+    // FIXME(milettri): we should be able to do without an intermediate vector;
+    //  provided iterator is not necessarily pointer, need to use intermediate vector!!!
 
     // introduce padding in case literals don't align;
     const size_t nSourceElemsPadded = calculatePaddedSize<input_t, storageBuffer_t>(messageLength);
@@ -953,10 +955,11 @@ void EncodedBlocks<H, N, W>::encode(const input_IT srcBegin,      // iterator be
 
     const size_t nBufferElems = calculateNDestTElements<input_t, storageBuffer_t>(messageLength);
     expandStorage(nBufferElems);
-    thisBlock->storeData(thisMetadata->nDataWords, reinterpret_cast<const storageBuffer_t*>(tmp.data()));
+    thisBlock->storeData(nBufferElems, reinterpret_cast<const storageBuffer_t*>(tmp.data()));
 
     *thisMetadata = Metadata{messageLength, 0, sizeof(input_t), sizeof(ransState_t), sizeof(storageBuffer_t), symbolTablePrecision, opt, 0, 0, 0, static_cast<int>(nBufferElems), 0};
   }
+  return {0, thisMetadata->getUncompressedSize(), thisMetadata->getCompressedSize()};
 }
 
 /// create a special EncodedBlocks containing only dictionaries made from provided vector of frequency tables

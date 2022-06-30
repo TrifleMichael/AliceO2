@@ -24,6 +24,7 @@
 #include "Framework/WorkflowSpec.h"
 #include "CCDB/CcdbApi.h"
 #include "CCDB/CcdbObjectInfo.h"
+#include "CommonUtils/NameConf.h"
 
 #include "TPCWorkflow/ProcessingHelpers.h"
 
@@ -102,13 +103,13 @@ class CalibLaserTracksDevice : public o2::framework::Task
     auto image = o2::ccdb::CcdbApi::createObjectImage(&ltrCalib, &w);
 
     md = w.getMetaData();
-    md["runNumber"] = std::to_string(mRunNumber);
+    md[o2::base::NameConf::CCDBRunTag.data()] = std::to_string(mRunNumber);
     w.setMetaData(md);
 
     const auto now = std::chrono::system_clock::now();
     const long timeStart = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     //const auto timeStart = ltrCalib.firstTime; //TODO: use once it is a correct time not TFid
-    const long timeEnd = 99999999999999;
+    const long timeEnd = o2::ccdb::CcdbObjectInfo::INFINITE_TIMESTAMP;
 
     w.setPath("TPC/Calib/LaserTracks");
     w.setStartValidityTimestamp(timeStart);

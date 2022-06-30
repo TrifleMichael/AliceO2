@@ -15,11 +15,13 @@
 #include "SimulationDataFormat/MCTruthContainer.h"
 #include "Framework/ControlService.h"
 #include "Framework/Logger.h"
+#include "Framework/CCDBParamSpec.h"
 #include "FT0Workflow/ReconstructionSpec.h"
 #include "DataFormatsFT0/Digit.h"
 #include "DataFormatsFT0/ChannelData.h"
 #include "DataFormatsFT0/MCLabel.h"
 #include "FT0Calibration/FT0ChannelTimeCalibrationObject.h"
+#include "Framework/CCDBParamSpec.h"
 
 using namespace o2::framework;
 
@@ -37,9 +39,15 @@ void ReconstructionDPL::init(InitContext& ic)
 
 void ReconstructionDPL::run(ProcessingContext& pc)
 {
+  /*
+  const auto ref = pc.inputs().getFirstValid(true);
+  auto creationTime =
+    o2::framework::DataRefUtils::getHeader<o2::framework::DataProcessingHeader*>(ref)->creation;
   auto& mCCDBManager = o2::ccdb::BasicCCDBManager::instance();
   mCCDBManager.setURL(mCCDBpath);
-  LOG(info) << " set-up CCDB " << mCCDBpath;
+  mCCDBManager.setTimestamp(creationTime);
+  LOG(debug) << " set-up CCDB " << mCCDBpath << " creationTime " << creationTime;
+  */
   mTimer.Start(false);
   mRecPoints.clear();
   auto digits = pc.inputs().get<gsl::span<o2::ft0::Digit>>("digits");
@@ -48,13 +56,13 @@ void ReconstructionDPL::run(ProcessingContext& pc)
   //std::unique_ptr<const o2::dataformats::MCTruthContainer<o2::ft0::MCLabel>> labels;
   //const o2::dataformats::MCTruthContainer<o2::ft0::MCLabel>* lblPtr = nullptr;
   if (mUseMC) {
-    //   labels = pc.inputs().get<const o2::dataformats::MCTruthContainer<o2::ft0::MCLabel>*>("labels");
-    // lblPtr = labels.get();
     LOG(info) << "Ignoring MC info";
   }
-  auto caliboffsets = mCCDBManager.get<o2::ft0::FT0ChannelTimeCalibrationObject>("FT0/Calibration/ChannelTimeOffset");
-  mReco.SetChannelOffset(caliboffsets);
-  LOG(debug) << " RecoSpec  mReco.SetChannelOffset(caliboffsets)";
+  if (mUpdateCCDB) {
+    auto caliboffsets = pc.inputs().get<o2::ft0::FT0ChannelTimeCalibrationObject*>("ft0offsets");
+    mReco.SetChannelOffset(caliboffsets.get());
+    LOG(info) << "RecoSpec  mReco.SetChannelOffset(&caliboffsets)";
+  }
   /*
   auto calibslew = mCCDBManager.get<std::array<TGraph, NCHANNELS>>("FT0/SlewingCorr");
   LOG(debug) << " calibslew " << calibslew;
@@ -83,6 +91,14 @@ void ReconstructionDPL::run(ProcessingContext& pc)
 
   mTimer.Stop();
 }
+//_______________________________________
+void ReconstructionDPL::finaliseCCDB(ConcreteDataMatcher& matcher, void* obj)
+{
+  if (matcher == ConcreteDataMatcher("FT0", "TimeOffset", 0)) {
+    mUpdateCCDB = false;
+    return;
+  }
+}
 
 void ReconstructionDPL::endOfStream(EndOfStreamContext& ec)
 {
@@ -100,6 +116,10 @@ DataProcessorSpec getReconstructionSpec(bool useMC, const std::string ccdbpath)
     LOG(info) << "Currently Reconstruction does not consume and provide MC truth";
     inputSpec.emplace_back("labels", o2::header::gDataOriginFT0, "DIGITSMCTR", 0, Lifetime::Timeframe);
   }
+  inputSpec.emplace_back("ft0offsets", "FT0", "TimeOffset", 0,
+                         Lifetime::Condition,
+                         ccdbParamSpec("FT0/Calib/ChannelTimeOffset"));
+
   outputSpec.emplace_back(o2::header::gDataOriginFT0, "RECPOINTS", 0, Lifetime::Timeframe);
   outputSpec.emplace_back(o2::header::gDataOriginFT0, "RECCHDATA", 0, Lifetime::Timeframe);
 

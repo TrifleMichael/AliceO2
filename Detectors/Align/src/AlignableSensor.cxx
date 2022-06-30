@@ -14,14 +14,12 @@
 /// @since  2021-02-01
 /// @brief  End-chain alignment volume in detector branch, where the actual measurement is done.
 
-#include <cstdio>
-#include <TClonesArray.h>
-
 #include "Align/AlignableSensor.h"
 #include "Framework/Logger.h"
 #include "Align/AlignmentPoint.h"
 #include "Align/AlignableDetector.h"
 #include "DetectorsBase/GeometryManager.h"
+#include <vector>
 
 ClassImp(o2::align::AlignableSensor);
 
@@ -303,6 +301,7 @@ int AlignableSensor::Compare(const TObject* b) const
 }
 
 //__________________________________________________________________
+/* // RS FIXME REM
 void AlignableSensor::setTrackingFrame()
 {
   // define tracking frame of the sensor
@@ -316,7 +315,7 @@ void AlignableSensor::setTrackingFrame()
   utils::bringToPiPM(mAlp);
   //
 }
-
+*/
 //____________________________________________
 void AlignableSensor::Print(const Option_t* opt) const
 {
@@ -370,28 +369,6 @@ void AlignableSensor::Print(const Option_t* opt) const
 }
 
 //____________________________________________
-void AlignableSensor::prepareMatrixT2L()
-{
-  // extract geometry T2L matrix
-  TGeoHMatrix t2l;
-  t2l.Clear();
-  t2l.RotateZ(mAlp * RadToDeg()); // rotate in direction of normal to the sensor plane
-  const TGeoHMatrix* matL2G = base::GeometryManager::getMatrix(mDet->getDetID(), getSID());
-  const TGeoHMatrix& matL2Gi = matL2G->Inverse();
-  t2l.MultiplyLeft(&matL2Gi);
-  setMatrixT2L(t2l);
-
-  //  const TGeoHMatrix* t2l = AliGeomManager::GetTracking2LocalMatrix(getVolID());
-  //  const if (!t2l)
-  //  {
-  //    Print("long");
-  //    LOG(fatal) << "Failed to find T2L matrix for VID: " << getVolID() << ", " << getSymName();
-  //  }
-  //  setMatrixT2L(*t2l);
-  //  //
-}
-
-//____________________________________________
 void AlignableSensor::prepareMatrixClAlg()
 {
   // prepare alignment matrix in the LOCAL frame: delta = Gideal^-1 * G
@@ -436,7 +413,7 @@ int AlignableSensor::finalizeStat(DOFStatistics& st)
 }
 
 //_________________________________________________________________
-void AlignableSensor::updateL2GRecoMatrices(const TClonesArray* algArr, const TGeoHMatrix* cumulDelta)
+void AlignableSensor::updateL2GRecoMatrices(const std::vector<o2::detectors::AlignParam>& algArr, const TGeoHMatrix* cumulDelta)
 {
   // recreate mMatL2GReco matrices from ideal L2G matrix and alignment objects
   // used during data reconstruction.
@@ -446,16 +423,6 @@ void AlignableSensor::updateL2GRecoMatrices(const TClonesArray* algArr, const TG
   prepareMatrixClAlgReco();
   //
 }
-
-/*
-//_________________________________________________________________
-AlignmentPoint* AlignableSensor::TrackPoint2AlgPoint(int, const AliTrackPointArray*, const AliESDtrack*)
-{
-  // dummy converter
-  AliError("Generic method, must be implemented in specific sensor");
-  return 0;
-}
-*/
 
 //_________________________________________________________________
 void AlignableSensor::applyAlignmentFromMPSol()

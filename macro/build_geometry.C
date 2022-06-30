@@ -41,16 +41,19 @@
 #include <DetectorsPassive/Cave.h>
 #include <DetectorsPassive/FrameStructure.h>
 #include <SimConfig/SimConfig.h>
-#include "FairRunSim.h"
+#include <FairRunSim.h>
+#include <FairRootFileSink.h>
 #include <FairLogger.h>
 #include <algorithm>
 #include "DetectorsCommonDataFormats/UpgradesStatus.h"
+#include <DetectorsBase/SimFieldUtils.h>
 #endif
 
 #ifdef ENABLE_UPGRADES
 #include <ITS3Simulation/Detector.h>
 #include <TRKSimulation/Detector.h>
 #include <FT3Simulation/Detector.h>
+#include <FCTSimulation/Detector.h>
 #include <Alice3DetectorsPassive/Pipe.h>
 #endif
 
@@ -59,10 +62,21 @@ void finalize_geometry(FairRunSim* run);
 bool isActivated(std::string s)
 {
   // access user configuration for list of wanted modules
-  auto& modulelist = o2::conf::SimConfig::Instance().getActiveDetectors();
+  auto& modulelist = o2::conf::SimConfig::Instance().getActiveModules();
   auto active = std::find(modulelist.begin(), modulelist.end(), s) != modulelist.end();
   if (active) {
     LOG(info) << "Activating " << s << " module";
+  }
+  return active;
+}
+
+bool isReadout(std::string s)
+{
+  // access user configuration for list of wanted modules
+  auto& modulelist = o2::conf::SimConfig::Instance().getReadoutDetectors();
+  auto active = std::find(modulelist.begin(), modulelist.end(), s) != modulelist.end();
+  if (active) {
+    LOG(info) << "Reading out " << s << " detector";
   }
   return active;
 }
@@ -85,15 +99,14 @@ void build_geometry(FairRunSim* run = nullptr)
   // Create simulation run if it does not exist
   if (run == nullptr) {
     run = new FairRunSim();
-    run->SetOutputFile("foo.root"); // Output file
+    run->SetSink(new FairRootFileSink("foo.root")); // Output file
     run->SetName("TGeant3");        // Transport engine
   }
   // Create media
   run->SetMaterials("media.geo"); // Materials
 
   // we need a field to properly init the media
-  auto field = o2::field::MagneticField::createNominalField(confref.getConfigData().mField, confref.getConfigData().mUniformField);
-  run->SetField(field);
+  run->SetField(o2::base::SimFieldUtils::createMagField());
 
   // Create geometry
   // we always need the cave
@@ -151,119 +164,113 @@ void build_geometry(FairRunSim* run = nullptr)
   // the absorber
   if (isActivated("ABSO")) {
     // the frame structure to support other detectors
-    auto abso = new o2::passive::Absorber("ABSO", "Absorber");
-    run->AddModule(abso);
+    run->AddModule(new o2::passive::Absorber("ABSO", "Absorber"));
   }
 
   // the shil
   if (isActivated("SHIL")) {
-    auto shil = new o2::passive::Shil("SHIL", "Small angle beam shield");
-    run->AddModule(shil);
+    run->AddModule(new o2::passive::Shil("SHIL", "Small angle beam shield"));
   }
 
   if (isActivated("TOF") || isActivated("TRD") || isActivated("FRAME")) {
     // the frame structure to support other detectors
-    auto frame = new o2::passive::FrameStructure("FRAME", "Frame");
-    run->AddModule(frame);
+    run->AddModule(new o2::passive::FrameStructure("FRAME", "Frame"));
   }
 
   if (isActivated("TOF")) {
     // TOF
-    auto tof = new o2::tof::Detector(true);
-    run->AddModule(tof);
+    run->AddModule(new o2::tof::Detector(isReadout("TOF")));
   }
 
   if (isActivated("TRD")) {
     // TRD
-    auto trd = new o2::trd::Detector(true);
-    run->AddModule(trd);
+    run->AddModule(new o2::trd::Detector(isReadout("TRD")));
   }
 
   if (isActivated("TPC")) {
     // tpc
-    auto tpc = new o2::tpc::Detector(true);
-    run->AddModule(tpc);
+    run->AddModule(new o2::tpc::Detector(isReadout("TPC")));
   }
 #ifdef ENABLE_UPGRADES
   if (isActivated("IT3")) {
     // ITS3
-    auto its3 = new o2::its3::Detector(true);
-    run->AddModule(its3);
+    run->AddModule(new o2::its3::Detector(isReadout("IT3")));
   }
 
   if (isActivated("TRK")) {
     // ALICE 3 TRK
-    auto trk = new o2::trk::Detector(true);
-    run->AddModule(trk);
+    run->AddModule(new o2::trk::Detector(isReadout("TRK")));
   }
 
   if (isActivated("FT3")) {
     // ALICE 3 FT3
-    auto ft3 = new o2::ft3::Detector(true);
-    run->AddModule(ft3);
+    run->AddModule(new o2::ft3::Detector(isReadout("FT3")));
+  }
+
+  if (isActivated("FCT")) {
+    // ALICE 3 FCT
+    run->AddModule(new o2::fct::Detector(isReadout("FCT")));
   }
 #endif
 
   if (isActivated("ITS")) {
     // its
-    auto its = new o2::its::Detector(true);
-    run->AddModule(its);
+    run->AddModule(new o2::its::Detector(isReadout("ITS")));
   }
 
   if (isActivated("MFT")) {
     // mft
-    auto mft = new o2::mft::Detector();
-    run->AddModule(mft);
+    run->AddModule(new o2::mft::Detector(isReadout("MFT")));
   }
 
   if (isActivated("MCH")) {
     // mch
-    run->AddModule(new o2::mch::Detector(true));
+    run->AddModule(new o2::mch::Detector(isReadout("MCH")));
   }
 
   if (isActivated("MID")) {
     // mid
-    run->AddModule(new o2::mid::Detector(true));
+    run->AddModule(new o2::mid::Detector(isReadout("MID")));
   }
 
   if (isActivated("EMC")) {
     // emcal
-    run->AddModule(new o2::emcal::Detector(true));
+    run->AddModule(new o2::emcal::Detector(isReadout("EMC")));
   }
 
   if (isActivated("PHS")) {
     // phos
-    run->AddModule(new o2::phos::Detector(true));
+    run->AddModule(new o2::phos::Detector(isReadout("PHS")));
   }
 
   if (isActivated("CPV")) {
     // cpv
-    run->AddModule(new o2::cpv::Detector(true));
+    run->AddModule(new o2::cpv::Detector(isReadout("CPV")));
   }
 
   if (isActivated("FT0")) {
     // FIT-T0
-    run->AddModule(new o2::ft0::Detector(true));
+    run->AddModule(new o2::ft0::Detector(isReadout("FT0")));
   }
 
   if (isActivated("FV0")) {
     // FIT-V0
-    run->AddModule(new o2::fv0::Detector(true));
+    run->AddModule(new o2::fv0::Detector(isReadout("FV0")));
   }
 
   if (isActivated("FDD")) {
     // FIT-FDD
-    run->AddModule(new o2::fdd::Detector(true));
+    run->AddModule(new o2::fdd::Detector(isReadout("FDD")));
   }
 
   if (isActivated("HMP")) {
     // HMP
-    run->AddModule(new o2::hmpid::Detector(true));
+    run->AddModule(new o2::hmpid::Detector(isReadout("HMP")));
   }
 
   if (isActivated("ZDC")) {
     // ZDC
-    run->AddModule(new o2::zdc::Detector(true));
+    run->AddModule(new o2::zdc::Detector(isReadout("ZDC")));
   }
 
   if (geomonly) {

@@ -69,14 +69,14 @@ int main(int argc, char** argv)
     //    add_option("input-file,i", bpo::value<std::string>()->default_value("trdtrapraw.root"), "input Trapsim raw file");
     add_option("input-file-digits,d", bpo::value<std::string>()->default_value("trddigits.root"), "input Trapsim digits file");
     add_option("input-file-tracklets,t", bpo::value<std::string>()->default_value("trdtracklets.root"), "input Trapsim tracklets file");
-    add_option("fileper,l", bpo::value<std::string>()->default_value("halfcru"), "all : raw file(false), halfcru : cru end point, cru : one file per cru, sm: one file per supermodule");
+    add_option("file-per,l", bpo::value<std::string>()->default_value("halfcru"), "all : raw file(false), halfcru : cru end point, cru : one file per cru, sm: one file per supermodule");
     add_option("output-dir,o", bpo::value<std::string>()->default_value("./"), "output directory for raw data");
-    add_option("tracklethcheader,x", bpo::value<int>()->default_value(0), "include tracklet half chamber header (for run3). 0 never, 1 if there is tracklet data, 2 always");
+    add_option("tracklethcheader,x", bpo::value<int>()->default_value(2), "include tracklet half chamber header (for run3). 0 never, 1 if there is tracklet data, 2 always");
     add_option("no-empty-hbf,e", bpo::value<bool>()->default_value(false)->implicit_value(true), "do not create empty HBF pages (except for HBF starting TF)");
     add_option("rdh-version,r", bpo::value<uint32_t>()->default_value(6), "rdh version in use default");
     add_option("configKeyValues", bpo::value<std::string>()->default_value(""), "comma-separated configKeyValues");
     add_option("hbfutils-config,u", bpo::value<std::string>()->default_value(std::string(o2::base::NameConf::DIGITIZATIONCONFIGFILE)), "config file for HBFUtils (or none)");
-    add_option("digitrate", bpo::value<int>()->default_value(1000), "only include digits at 1 per this number");
+    add_option("digitrate", bpo::value<int>()->default_value(1), "only include digits at 1 per this number");
     add_option("verbose,w", bpo::value<bool>()->default_value(false), "verbose");
 
     opt_all.add(opt_general).add(opt_hidden);
@@ -104,7 +104,7 @@ int main(int argc, char** argv)
   o2::conf::ConfigurableParam::updateFromString(vm["configKeyValues"].as<std::string>());
 
   std::cout << "yay it ran" << std::endl;
-  trap2raw(vm["input-file-digits"].as<std::string>(), vm["input-file-tracklets"].as<std::string>(), vm["output-dir"].as<std::string>(), vm["digitrate"].as<int>(), vm["verbosity"].as<int>(), vm["fileper"].as<std::string>(), vm["rdh-version"].as<uint32_t>(), vm["no-empty-hbf"].as<bool>(), vm["tracklethcheader"].as<int>());
+  trap2raw(vm["input-file-digits"].as<std::string>(), vm["input-file-tracklets"].as<std::string>(), vm["output-dir"].as<std::string>(), vm["digitrate"].as<int>(), vm["verbosity"].as<int>(), vm["file-per"].as<std::string>(), vm["rdh-version"].as<uint32_t>(), vm["no-empty-hbf"].as<bool>(), vm["tracklethcheader"].as<int>());
 
   return 0;
 }
@@ -137,7 +137,6 @@ void trap2raw(const std::string& inpDigitsName, const std::string& inpTrackletsN
   }
 
   mc2raw.setTrackletHCHeader(trackletHCHeader);
-  LOG(info) << "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%;";
   mc2raw.readTrapData();
   wr.writeConfFile(wr.getOrigin().str, "RAWDATA", o2::utils::Str::concat_string(outDirName, wr.getOrigin().str, "raw.cfg"));
   //

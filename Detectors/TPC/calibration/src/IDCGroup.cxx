@@ -12,7 +12,9 @@
 #include "TPCCalibration/IDCGroup.h"
 #include "CommonUtils/TreeStreamRedirector.h"
 #include "TPCCalibration/IDCDrawHelper.h"
+#include "TPCCalibration/IDCContainer.h"
 #include "TPCBase/Mapper.h"
+#include "TPCBase/CalDet.h"
 #include "TFile.h"
 #include <numeric>
 
@@ -57,33 +59,4 @@ void o2::tpc::IDCGroup::dumpToFile(const char* outFileName, const char* outName)
 float o2::tpc::IDCGroup::getValUngroupedGlobal(unsigned int ugrow, unsigned int upad, unsigned int integrationInterval) const
 {
   return mIDCsGrouped[getIndexUngrouped(Mapper::getLocalRowFromGlobalRow(ugrow), upad, integrationInterval)];
-}
-
-std::vector<float> o2::tpc::IDCGroup::get1DIDCs() const
-{
-  return get1DIDCs(mIDCsGrouped, getNIntegrationIntervals(), getNIDCsPerIntegrationInterval(), mRegion, true);
-}
-
-std::vector<float> o2::tpc::IDCGroup::get1DIDCsUngrouped(const std::vector<float> idc, const unsigned int region)
-{
-  const auto nIDCsPerIntegrationInterval = Mapper::PADSPERREGION[region];
-  return get1DIDCs(idc, idc.size() / nIDCsPerIntegrationInterval, nIDCsPerIntegrationInterval, region, false);
-}
-
-std::vector<float> o2::tpc::IDCGroup::get1DIDCs(const std::vector<float> idc, const unsigned int nIntervals, const unsigned int nIDCsPerIntegrationInterval, const unsigned int region, const bool normalize)
-{
-  // integrate IDCs for each interval
-  std::vector<float> idcOne;
-  idcOne.reserve(nIntervals);
-  for (unsigned int i = 0; i < nIntervals; ++i) {
-    // set integration range for one integration interval
-    const auto start = idc.begin() + i * nIDCsPerIntegrationInterval;
-    const auto end = start + nIDCsPerIntegrationInterval;
-    idcOne.emplace_back(std::accumulate(start, end, decltype(idc)::value_type(0)));
-  }
-  // normalize 1D-IDCs to absolute space charge
-  const float norm = normalize ? Mapper::REGIONAREA[region] / nIDCsPerIntegrationInterval : 1.f / nIDCsPerIntegrationInterval;
-  std::transform(idcOne.begin(), idcOne.end(), idcOne.begin(), [norm](auto& val) { return val * norm; });
-
-  return idcOne;
 }

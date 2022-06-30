@@ -40,22 +40,26 @@ bool NoiseSlotCalibrator::processTimeFrame(gsl::span<const o2::itsmft::CompClust
     for (const auto& c : clustersInFrame) {
       auto pattID = c.getPatternID();
       o2::itsmft::ClusterPattern patt;
+      auto row = c.getRow();
+      auto col = c.getCol();
       if (mDict.getSize() == 0) {
         if (pattID == o2::itsmft::CompCluster::InvalidPatternID) {
-          o2::itsmft::ClusterPattern tmp(pattIt);
-          patt = tmp;
+          patt.acquirePattern(pattIt);
         } else {
           LOG(fatal) << "Clusters contain pattern IDs, but no dictionary is provided...";
         }
-      } else if ((pattID == o2::itsmft::CompCluster::InvalidPatternID) || mDict.isGroup(pattID)) {
-        o2::itsmft::ClusterPattern tmp(pattIt);
-        patt = tmp;
+      } else if (pattID == o2::itsmft::CompCluster::InvalidPatternID) {
+        patt.acquirePattern(pattIt);
+      } else if (mDict.isGroup(pattID)) {
+        patt.acquirePattern(pattIt);
+        float xCOG = 0., zCOG = 0.;
+        patt.getCOG(xCOG, zCOG); // for grouped patterns the reference pixel is at COG
+        row -= round(xCOG);
+        col -= round(zCOG);
       } else {
         patt = mDict.getPattern(pattID);
       }
       auto id = c.getSensorID();
-      auto row = c.getRow();
-      auto col = c.getCol();
       auto colSpan = patt.getColumnSpan();
       auto rowSpan = patt.getRowSpan();
 
@@ -95,15 +99,16 @@ bool NoiseSlotCalibrator::processTimeFrame(gsl::span<const o2::itsmft::CompClust
     }
   }
 
+  noiseMap.addStrobes(rofs.size());
   mNumberOfStrobes += rofs.size();
   return hasEnoughData(slotTF);
 }
 
 // Functions overloaded from the calibration framework
-bool NoiseSlotCalibrator::process(calibration::TFType tf, const gsl::span<const o2::itsmft::CompClusterExt> data)
+bool NoiseSlotCalibrator::process(const gsl::span<const o2::itsmft::CompClusterExt> data)
 {
   LOG(warning) << "Only 1-pix noise calibraton is possible !";
-  return calibration::TimeSlotCalibration<o2::itsmft::CompClusterExt, o2::itsmft::NoiseMap>::process(tf, data);
+  return calibration::TimeSlotCalibration<o2::itsmft::CompClusterExt, o2::itsmft::NoiseMap>::process(data);
 }
 
 // Functions required by the calibration framework
@@ -116,16 +121,16 @@ Slot& NoiseSlotCalibrator::emplaceNewSlot(bool front, calibration::TFType tstart
   return slot;
 }
 
-bool NoiseSlotCalibrator::hasEnoughData(const Slot&) const
+bool NoiseSlotCalibrator::hasEnoughData(const Slot& slot) const
 {
-  return (mNumberOfStrobes * mProbabilityThreshold >= mThreshold) ? true : false;
+  return slot.getContainer()->getNumberOfStrobes() > mMinROFs ? true : false;
 }
 
 void NoiseSlotCalibrator::finalizeSlot(Slot& slot)
 {
-  LOG(info) << "Number of processed strobes is " << mNumberOfStrobes;
   o2::itsmft::NoiseMap* map = slot.getContainer();
-  map->applyProbThreshold(mProbabilityThreshold, mNumberOfStrobes);
+  LOG(info) << "Number of processed strobes is " << map->getNumberOfStrobes();
+  map->applyProbThreshold(mProbabilityThreshold, map->getNumberOfStrobes(), mProbRelErr);
 }
 
 } // namespace its

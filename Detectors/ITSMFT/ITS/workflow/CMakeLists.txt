@@ -10,6 +10,7 @@
 # or submit itself to any jurisdiction.
 
 o2_add_library(ITSWorkflow
+               TARGETVARNAME targetName
                SOURCES src/RecoWorkflow.cxx
                        src/ClusterWriterWorkflow.cxx
                        src/ClustererSpec.cxx
@@ -17,24 +18,30 @@ o2_add_library(ITSWorkflow
                        src/TrackerSpec.cxx
                        src/CookedTrackerSpec.cxx
                        src/TrackWriterSpec.cxx
-                       src/IRFrameWriterSpec.cxx
-                       src/IRFrameReaderSpec.cxx
                        src/TrackReaderSpec.cxx
                        src/VertexReaderSpec.cxx
+                       src/ThresholdCalibratorSpec.cxx
+                       src/ThresholdAggregatorWorkflow.cxx
+                       src/ThresholdAggregatorSpec.cxx
          PUBLIC_LINK_LIBRARIES O2::Framework
-                                     O2::SimConfig
-                                     O2::DataFormatsITS
-                                     O2::SimulationDataFormat
-                                     O2::ITStracking
-                                     O2::ITSReconstruction
-                                     O2::ITSMFTReconstruction
-                                     O2::ITSMFTWorkflow
-                                     O2::GPUTracking)
+                               O2::SimConfig
+                               O2::DataFormatsITS
+                               O2::DataFormatsDCS
+                               O2::SimulationDataFormat
+                               O2::ITStracking
+                               O2::ITSReconstruction
+                               O2::ITSMFTReconstruction
+                               O2::ITSMFTWorkflow
+                               O2::DetectorsCalibration
+                               O2::GlobalTrackingWorkflowWriters
+                               O2::CCDB
+                               O2::GPUTracking)
 
 o2_add_executable(reco-workflow
                   SOURCES src/its-reco-workflow.cxx
                   COMPONENT_NAME its
-                  PUBLIC_LINK_LIBRARIES O2::ITSWorkflow)
+                  PUBLIC_LINK_LIBRARIES O2::ITSWorkflow
+                                        O2::GlobalTrackingWorkflowReaders)
 
 o2_add_executable(cluster-writer-workflow
                   SOURCES src/its-cluster-writer-workflow.cxx
@@ -46,3 +53,17 @@ o2_add_executable(cluster-reader-workflow
                   COMPONENT_NAME its
                   PUBLIC_LINK_LIBRARIES O2::ITSWorkflow)
 
+o2_add_executable(threshold-calib-workflow
+                  SOURCES src/its-threshold-calib-workflow.cxx
+                  COMPONENT_NAME its
+                  PUBLIC_LINK_LIBRARIES O2::ITSWorkflow)
+
+o2_add_executable(threshold-aggregator-workflow
+                  SOURCES src/its-threshold-aggregator-workflow.cxx
+                  COMPONENT_NAME its
+                  PUBLIC_LINK_LIBRARIES O2::ITSWorkflow)
+
+if (OpenMP_CXX_FOUND)
+    target_compile_definitions(${targetName} PRIVATE WITH_OPENMP)
+    target_link_libraries(${targetName} PRIVATE OpenMP::OpenMP_CXX)
+endif()

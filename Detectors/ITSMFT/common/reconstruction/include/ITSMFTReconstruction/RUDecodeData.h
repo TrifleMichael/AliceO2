@@ -40,7 +40,7 @@ struct RUDecodeData {
   std::array<uint8_t, MaxCablesPerRU> cableHWID;           // HW ID of cable whose data is in the corresponding slot of cableData
   std::array<uint8_t, MaxCablesPerRU> cableLinkID;         // ID of the GBT link transmitting this cable data
   std::array<GBTLink*, MaxCablesPerRU> cableLinkPtr;       // Ptr of the GBT link transmitting this cable data
-
+  std::unordered_map<uint64_t, uint32_t> linkHBFToDump;    // FEEID<<32+hbfEntry to dump in case of error
   int ruSWID = -1;         // SW (stave) ID
   int nCables = 0;         // total number of cables decoded for single trigger
   int nChipsFired = 0;     // number of chips with data or with errors
@@ -73,6 +73,7 @@ int RUDecodeData::decodeROF(const Mapping& mp)
   nChipsFired = 0;
   lastChipChecked = 0;
   int ntot = 0;
+  std::array<bool, Mapping::getNChips()> doneChips{};
   auto* chipData = &chipsData[0];
   for (int icab = 0; icab < nCables; icab++) { // cableData is ordered in such a way to have chipIDs in increasing order
     if (!cableData[icab].getSize()) {
@@ -87,16 +88,33 @@ int RUDecodeData::decodeROF(const Mapping& mp)
     int ret = 0;
     while ((ret = AlpideCoder::decodeChip(*chipData, cableData[icab], chIdGetter)) || chipData->isErrorSet()) { // we register only chips with hits or errors flags set
       setROFInfo(chipData, cableLinkPtr[icab]);
+      auto nhits = chipData->getData().size();
+      if (nhits && doneChips[chipData->getChipID()]) {
+        if (chipData->getChipID() == chipsData[nChipsFired - 1].getChipID()) {
+          LOGP(debug, "re-entry into the data of the chip {} after previously detector error", chipData->getChipID());
+        }
+#ifdef ALPIDE_DECODING_STAT
+        else {
+          chipData->setError(ChipStat::InterleavedChipData);
+        }
+#endif
+        ret = -1; // discard decoded data
+        nhits = 0;
+      }
 #ifdef ALPIDE_DECODING_STAT
       fillChipStatistics(icab, chipData);
 #endif
-      if (ret >= 0 && !chipData->isErrorSet()) { // make sure there was no error
-        ntot += chipData->getData().size();
+      if (nhits && chipData->getChipID() < Mapping::getNChips()) {
+        doneChips[chipData->getChipID()] = true;
+        ntot += nhits;
         if (++nChipsFired < chipsData.size()) { // fetch next free chip
           chipData = &chipsData[nChipsFired];
         } else {
           break; // last chip decoded
         }
+      }
+      if (ret < 0) {
+        break; // negative code was returned by decoder: abandon cable data
       }
     }
   }

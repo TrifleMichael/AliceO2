@@ -13,6 +13,7 @@
 #define ALICEO2_TRD_HELPERMETHODS_HH
 
 #include "DataFormatsTRD/Constants.h"
+#include <iostream>
 
 namespace o2
 {
@@ -45,6 +46,12 @@ struct HelperMethods {
   static int getPadRowFromMCM(int irob, int imcm)
   {
     return constants::NMCMROBINROW * (irob / 2) + imcm / constants::NMCMROBINCOL;
+  }
+
+  static void printSectorStackLayer(int det)
+  {
+    // for a given chamber number prints SECTOR_STACK_LAYER
+    printf("%02i_%i_%i\n", det / constants::NCHAMBERPERSEC, (det % constants::NCHAMBERPERSEC) / constants::NLAYER, det % constants::NLAYER);
   }
 
   static int getPadColFromADC(int irob, int imcm, int iadc)
@@ -82,7 +89,7 @@ struct HelperMethods {
     return det % constants::NLAYER;
   }
 
-  static int getDetector(int layer, int stack, int sector)
+  static int getDetector(int sector, int stack, int layer)
   {
     return (layer + stack * constants::NLAYER + sector * constants::NLAYER * constants::NSTACK);
   }
@@ -132,7 +139,6 @@ struct HelperMethods {
     int detector = hcid / 2;
     int supermodule = hcid / 60;
     int chamberside = hcid % 2; // 0 for side 0, 1 for side 1;
-    int ori = -1;
     // now offset for supermodule (+60*supermodule);
     return HelperMethods::getORIinSuperModule(detector, chamberside) + 60 * supermodule; // it takes readoutboard but only cares if its odd or even hence side here.
   }

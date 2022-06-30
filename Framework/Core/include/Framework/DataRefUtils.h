@@ -25,6 +25,11 @@
 #include <type_traits>
 #include <typeinfo>
 
+namespace o2::conf
+{
+class ConfigurableParam;
+}
+
 namespace o2::framework
 {
 
@@ -34,6 +39,7 @@ struct DataRefUtils {
   template <typename T>
   static auto as(DataRef const& ref)
   {
+    auto payloadSize = DataRefUtils::getPayloadSize(ref);
     // SFINAE makes this available only for the case we are using
     // trivially copyable type, this is to distinguish it from the
     // alternative below, which works for TObject (which are serialised).
@@ -43,11 +49,11 @@ struct DataRefUtils {
       if (header->payloadSerializationMethod != o2::header::gSerializationMethodNone) {
         throw runtime_error("Attempt to extract a POD from a wrong message kind");
       }
-      if ((header->payloadSize % sizeof(T)) != 0) {
+      if ((payloadSize % sizeof(T)) != 0) {
         throw runtime_error("Cannot extract POD from message as size do not match");
       }
       //FIXME: provide a const collection
-      return gsl::span<T>(reinterpret_cast<T*>(const_cast<char*>(ref.payload)), header->payloadSize / sizeof(T));
+      return gsl::span<T>(reinterpret_cast<T*>(const_cast<char*>(ref.payload)), payloadSize / sizeof(T));
     } else if constexpr (has_root_dictionary<T>::value == true &&
                          is_messageable<T>::value == false) {
       std::unique_ptr<T> result;
@@ -65,7 +71,7 @@ struct DataRefUtils {
           throw runtime_error("Attempt to extract a TMessage from non-ROOT serialised message");
         }
 
-        typename RSS::FairTMessage ftm(const_cast<char*>(ref.payload), header->payloadSize);
+        typename RSS::FairTMessage ftm(const_cast<char*>(ref.payload), payloadSize);
         auto* storedClass = ftm.GetClass();
         auto* requestedClass = RSS::TClass::GetClass(typeid(T));
         // should always have the class description if has_root_dictionary is true
@@ -119,7 +125,7 @@ struct DataRefUtils {
       });
 
       return std::move(result);
-    } else if constexpr (is_specialization<T, ROOTSerialized>::value == true) {
+    } else if constexpr (is_specialization_v<T, ROOTSerialized> == true) {
       // See above. SFINAE allows us to use this to extract a ROOT-serialized object
       // with a somewhat uniform API. ROOT serialization method is enforced by using
       // type wrapper @a ROOTSerialized
@@ -140,7 +146,7 @@ struct DataRefUtils {
           throw runtime_error("ROOT serialization not supported, dictionary not found for data type");
         }
 
-        typename RSS::FairTMessage ftm(const_cast<char*>(ref.payload), header->payloadSize);
+        typename RSS::FairTMessage ftm(const_cast<char*>(ref.payload), payloadSize);
         result.reset(static_cast<wrapped*>(ftm.ReadObjectAny(cl)));
         if (result.get() == nullptr) {
           throw runtime_error_f("Unable to extract class %s", cl == nullptr ? "<name not available>" : cl->GetName());
@@ -151,10 +157,16 @@ struct DataRefUtils {
         }
       });
       return std::move(result);
-    } else if constexpr (is_specialization<T, CCDBSerialized>::value == true) {
+    } else if constexpr (is_specialization_v<T, CCDBSerialized> == true) {
       using wrapped = typename T::wrapped_type;
       using DataHeader = o2::header::DataHeader;
-      std::unique_ptr<wrapped> result(static_cast<wrapped*>(DataRefUtils::decodeCCDB(ref, typeid(wrapped))));
+      auto* ptr = DataRefUtils::decodeCCDB(ref, typeid(wrapped));
+      if constexpr (std::is_base_of<o2::conf::ConfigurableParam, wrapped>::value) {
+        auto& param = const_cast<typename std::remove_const<wrapped&>::type>(wrapped::Instance());
+        param.syncCCDBandRegistry(ptr);
+        ptr = &param;
+      }
+      std::unique_ptr<wrapped> result(static_cast<wrapped*>(ptr));
       return std::move(result);
     }
   }

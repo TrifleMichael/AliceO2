@@ -87,13 +87,14 @@ class SimTraits
       /*FT0*/ VS{ "FT0Hit" },
       /*FV0*/ VS{ "FV0Hit" },
       /*FDD*/ VS{ "FDDHit" },
-      /*ACO*/ VS{ "ACOHit" },
+      /*TST*/ VS{ "TSTHit" }, // former ACO
       /*CTP*/ VS{ "CTPHit" }
 #ifdef ENABLE_UPGRADES
       ,
       /*IT3*/ VS{ "IT3Hit" },
       /*TRK*/ VS{ "TRKHit" },
-      /*FT3*/ VS{ "FT3Hit" }
+      /*FT3*/ VS{ "FT3Hit" },
+      /*FCT*/ VS{ "FCTHit" }
 #endif
     };
   // clang-format on
@@ -236,6 +237,10 @@ struct DetIDToHitTypes<o2::detectors::DetID::TRK> {
 };
 template <>
 struct DetIDToHitTypes<o2::detectors::DetID::FT3> {
+  using HitType = o2::itsmft::Hit;
+};
+template <>
+struct DetIDToHitTypes<o2::detectors::DetID::FCT> {
   using HitType = o2::itsmft::Hit;
 };
 #endif

@@ -22,7 +22,6 @@
 #include "Framework/ConcreteDataMatcher.h"
 #include "Framework/RawDeviceService.h"
 #include "Framework/DeviceSpec.h"
-#include <fairmq/FairMQDevice.h>
 
 using namespace o2::framework;
 
@@ -87,7 +86,7 @@ void CompressedAnalysisTask::run(ProcessingContext& pc)
 
       const auto* headerIn = DataRefUtils::getHeader<o2::header::DataHeader*>(ref);
       auto payloadIn = ref.payload;
-      auto payloadInSize = headerIn->payloadSize;
+      auto payloadInSize = DataRefUtils::getPayloadSize(ref);
 
       mAnalysis->setDecoderBuffer(payloadIn);
       mAnalysis->setDecoderBufferSize(payloadInSize);

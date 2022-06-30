@@ -26,6 +26,7 @@ o2_add_library(GlobalTrackingWorkflow
                        src/TOFMatchChecker.cxx
                        src/TOFEventTimeChecker.cxx
                        src/GlobalFwdTrackWriterSpec.cxx
+                       src/GlobalFwdMatchingAssessmentSpec.cxx
                        src/MatchedMFTMCHWriterSpec.cxx
                PUBLIC_LINK_LIBRARIES O2::GlobalTracking
                                      O2::GlobalTrackingWorkflowReaders
@@ -90,6 +91,11 @@ o2_add_executable(matcher-workflow
                   SOURCES src/globalfwd-matcher-workflow.cxx
                   PUBLIC_LINK_LIBRARIES O2::GlobalTrackingWorkflow)
 
+o2_add_executable(assessment-workflow
+                  COMPONENT_NAME globalfwd
+                  SOURCES src/globalfwd-assessment-workflow.cxx
+                  PUBLIC_LINK_LIBRARIES O2::GlobalTrackingWorkflow)
+
 o2_add_executable(writer-workflow
                   COMPONENT_NAME tfidinfo
                   SOURCES src/tfidinfo-writer-workflow.cxx
@@ -99,4 +105,5 @@ add_subdirectory(tofworkflow)
 add_subdirectory(tpcinterpolationworkflow)
 add_subdirectory(helpers)
 add_subdirectory(readers)
+add_subdirectory(writers)
 add_subdirectory(qc)

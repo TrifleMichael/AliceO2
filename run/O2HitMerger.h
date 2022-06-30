@@ -17,8 +17,8 @@
 #include <memory>
 #include <string>
 #include <type_traits>
-#include "FairMQMessage.h"
-#include <FairMQDevice.h>
+#include <fairmq/Message.h>
+#include <fairmq/Device.h>
 #include <FairLogger.h>
 #include <SimulationDataFormat/MCEventHeader.h>
 #include <SimulationDataFormat/Stack.h>
@@ -32,7 +32,7 @@
 #include "TROOT.h"
 #include <memory>
 #include <TMessage.h>
-#include <FairMQParts.h>
+#include <fairmq/Parts.h>
 #include <ctime>
 #include <TStopwatch.h>
 #include <sstream>
@@ -73,7 +73,10 @@
 #include <ITS3Simulation/Detector.h>
 #include <TRKSimulation/Detector.h>
 #include <FT3Simulation/Detector.h>
+#include <FCTSimulation/Detector.h>
 #endif
+
+#include <tbb/concurrent_unordered_map.h>
 
 namespace o2
 {
@@ -89,7 +92,7 @@ void sighandler(int signal)
   }
 }
 
-class O2HitMerger : public FairMQDevice
+class O2HitMerger : public fair::mq::Device
 {
 
   class TMessageWrapper : public TMessage
@@ -119,7 +122,7 @@ class O2HitMerger : public FairMQDevice
   }
 
  private:
-  /// Overloads the InitTask() method of FairMQDevice
+  /// Overloads the InitTask() method of fair::mq::Device
   void InitTask() final
   {
     LOG(info) << "INIT HIT MERGER";
@@ -223,6 +226,13 @@ class O2HitMerger : public FairMQDevice
     // clear "counter" datastructures
     mPartsCheckSum.clear();
     mEventChecksum = 0;
+
+    // clear collector datastructures
+    mMCTrackBuffer.clear();
+    mTrackRefBuffer.clear();
+    mSubEventInfoBuffer.clear();
+    mFlushableEvents.clear();
+
     return true;
   }
 
@@ -247,7 +257,7 @@ class O2HitMerger : public FairMQDevice
     return checksum == nparts * (nparts + 1) / 2;
   }
 
-  void consumeHits(int eventID, FairMQParts& data, int& index)
+  void consumeHits(int eventID, fair::mq::Parts& data, int& index)
   {
     auto detIDmessage = std::move(data.At(index++));
     // this should be a detector ID
@@ -266,7 +276,7 @@ class O2HitMerger : public FairMQDevice
   }
 
   template <typename T, typename BT>
-  void consumeData(int eventID, FairMQParts& data, int& index, BT& buffer)
+  void consumeData(int eventID, fair::mq::Parts& data, int& index, BT& buffer)
   {
     auto decodeddata = o2::base::decodeTMessage<T*>(data, index);
     if (buffer.find(eventID) == buffer.end()) {
@@ -292,13 +302,13 @@ class O2HitMerger : public FairMQDevice
   {
     o2::simpubsub::publishMessage(fChannels["merger-notifications"].at(0), o2::simpubsub::simStatusString("MERGER", "STATUS", "AWAITING INPUT"));
 
-    auto factory = FairMQTransportFactory::CreateTransportFactory("zeromq");
-    auto channel = FairMQChannel{"o2sim-control", "sub", factory};
+    auto factory = fair::mq::TransportFactory::CreateTransportFactory("zeromq");
+    auto channel = fair::mq::Channel{"o2sim-control", "sub", factory};
     auto controlsocketname = getenv("ALICE_O2SIMCONTROL");
     LOG(info) << "SOCKETNAME " << controlsocketname;
     channel.Connect(std::string(controlsocketname));
     channel.Validate();
-    std::unique_ptr<FairMQMessage> reply(channel.NewMessage());
+    std::unique_ptr<fair::mq::Message> reply(channel.NewMessage());
 
     LOG(info) << "WAITING FOR INPUT";
     if (channel.Receive(reply) > 0) {
@@ -320,7 +330,7 @@ class O2HitMerger : public FairMQDevice
   bool ConditionalRun() override
   {
     auto& channel = fChannels.at("simdata").at(0);
-    FairMQParts request;
+    fair::mq::Parts request;
     auto bytes = channel.Receive(request);
     if (bytes < 0) {
       LOG(error) << "Some error occurred on socket during receive on sim data";
@@ -339,7 +349,7 @@ class O2HitMerger : public FairMQDevice
     return more;
   }
 
-  bool handleSimData(FairMQParts& data, int /*index*/)
+  bool handleSimData(fair::mq::Parts& data, int /*index*/)
   {
     bool expectmore = true;
     int index = 0;
@@ -495,8 +505,6 @@ class O2HitMerger : public FairMQDevice
     for (auto ptr : vectorOfSubEventMCTracks) {
       delete ptr; // avoid this by using unique ptr
     }
-    // TODO: protect by lock (as multithreaded access to STL MAP)
-    mMCTrackBuffer.erase(eventID);
   }
 
   template <typename T, typename M>
@@ -548,7 +556,6 @@ class O2HitMerger : public FairMQDevice
     for (auto ptr : vectorOfT) {
       delete ptr; // avoid this by using unique ptr
     }
-    mapOfVectorOfTs.erase(eventID);
   }
 
   void updateTrackIdWithOffset(MCTrack& track, Int_t nprim, Int_t idelta0, Int_t idelta1)
@@ -766,27 +773,29 @@ class O2HitMerger : public FairMQDevice
   }
 
   std::map<uint32_t, uint32_t> mPartsCheckSum; //! mapping event id -> part checksum used to detect when all info
-  std::string mOutFileName; //!
+  std::string mOutFileName;                    //!
 
   // structures for the final flush
-  TFile* mOutFile;                                     //! outfile for kinematics
-  TTree* mOutTree;                                     //! tree (kinematics) associated to mOutFile
-  std::unordered_map<int, TFile*> mDetectorOutFiles;   //! outfiles per detector for hits
-  std::unordered_map<int, TTree*> mDetectorToTTreeMap; //! the trees
+  TFile* mOutFile; //! outfile for kinematics
+  TTree* mOutTree; //! tree (kinematics) associated to mOutFile
+
+  template <class K, class V>
+  using Hashtable = tbb::concurrent_unordered_map<K, V>;
+  Hashtable<int, TFile*> mDetectorOutFiles;   //! outfiles per detector for hits
+  Hashtable<int, TTree*> mDetectorToTTreeMap; //! the trees
 
   // intermediate structures to collect data per event
-  std::thread mMergerIOThread;                            //! a thread used to do hit merging and IO flushing asynchronously
-  std::mutex mMapsMtx;                                    //!
+  std::thread mMergerIOThread; //! a thread used to do hit merging and IO flushing asynchronously
   bool mergingInProgress = false;
 
-  std::unordered_map<int, std::vector<std::vector<o2::MCTrack>*>> mMCTrackBuffer;         //! vector of sub-event track vectors; one per event
-  std::unordered_map<int, std::vector<std::vector<o2::TrackReference>*>> mTrackRefBuffer; //!
-  std::unordered_map<int, std::list<o2::data::SubEventInfo*>> mSubEventInfoBuffer;
+  Hashtable<int, std::vector<std::vector<o2::MCTrack>*>> mMCTrackBuffer;         //! vector of sub-event track vectors; one per event
+  Hashtable<int, std::vector<std::vector<o2::TrackReference>*>> mTrackRefBuffer; //!
+  Hashtable<int, std::list<o2::data::SubEventInfo*>> mSubEventInfoBuffer;
+  Hashtable<int, bool> mFlushableEvents; //! collection of events which have completely arrived
 
   int mEventChecksum = 0;   //! checksum for events
   int mNExpectedEvents = 0; //! number of events that we expect to receive
-  std::unordered_map<int, bool> mFlushableEvents; //! collection of events which has completely arrived
-  int mNextFlushID = 1;                           //! EventID to be flushed next
+  int mNextFlushID = 1;     //! EventID to be flushed next
   TStopwatch mTimer;
 
   bool mAsService = false; //! if run in deamonized mode
@@ -800,7 +809,7 @@ class O2HitMerger : public FairMQDevice
   std::string mCurrentOutputDir; // current output folder asked
 
   // channel to PUB status messages to outside subscribers
-  FairMQChannel mPubChannel;
+  fair::mq::Channel mPubChannel;
 
   // init detector instances
   void initDetInstances();
@@ -814,7 +823,7 @@ void O2HitMerger::initHitFiles(std::string prefix)
   // a little helper lambda
   auto isActivated = [](std::string s) -> bool {
     // access user configuration for list of wanted modules
-    auto& modulelist = o2::conf::SimConfig::Instance().getActiveDetectors();
+    auto& modulelist = o2::conf::SimConfig::Instance().getReadoutDetectors();
     auto active = std::find(modulelist.begin(), modulelist.end(), s) != modulelist.end();
     return active; };
 
@@ -835,7 +844,7 @@ void O2HitMerger::initDetInstances()
   // a little helper lambda
   auto isActivated = [](std::string s) -> bool {
     // access user configuration for list of wanted modules
-    auto& modulelist = o2::conf::SimConfig::Instance().getActiveDetectors();
+    auto& modulelist = o2::conf::SimConfig::Instance().getReadoutDetectors();
     auto active = std::find(modulelist.begin(), modulelist.end(), s) != modulelist.end();
     return active; };
 
@@ -857,7 +866,7 @@ void O2HitMerger::initDetInstances()
       counter++;
     }
     if (i == DetID::MFT) {
-      mDetectorInstances[i] = std::move(std::make_unique<o2::mft::Detector>());
+      mDetectorInstances[i] = std::move(std::make_unique<o2::mft::Detector>(true));
       counter++;
     }
     if (i == DetID::TRD) {
@@ -919,6 +928,10 @@ void O2HitMerger::initDetInstances()
     }
     if (i == DetID::FT3) {
       mDetectorInstances[i] = std::move(std::make_unique<o2::ft3::Detector>(true));
+      counter++;
+    }
+    if (i == DetID::FCT) {
+      mDetectorInstances[i] = std::move(std::make_unique<o2::fct::Detector>(true));
       counter++;
     }
 #endif

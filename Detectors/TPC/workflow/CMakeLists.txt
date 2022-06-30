@@ -23,6 +23,7 @@ o2_add_library(TPCWorkflow
                        src/CalDetMergerPublisherSpec.cxx
                        src/KryptonClustererSpec.cxx
                        src/KryptonRawFilterSpec.cxx
+                       src/SACProcessorSpec.cxx
                        src/IDCToVectorSpec.cxx
                        src/CalibdEdxSpec.cxx
                        src/CalibratordEdxSpec.cxx
@@ -91,6 +92,11 @@ o2_add_executable(laser-track-filter
 o2_add_executable(apply-ccdb-calib
                   COMPONENT_NAME tpc
                   SOURCES src/tpc-apply-ccdb-calib.cxx
+                  PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
+
+o2_add_executable(sac-processing
+                  COMPONENT_NAME tpc
+                  SOURCES src/tpc-sac-processing.cxx
                   PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
 
 o2_add_executable(idc-integrate
@@ -173,6 +179,11 @@ o2_add_executable(track-and-cluster-filter
                   SOURCES src/track-and-cluster-filter.cxx
                   PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
 
+o2_add_executable(calib-gainmap-tracks
+                  COMPONENT_NAME tpc
+                  SOURCES src/tpc-calib-gainmap-tracks.cxx
+                  PUBLIC_LINK_LIBRARIES O2::TPCWorkflow O2::GlobalTracking)
+
 o2_add_test(workflow
             COMPONENT_NAME tpc
             LABELS tpc workflow
@@ -188,6 +199,16 @@ o2_add_executable(digits-to-rawzs
 o2_add_executable(monitor-workflow
                   COMPONENT_NAME tpc
                   SOURCES src/tpc-monitor-workflow.cxx
+                  PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
+
+o2_add_executable(calibrator-gainmap-tracks
+                  COMPONENT_NAME tpc
+                  SOURCES src/tpc-calibrator-gainmap-tracks.cxx
+                  PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
+
+o2_add_executable(entropy-encoder-workflow
+                  SOURCES src/entropy-encoder-workflow.cxx
+                  COMPONENT_NAME tpc
                   PUBLIC_LINK_LIBRARIES O2::TPCWorkflow)
 
 add_subdirectory(readers)

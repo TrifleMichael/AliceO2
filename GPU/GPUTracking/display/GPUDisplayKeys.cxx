@@ -13,7 +13,6 @@
 /// \author David Rohr
 
 #include "GPUDisplay.h"
-#ifdef GPUCA_BUILD_EVENT_DISPLAY
 
 using namespace GPUCA_NAMESPACE::gpu;
 
@@ -48,6 +47,7 @@ const char* HelpText[] = {
   "[o] / [p] / [O] / [P]         Save / restore current camera position / Animation path",
   "[h]                           Print Help",
   "[H]                           Show info texts",
+  "[q] / [Q]                     Start / Stop Qt GUI",
   "[w] / [s] / [a] / [d]         Zoom / Strafe Left and Right",
   "[pgup] / [pgdn]               Strafe up / down",
   "[e] / [f]                     Rotate left / right",
@@ -79,25 +79,26 @@ void GPUDisplay::PrintHelp()
 void GPUDisplay::HandleKey(unsigned char key)
 {
   GPUSettingsDisplayHeavy oldCfgH = mCfgH;
+  GPUSettingsDisplayLight oldCfgL = mCfgL;
   GPUSettingsDisplayRenderer oldCfgR = mCfgR;
   if (key == 'n') {
-    mBackend->mDisplayControl = 1;
+    mFrontend->mDisplayControl = 1;
     SetInfo("Showing next event", 1);
-  } else if (key == 27 || key == mBackend->KEY_ESCAPE) {
-    mBackend->mDisplayControl = 2;
+  } else if (key == 27 || key == mFrontend->KEY_ESCAPE) {
+    mFrontend->mDisplayControl = 2;
     SetInfo("Exiting", 1);
   } else if (key == 'r') {
     mResetScene = 1;
     SetInfo("View reset", 1);
-  } else if (key == mBackend->KEY_ALT && mBackend->mKeysShift[mBackend->KEY_ALT]) {
+  } else if (key == mFrontend->KEY_ALT && mFrontend->mKeysShift[mFrontend->KEY_ALT]) {
     mCfgR.camLookOrigin ^= 1;
     mCfgR.cameraMode = mCfgR.camLookOrigin + 2 * mCfgR.camYUp;
     SetInfo("Camera locked on origin: %s", mCfgR.camLookOrigin ? "enabled" : "disabled");
-  } else if (key == mBackend->KEY_CTRL && mBackend->mKeysShift[mBackend->KEY_CTRL]) {
+  } else if (key == mFrontend->KEY_CTRL && mFrontend->mKeysShift[mFrontend->KEY_CTRL]) {
     mCfgR.camYUp ^= 1;
     mCfgR.cameraMode = mCfgR.camLookOrigin + 2 * mCfgR.camYUp;
     SetInfo("Camera locked on y-axis facing upwards: %s", mCfgR.camYUp ? "enabled" : "disabled");
-  } else if (key == mBackend->KEY_ENTER) {
+  } else if (key == mFrontend->KEY_ENTER) {
     mCfgR.cameraMode++;
     if (mCfgR.cameraMode == 4) {
       mCfgR.cameraMode = 0;
@@ -106,8 +107,8 @@ void GPUDisplay::HandleKey(unsigned char key)
     mCfgR.camYUp = mCfgR.cameraMode & 2;
     const char* modeText[] = {"Descent (free movement)", "Focus locked on origin (y-axis forced upwards)", "Spectator (y-axis forced upwards)", "Focus locked on origin (with free rotation)"};
     SetInfo("Camera mode %d: %s", mCfgR.cameraMode, modeText[mCfgR.cameraMode]);
-  } else if (key == mBackend->KEY_ALT) {
-    mBackend->mKeys[mBackend->KEY_CTRL] = false; // Release CTRL with alt, to avoid orienting along y automatically!
+  } else if (key == mFrontend->KEY_ALT) {
+    mFrontend->mKeys[mFrontend->KEY_CTRL] = false; // Release CTRL with alt, to avoid orienting along y automatically!
   } else if (key == 'l') {
     if (mCfgL.drawSlice >= (mCfgL.drawRelatedSlices ? (NSLICES / 4 - 1) : (NSLICES - 1))) {
       mCfgL.drawSlice = -1;
@@ -241,18 +242,14 @@ void GPUDisplay::HandleKey(unsigned char key)
     SetInfo("Smoothing of lines %s", mCfgL.smoothLines ? "enabled" : "disabled");
   } else if (key == 'D') {
     mCfgL.depthBuffer ^= true;
-    GLint depthBits = 0;
-#ifndef GPUCA_DISPLAY_OPENGL_CORE
-    glGetIntegerv(GL_DEPTH_BITS, &depthBits);
-#endif
-    SetInfo("Depth buffer (z-buffer, %d bits) %s", depthBits, mCfgL.depthBuffer ? "enabled" : "disabled");
-    setDepthBuffer();
+    SetInfo("Depth buffer (z-buffer, %u bits) %s", mBackend->DepthBits(), mCfgL.depthBuffer ? "enabled" : "disabled");
+    mBackend->setDepthBuffer();
   } else if (key == 'W') {
     mCfgR.drawQualityMSAA *= 2;
     if (mCfgR.drawQualityMSAA < 2) {
       mCfgR.drawQualityMSAA = 2;
     }
-    if (mCfgR.drawQualityMSAA > 16) {
+    if (mCfgR.drawQualityMSAA > 16 || mCfgR.drawQualityMSAA > mBackend->getMaxMSAA()) {
       mCfgR.drawQualityMSAA = 0;
     }
     SetInfo("Multisampling anti-aliasing factor set to %d", mCfgR.drawQualityMSAA);
@@ -309,47 +306,47 @@ void GPUDisplay::HandleKey(unsigned char key)
     mCfgL.drawGlobalTracks ^= 1;
   } else if (key == '8') {
     mCfgL.drawFinal ^= 1;
-  } else if (key == mBackend->KEY_F1) {
-    if (mBackend->mKeysShift[mBackend->KEY_F1]) {
+  } else if (key == mFrontend->KEY_F1) {
+    if (mFrontend->mKeysShift[mFrontend->KEY_F1]) {
       mCfgH.drawTPCTracks ^= 1;
       SetInfo("Track Filter Mask: TPC:%d TRD:%d TOF:%d ITS:%d", (int)mCfgH.drawTPCTracks, (int)mCfgH.drawTRDTracks, (int)mCfgH.drawTOFTracks, (int)mCfgH.drawITSTracks);
     } else {
       mCfgL.drawTPC ^= 1;
       SetInfo("Showing TPC Clusters: %d", (int)mCfgL.drawTPC);
     }
-  } else if (key == mBackend->KEY_F2) {
-    if (mBackend->mKeysShift[mBackend->KEY_F2]) {
+  } else if (key == mFrontend->KEY_F2) {
+    if (mFrontend->mKeysShift[mFrontend->KEY_F2]) {
       mCfgH.drawTRDTracks ^= 1;
       SetInfo("Track Filter Mask: TPC:%d TRD:%d TOF:%d ITS:%d", (int)mCfgH.drawTPCTracks, (int)mCfgH.drawTRDTracks, (int)mCfgH.drawTOFTracks, (int)mCfgH.drawITSTracks);
     } else {
       mCfgL.drawTRD ^= 1;
       SetInfo("Showing TRD Tracklets: %d", (int)mCfgL.drawTRD);
     }
-  } else if (key == mBackend->KEY_F3) {
-    if (mBackend->mKeysShift[mBackend->KEY_F3]) {
+  } else if (key == mFrontend->KEY_F3) {
+    if (mFrontend->mKeysShift[mFrontend->KEY_F3]) {
       mCfgH.drawTOFTracks ^= 1;
       SetInfo("Track Filter Mask: TPC:%d TRD:%d TOF:%d ITS:%d", (int)mCfgH.drawTPCTracks, (int)mCfgH.drawTRDTracks, (int)mCfgH.drawTOFTracks, (int)mCfgH.drawITSTracks);
     } else {
       mCfgL.drawTOF ^= 1;
       SetInfo("Showing TOF Hits: %d", (int)mCfgL.drawTOF);
     }
-  } else if (key == mBackend->KEY_F4) {
-    if (mBackend->mKeysShift[mBackend->KEY_F4]) {
+  } else if (key == mFrontend->KEY_F4) {
+    if (mFrontend->mKeysShift[mFrontend->KEY_F4]) {
       mCfgH.drawITSTracks ^= 1;
       SetInfo("Track Filter Mask: TPC:%d TRD:%d TOF:%d ITS:%d", (int)mCfgH.drawTPCTracks, (int)mCfgH.drawTRDTracks, (int)mCfgH.drawTOFTracks, (int)mCfgH.drawITSTracks);
     } else {
       mCfgL.drawITS ^= 1;
       SetInfo("Showing ITS Clusters: %d", (int)mCfgL.drawITS);
     }
-  } else if (key == mBackend->KEY_F12 && mBackend->mKeysShift[mBackend->KEY_F12]) {
+  } else if (key == mFrontend->KEY_F12 && mFrontend->mKeysShift[mFrontend->KEY_F12]) {
     mCfgH.drawTracksAndFilter ^= 1;
     SetInfo("Track filter: %s", mCfgH.drawTracksAndFilter ? "AND" : "OR");
   } else if (key == 't') {
-    GPUInfo("Taking screenshot");
     static int nScreenshot = 1;
     char fname[32];
     sprintf(fname, "screenshot%d.bmp", nScreenshot++);
-    DoScreenshot(fname);
+    mRequestScreenshot = true;
+    mScreenshotFile = fname;
     SetInfo("Taking screenshot (%s)", fname);
   } else if (key == 'Z') {
     mCfgR.screenshotScaleFactor += 1;
@@ -358,10 +355,10 @@ void GPUDisplay::HandleKey(unsigned char key)
     }
     SetInfo("Screenshot scaling factor set to %d", mCfgR.screenshotScaleFactor);
   } else if (key == 'y' || key == 'T') {
-    if ((mAnimateScreenshot = (key == 'T'))) {
-      mAnimationExport++;
-    }
     if (mAnimateVectors[0].size() > 1) {
+      if ((mAnimateScreenshot = (key == 'T'))) {
+        mAnimationExport++;
+      }
       startAnimation();
       SetInfo("Starting Animation", 1);
     } else {
@@ -459,6 +456,12 @@ void GPUDisplay::HandleKey(unsigned char key)
   } else if (key == 'h') {
     PrintHelp();
     SetInfo("Showing help text", 1);
+  } else if (key == 'q') {
+    SetInfo("Starting GUI", 1);
+    mFrontend->startGUI();
+  } else if (key == 'Q') {
+    SetInfo("Stopping GUI", 1);
+    mFrontend->stopGUI();
   }
   /*
   else if (key == '^')
@@ -469,25 +472,30 @@ void GPUDisplay::HandleKey(unsigned char key)
   */
 
   if (memcmp((void*)&oldCfgH, (void*)&mCfgH, sizeof(mCfgH)) != 0) {
-    mUpdateDLList = true;
+    mUpdateEventData = true;
   }
-  if (oldCfgR.drawQualityMSAA != mCfgR.drawQualityMSAA || oldCfgR.drawQualityDownsampleFSAA != mCfgR.drawQualityDownsampleFSAA) {
-    UpdateOffscreenBuffers();
+  if (memcmp((void*)&oldCfgL, (void*)&mCfgL, sizeof(mCfgL)) != 0 || memcmp((void*)&oldCfgR, (void*)&mCfgR, sizeof(mCfgR)) != 0) {
+    mUpdateDrawCommands = true;
   }
+  if (oldCfgR.drawQualityMSAA != mCfgR.drawQualityMSAA || oldCfgR.drawQualityDownsampleFSAA != mCfgR.drawQualityDownsampleFSAA || oldCfgL.depthBuffer != mCfgL.depthBuffer || oldCfgR.screenshotScaleFactor != mCfgR.screenshotScaleFactor) {
+    mUpdateRenderPipeline = true;
+  }
+
   if (oldCfgR.drawQualityVSync != mCfgR.drawQualityVSync) {
+    mFrontend->SetVSync(mCfgR.drawQualityVSync);
     mBackend->SetVSync(mCfgR.drawQualityVSync);
   }
   if (oldCfgR.fullScreen != mCfgR.fullScreen) {
-    mBackend->SwitchFullscreen(mCfgR.fullScreen);
+    mFrontend->SwitchFullscreen(mCfgR.fullScreen);
   }
   if (oldCfgR.maximized != mCfgR.maximized) {
-    mBackend->ToggleMaximized(mCfgR.maximized);
+    mFrontend->ToggleMaximized(mCfgR.maximized);
   }
   if (oldCfgR.maxFPSRate != mCfgR.maxFPSRate) {
-    mBackend->mMaxFPSRate = mCfgR.maxFPSRate;
+    mFrontend->mMaxFPSRate = mCfgR.maxFPSRate;
   }
   if (oldCfgR.useGLIndirectDraw != mCfgR.useGLIndirectDraw) {
-    mUpdateDLList = true;
+    mUpdateEventData = true;
   }
 }
 
@@ -500,17 +508,15 @@ void GPUDisplay::HandleSendKey(int key)
   if (press >= 'a' && press <= 'z') {
     press += 'A' - 'a';
   }
-  bool oldShift = mBackend->mKeysShift[press];
-  mBackend->mKeysShift[press] = shifted;
+  bool oldShift = mFrontend->mKeysShift[press];
+  mFrontend->mKeysShift[press] = shifted;
   HandleKey(key);
-  mBackend->mKeysShift[press] = oldShift;
+  mFrontend->mKeysShift[press] = oldShift;
 }
 
 void GPUDisplay::PrintGLHelpText(float colorValue)
 {
   for (unsigned int i = 0; i < sizeof(HelpText) / sizeof(HelpText[0]); i++) {
-    mBackend->OpenGLPrint(HelpText[i], 40.f, 35 + 20 * (1 + i), colorValue, colorValue, colorValue, mInfoHelpTimer.GetCurrentElapsedTime() >= 5 ? (6 - mInfoHelpTimer.GetCurrentElapsedTime()) : 1, false);
+    OpenGLPrint(HelpText[i], 40.f, 35 + std::max(20, mDrawTextFontSize + 4) * (1 + i), colorValue, colorValue, colorValue, mInfoHelpTimer.GetCurrentElapsedTime() >= 5 ? (6 - mInfoHelpTimer.GetCurrentElapsedTime()) : 1, false);
   }
 }
-
-#endif

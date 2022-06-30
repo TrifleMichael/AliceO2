@@ -27,13 +27,18 @@ namespace itsmft
 class ChipPixelData;
 
 struct ChipStat {
+  enum ActionOnError : int {
+    ErrActNone = 0x0,      // do nothing
+    ErrActPropagate = 0x1, // propagate to decoded data
+    ErrActDump = 0x2       // produce raw data dump
+  };
 
   enum DecErrors : int {
-    BusyViolation,
-    DataOverrun,
-    Fatal,
-    BusyOn,
-    BusyOff,
+    BusyViolation,                // Busy violation
+    DataOverrun,                  // Data overrun
+    Fatal,                        // Fatal (?)
+    BusyOn,                       // Busy On
+    BusyOff,                      // Busy Off
     TruncatedChipEmpty,           // Data was truncated after ChipEmpty
     TruncatedChipHeader,          // Data was truncated after ChipHeader
     TruncatedRegion,              // Data was truncated after Region record
@@ -43,8 +48,8 @@ struct ChipStat {
     UnknownWord,                  // Unknown word was seen
     RepeatingPixel,               // Same pixel fired more than once
     WrongRow,                     // Non-existing row decoded
-    APE_STRIP_START,              // lane entering strip data mode | See https://alice.its.cern.ch/jira/browse/O2-1717
-    APE_STRIP_STOP,               // lane exiting strip data mode
+    APE_STRIP,                    // lane data stripped for this chip event (behaviour changed with RU FW v1.16.0, for general APE behaviour see  https://alice.its.cern.ch/jira/browse/O2-1717)
+    APE_RESERVED_F3,              // reserved F3
     APE_DET_TIMEOUT,              // detector timeout (FATAL)
     APE_OOT_START,                // 8b10b OOT (FATAL, start)
     APE_PROTOCOL_ERROR,           // event protocol error marker (FATAL, start)
@@ -52,6 +57,14 @@ struct ChipStat {
     APE_FSM_ERROR,                // FSM error (FATAL, SEU error, reached an unknown state)
     APE_OCCUPANCY_RATE_LIMIT,     // pending detector events limit (FATAL)
     APE_OCCUPANCY_RATE_LIMIT_2,   // pending detector events limit in packager(FATAL)
+    APE_LANE_PROTOCOL_ERROR,      // lane protocol error
+    APE_RESERVED_FC,              // reserved FC
+    APE_ERROR_NON_CRITICAL_BYTE,  // Error in non critical byte
+    APE_OOT_NON_CRITICAL,         // OOT non-critical
+    WrongDColOrder,               // DColumns non increasing
+    InterleavedChipData,          // Chip data interleaved on the cable
+    TruncatedBuffer,              // truncated buffer, 0 padding
+    TrailerAfterHeader,           // trailer seen after header w/o FE of FD set
     NErrorsDefined
   };
 
@@ -70,16 +83,58 @@ struct ChipStat {
     "Unknown word",                                 // UnknownWord
     "Same pixel fired multiple times",              // RepeatingPixel
     "Non-existing row decoded",                     // WrongRow
-    "APE_STRIP_START",
-    "APE_STRIP_STOP",
-    "APE_DET_TIMEOUT",
-    "APE_OOT_START",
-    "APE_PROTOCOL_ERROR",
-    "APE_LANE_FIFO_OVERFLOW_ERROR",
-    "APE_FSM_ERROR",
-    "APE_OCCUPANCY_RATE_LIMIT",
-    "APE_OCCUPANCY_RATE_LIMIT_2"};
+    "APE_STRIP",                                    // lane data stripped for this chip event (behaviour changed with RU FW v1.16.0, for general APE behaviour see  https://alice.its.cern.ch/jira/browse/O2-1717)
+    "APE_RESERVED_F3",                              // reserved F3
+    "APE_DET_TIMEOUT",                              // detector timeout (FATAL)
+    "APE_OOT_START",                                // 8b10b OOT (FATAL, start)
+    "APE_PROTOCOL_ERROR",                           // event event protocol error marker (FATAL, start)
+    "APE_LANE_FIFO_OVERFLOW_ERROR",                 // lane FIFO overflow error (FATAL)
+    "APE_FSM_ERROR",                                // FSM error (FATAL, SEU error, reached an unknown state)
+    "APE_OCCUPANCY_RATE_LIMIT",                     // pending detector events limit (FATAL)
+    "APE_OCCUPANCY_RATE_LIMIT_2",                   // pending detector events limit in packager(FATAL)
+    "APE_LANE_PROTOCOL_ERROR",                      // lane protocol error
+    "APE_RESERVED_FC",                              // reserved
+    "APE_ERROR_IN_NON_CRITICAL_BYTE",               // Error in non critical byte
+    "APE_OOT_NON_CRITICAL",                         // OOT non-critical
+    "DColumns non-increasing",                      // DColumns non increasing
+    "Chip data interleaved on the cable",           // Chip data interleaved on the cable
+    "TruncatedBuffer",                              // truncated buffer, 0 padding
+    "TrailerAfterHeader"                            // trailer seen after header w/o FE of FD set
+  };
 
+  static constexpr std::array<uint32_t, NErrorsDefined> ErrActions = {
+    ErrActPropagate | ErrActDump, // Busy violation
+    ErrActPropagate | ErrActDump, // Data overrun
+    ErrActPropagate | ErrActDump, // Fatal (?)
+    ErrActNone,                   // Busy On
+    ErrActNone,                   // Busy Off
+    ErrActPropagate | ErrActDump, // Data was truncated after ChipEmpty
+    ErrActPropagate | ErrActDump, // Data was truncated after ChipHeader
+    ErrActPropagate | ErrActDump, // Data was truncated after Region record
+    ErrActPropagate | ErrActDump, // Data was truncated in the LongData record
+    ErrActPropagate | ErrActDump, // LongData pattern has highest bit set
+    ErrActPropagate | ErrActDump, // Region is not followed by Short or Long data
+    ErrActPropagate | ErrActDump, // Unknown word was seen
+    ErrActPropagate,              // Same pixel fired more than once
+    ErrActPropagate | ErrActDump, // Non-existing row decoded
+    ErrActPropagate | ErrActDump, // lane data stripped for this chip event (behaviour changed with RU FW v1.16.0, for general APE behaviour see  https://alice.its.cern.ch/jira/browse/O2-1717)
+    ErrActPropagate | ErrActDump, // reserved F3
+    ErrActPropagate | ErrActDump, // detector timeout (FATAL)
+    ErrActPropagate | ErrActDump, // 8b10b OOT (FATAL, start)
+    ErrActPropagate | ErrActDump, // event protocol error marker (FATAL, start)
+    ErrActPropagate | ErrActDump, // lane FIFO overflow error (FATAL)
+    ErrActPropagate | ErrActDump, // FSM error (FATAL, SEU error, reached an unknown state)
+    ErrActPropagate | ErrActDump, // pending detector events limit (FATAL)
+    ErrActPropagate | ErrActDump, // pending detector events limit in packager(FATAL)
+    ErrActPropagate | ErrActDump, // lane protocol error
+    ErrActPropagate | ErrActDump, // reserved FC
+    ErrActPropagate | ErrActDump, // Error in non critical byte
+    ErrActPropagate | ErrActDump, // OOT non-critical
+    ErrActPropagate | ErrActDump, // DColumns non increasing
+    ErrActPropagate | ErrActDump, // Chip data interleaved on the cable
+    ErrActPropagate | ErrActDump, // Truncated buffer while something was expected
+    ErrActPropagate | ErrActDump  // trailer seen after header w/o FE of FD set
+  };
   uint16_t feeID = -1;
   size_t nHits = 0;
   std::array<uint32_t, NErrorsDefined> errorCounts = {};
@@ -91,19 +146,28 @@ struct ChipStat {
     memset(errorCounts.data(), 0, sizeof(uint32_t) * errorCounts.size());
     nHits = 0;
   }
+
+  static int getAPENonCritical(uint8_t c)
+  {
+    if (c == 0xfd || c == 0xfe) {
+      return APE_STRIP + c - 0xf2;
+    }
+    return -1;
+  }
+
   // return APE DecErrors code or -1 if not APE error, set fatal flag if needd
   static int getAPECode(uint8_t c, bool& ft)
   {
-    if (c < 0xf2 || c > 0xfa) {
+    if (c < 0xf2 || c > 0xfe) {
       ft = false;
       return -1;
     }
-    ft = c >= 0xf4;
-    return APE_STRIP_START + c - 0xf2;
+    ft = c >= 0xf2 && c <= 0xfe;
+    return APE_STRIP + c - 0xf2;
   }
   uint32_t getNErrors() const;
-  void addErrors(uint32_t mask, uint16_t chID, int verbosity);
-  void addErrors(const ChipPixelData& d, int verbosity);
+  uint32_t addErrors(uint32_t mask, uint16_t chID, int verbosity);
+  uint32_t addErrors(const ChipPixelData& d, int verbosity);
   void print(bool skipNoErr = true, const std::string& pref = "FEEID") const;
 
   ClassDefNV(ChipStat, 1);

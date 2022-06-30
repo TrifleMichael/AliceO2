@@ -107,8 +107,7 @@ void VertexTrackMatcher::process(const o2::globaltracking::RecoContainer& recoDa
       auto res = tro.tBracket.isOutside(vto.tBracket);
       if (res == TBracket::Below) {                                       // vertex preceeds the track
         if (tro.tBracket.getMin() > vto.tBracket.getMin() + maxVtxSpan) { // all following vertices will be preceeding all following tracks times
-          ivStart = ++iv;
-          break;
+          ivStart = iv + 1;
         }
         continue; // following vertex with longer span might still match this track
       }
@@ -118,28 +117,20 @@ void VertexTrackMatcher::process(const o2::globaltracking::RecoContainer& recoDa
       // track matches to vertex, register
       vtxList.push_back(vto.origID); // flag matching vertex
     }
-    if ((tro.origID.getSource() == GIndex::Source::MFT) || (tro.origID.getSource() == GIndex::Source::MFTMCH)) { // Fwd tracks are treated differently: tracks with unresolved ambiguities are marked as orphans -> unassigned
-      if (vtxList.size() == 1) {
-        nAssigned++;
-        tmpMap[vtxList[0]].emplace_back(tro.origID).setAmbiguous();
-      } else {
-        orphans.emplace_back(tro.origID); // register as unassigned MFT track
+    if (vtxList.size()) {
+      nAssigned++;
+      bool ambig = vtxList.size() > 1;
+      for (auto v : vtxList) {
+        auto& ref = tmpMap[v].emplace_back(tro.origID);
+        if (ambig) {
+          ref.setAmbiguous();
+        }
       }
-      if (vtxList.size() > 1) { // did track match to multiple vertices?
-        nAmbiguous++;           // Should count MFT tracks here even if they end up on the orphans/unassigned table?
+      if (ambig) { // did track match to multiple vertices?
+        nAmbiguous++;
       }
     } else {
-      if (vtxList.size()) {
-        nAssigned++;
-        for (auto v : vtxList) {
-          tmpMap[v].emplace_back(tro.origID).setAmbiguous();
-        }
-        if (vtxList.size() > 1) { // did track match to multiple vertices?
-          nAmbiguous++;
-        }
-      } else {
-        orphans.emplace_back(tro.origID); // register unassigned track
-      }
+      orphans.emplace_back(tro.origID); // register unassigned track
     }
   }
 
@@ -181,28 +172,33 @@ void VertexTrackMatcher::extractTracks(const o2::globaltracking::RecoContainer& 
   mTBrackets.clear();
 
   auto creator = [this, &vcont](auto& _tr, GIndex _origID, float t0, float terr) {
-    if (vcont.find(_origID) != vcont.end()) { // track is contributor to vertex, already accounted
-      return true;
+    if constexpr (!(isMFTTrack<decltype(_tr)>() || isMCHTrack<decltype(_tr)>() || isGlobalFwdTrack<decltype(_tr)>())) { // Skip test for forward tracks; do not contribute to vertex
+      if (vcont.find(_origID) != vcont.end()) {                                                                         // track is contributor to vertex, already accounted
+        return true;
+      }
     }
+
     if constexpr (isTPCTrack<decltype(_tr)>()) {
       // unconstrained TPC track, with t0 = TrackTPC.getTime0+0.5*(DeltaFwd-DeltaBwd) and terr = 0.5*(DeltaFwd+DeltaBwd) in TimeBins
       t0 *= this->mTPCBin2MUS;
       terr *= this->mTPCBin2MUS;
     } else if constexpr (isITSTrack<decltype(_tr)>()) {
-      t0 += 0.5 * this->mITSROFrameLengthMUS; // ITS time is supplied in \mus as beginning of ROF
-      terr *= this->mITSROFrameLengthMUS;     // error is supplied as a half-ROF duration, convert to \mus
+      t0 += 0.5 * this->mITSROFrameLengthMUS;           // ITS time is supplied in \mus as beginning of ROF
+      terr *= this->mITSROFrameLengthMUS;               // error is supplied as a half-ROF duration, convert to \mus
     } else if constexpr (isMFTTrack<decltype(_tr)>()) { // Same for MFT
       t0 += 0.5 * this->mMFTROFrameLengthMUS;
       terr *= this->mMFTROFrameLengthMUS;
-    } else if constexpr (isGlobalFwdTrack<decltype(_tr)>()) {
-      t0 = _tr.getTimeMUS().getTimeStamp();
-      terr = _tr.getTimeMUS().getTimeStampError() * mPVParams->nSigmaTimeTrack; // gaussian errors must be scaled by requested n-sigma
-    } else {
+    } else if constexpr (!(isMCHTrack<decltype(_tr)>() || isGlobalFwdTrack<decltype(_tr)>())) {
+      // for all other tracks the time is in \mus with gaussian error
       terr *= mPVParams->nSigmaTimeTrack; // gaussian errors must be scaled by requested n-sigma
     }
-    // for all other tracks the time is in \mus with gaussian error
+
     terr += mPVParams->timeMarginTrackTime;
     mTBrackets.emplace_back(TrackTBracket{{t0 - terr, t0 + terr}, _origID});
+
+    if constexpr (isGlobalFwdTrack<decltype(_tr)>() || isMFTTrack<decltype(_tr)>()) {
+      return false;
+    }
     return true;
   };
 

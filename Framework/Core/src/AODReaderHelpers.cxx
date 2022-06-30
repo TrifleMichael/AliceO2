@@ -13,7 +13,7 @@
 #include "Framework/TableTreeHelpers.h"
 #include "Framework/AnalysisHelpers.h"
 #include "AnalysisDataModelHelpers.h"
-#include "DataProcessingHelpers.h"
+#include "Framework/DataProcessingHelpers.h"
 #include "Framework/ExpressionHelpers.h"
 #include "Framework/RootTableBuilderHelpers.h"
 #include "Framework/AlgorithmSpec.h"
@@ -90,42 +90,41 @@ AlgorithmSpec AODReaderHelpers::indexBuilderCallback(std::vector<InputSpec>& req
       auto outputs = pc.outputs();
       // spawn tables
       for (auto& input : requested) {
-        auto&& [origin, description] = DataSpecUtils::asConcreteDataTypeMatcher(input);
-
+        auto&& [origin, description, version] = DataSpecUtils::asConcreteDataMatcher(input);
         auto maker = [&](auto metadata) {
           using metadata_t = decltype(metadata);
           using Key = typename metadata_t::Key;
           using index_pack_t = typename metadata_t::index_pack_t;
-          using sources = typename metadata_t::originals;
+          using originals = typename metadata_t::originals;
           if constexpr (metadata_t::exclusive == true) {
             return o2::framework::IndexExclusive::indexBuilder(input.binding.c_str(), index_pack_t{},
                                                                extractTypedOriginal<Key>(pc),
-                                                               extractOriginalsTuple(sources{}, pc));
+                                                               extractOriginalsTuple(originals{}, pc));
           } else {
             return o2::framework::IndexSparse::indexBuilder(input.binding.c_str(), index_pack_t{},
                                                             extractTypedOriginal<Key>(pc),
-                                                            extractOriginalsTuple(sources{}, pc));
+                                                            extractOriginalsTuple(originals{}, pc));
           }
         };
 
         if (description == header::DataDescription{"MA_RN2_EX"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::Run2MatchedExclusiveMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::Run2MatchedExclusiveMetadata{}));
         } else if (description == header::DataDescription{"MA_RN2_SP"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::Run2MatchedSparseMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::Run2MatchedSparseMetadata{}));
         } else if (description == header::DataDescription{"MA_RN3_EX"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::Run3MatchedExclusiveMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::Run3MatchedExclusiveMetadata{}));
         } else if (description == header::DataDescription{"MA_RN3_SP"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::Run3MatchedSparseMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::Run3MatchedSparseMetadata{}));
         } else if (description == header::DataDescription{"MA_BCCOL_EX"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::MatchedBCCollisionsExclusiveMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::MatchedBCCollisionsExclusiveMetadata{}));
         } else if (description == header::DataDescription{"MA_BCCOL_SP"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::MatchedBCCollisionsSparseMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::MatchedBCCollisionsSparseMetadata{}));
         } else if (description == header::DataDescription{"MA_RN3_BC_SP"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::Run3MatchedToBCSparseMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::Run3MatchedToBCSparseMetadata{}));
         } else if (description == header::DataDescription{"MA_RN3_BC_EX"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::Run3MatchedToBCExclusiveMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::Run3MatchedToBCExclusiveMetadata{}));
         } else if (description == header::DataDescription{"MA_RN2_BC_SP"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::Run2MatchedToBCSparseMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::Run2MatchedToBCSparseMetadata{}));
         } else {
           throw std::runtime_error("Not an index table");
         }
@@ -141,29 +140,41 @@ AlgorithmSpec AODReaderHelpers::aodSpawnerCallback(std::vector<InputSpec>& reque
       auto outputs = pc.outputs();
       // spawn tables
       for (auto& input : requested) {
-        auto&& [origin, description] = DataSpecUtils::asConcreteDataTypeMatcher(input);
+        auto&& [origin, description, version] = DataSpecUtils::asConcreteDataMatcher(input);
 
         auto maker = [&](auto metadata) {
           using metadata_t = decltype(metadata);
           using expressions = typename metadata_t::expression_pack_t;
-          auto original_table = pc.inputs().get<TableConsumer>(input.binding)->asArrowTable();
-          return o2::framework::spawner(expressions{}, original_table.get(), input.binding.c_str());
+          std::vector<std::shared_ptr<arrow::Table>> originalTables;
+          for (auto& i : input.metadata) {
+            if ((i.type == VariantType::String) && (i.name.find("input:") != std::string::npos)) {
+              auto spec = DataSpecUtils::fromMetadataString(i.defaultValue.get<std::string>());
+              originalTables.push_back(pc.inputs().get<TableConsumer>(spec.binding)->asArrowTable());
+            }
+          }
+          return o2::framework::spawner(expressions{}, std::move(originalTables), input.binding.c_str());
         };
 
         if (description == header::DataDescription{"TRACK"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::TracksExtensionMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::TracksExtensionMetadata{}));
+        } else if (description == header::DataDescription{"TRACK_IU"}) {
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::TracksIUExtensionMetadata{}));
         } else if (description == header::DataDescription{"TRACKCOV"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::TracksCovExtensionMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::TracksCovExtensionMetadata{}));
+        } else if (description == header::DataDescription{"TRACKCOV_IU"}) {
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::TracksCovIUExtensionMetadata{}));
         } else if (description == header::DataDescription{"TRACKEXTRA"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::TracksExtraExtensionMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::TracksExtraExtensionMetadata{}));
         } else if (description == header::DataDescription{"MFTTRACK"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::MFTTracksExtensionMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::MFTTracksExtensionMetadata{}));
         } else if (description == header::DataDescription{"FWDTRACK"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::FwdTracksExtensionMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::FwdTracksExtensionMetadata{}));
         } else if (description == header::DataDescription{"FWDTRACKCOV"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::FwdTracksCovExtensionMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::FwdTracksCovExtensionMetadata{}));
         } else if (description == header::DataDescription{"MCPARTICLE"}) {
-          outputs.adopt(Output{origin, description}, maker(o2::aod::McParticlesExtensionMetadata{}));
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::McParticles_000ExtensionMetadata{}));
+        } else if (description == header::DataDescription{"MCPARTICLE_001"}) {
+          outputs.adopt(Output{origin, description, version}, maker(o2::aod::McParticles_001ExtensionMetadata{}));
         } else {
           throw runtime_error("Not an extended table");
         }

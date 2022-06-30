@@ -17,7 +17,6 @@
 #include "DetectorsBase/Propagator.h"
 #include "TPCBase/ParameterGas.h"
 
-#undef WITH_OPENMP
 #ifdef WITH_OPENMP
 #include <omp.h>
 #endif
@@ -38,11 +37,9 @@ void SVertexer::process(const o2::globaltracking::RecoContainer& recoData) // ac
   int ntrP = mTracksPool[POS].size(), ntrN = mTracksPool[NEG].size(), iThread = 0;
   mV0sTmp[0].clear();
   mCascadesTmp[0].clear();
-
 #ifdef WITH_OPENMP
-  omp_set_num_threads(mNThreads);
   int dynGrp = std::min(4, std::max(1, mNThreads / 2));
-#pragma omp parallel for schedule(dynamic, dynGrp)
+#pragma omp parallel for schedule(dynamic, dynGrp) num_threads(mNThreads)
 #endif
   for (int itp = 0; itp < ntrP; itp++) {
     auto& seedP = mTracksPool[POS][itp];
@@ -66,17 +63,58 @@ void SVertexer::process(const o2::globaltracking::RecoContainer& recoData) // ac
       checkV0(seedP, seedN, itp, itn, iThread);
     }
   }
-#ifdef WITH_OPENMP
-  for (int i = 1; i < mNThreads; i++) { // merge results of all threads
-    for (auto& casc : mCascadesTmp[i]) { // before merging fix cascades references on v0
-      casc.setV0ID(casc.getV0ID() + mV0sTmp[0].size());
+  // sort V0s and Cascades in vertex id
+  struct vid {
+    int thrID;
+    int entry;
+    int vtxID;
+  };
+  size_t nv0 = 0, ncsc = 0;
+  for (int i = 0; i < mNThreads; i++) {
+    nv0 += mV0sTmp[0].size();
+    ncsc += mCascadesTmp[i].size();
+  }
+  std::vector<vid> v0SortID, cascSortID;
+  v0SortID.reserve(nv0);
+  cascSortID.reserve(ncsc);
+  for (int i = 0; i < mNThreads; i++) {
+    for (int j = 0; j < (int)mV0sTmp[i].size(); j++) {
+      v0SortID.emplace_back(vid{i, j, mV0sTmp[i][j].getVertexID()});
     }
-    mV0sTmp[0].insert(mV0sTmp[0].end(), mV0sTmp[i].begin(), mV0sTmp[i].end());
-    mCascadesTmp[0].insert(mCascadesTmp[0].end(), mCascadesTmp[i].begin(), mCascadesTmp[i].end());
+    for (int j = 0; j < (int)mCascadesTmp[i].size(); j++) {
+      cascSortID.emplace_back(vid{i, j, mCascadesTmp[i][j].getVertexID()});
+    }
+  }
+  std::sort(v0SortID.begin(), v0SortID.end(), [](const vid& a, const vid& b) { return a.vtxID > b.vtxID; });
+  std::sort(cascSortID.begin(), cascSortID.end(), [](const vid& a, const vid& b) { return a.vtxID > b.vtxID; });
+  // sorted V0s
+  std::vector<V0> bufV0;
+  bufV0.reserve(nv0);
+  for (const auto& id : v0SortID) {
+    auto& v0 = mV0sTmp[id.thrID][id.entry];
+    int pos = bufV0.size();
+    bufV0.push_back(v0);
+    v0.setVertexID(pos); // this v0 copy will be discarded, use its vertexID to store the new position of final V0
+  }
+  // since V0s were reshuffled, we need to correct the cascade -> V0 reference indices
+  for (int i = 0; i < mNThreads; i++) {  // merge results of all threads
+    for (auto& casc : mCascadesTmp[i]) { // before merging fix cascades references on v0
+      casc.setV0ID(mV0sTmp[i][casc.getV0ID()].getVertexID());
+    }
+  }
+  // sorted Cascades
+  std::vector<Cascade> bufCasc;
+  bufCasc.reserve(ncsc);
+  for (const auto& id : cascSortID) {
+    bufCasc.push_back(mCascadesTmp[id.thrID][id.entry]);
+  }
+  //
+  mV0sTmp[0].swap(bufV0);               // the final result is fetched from here
+  mCascadesTmp[0].swap(bufCasc);        // the final result is fetched from here
+  for (int i = 1; i < mNThreads; i++) { // clean unneeded s.vertices
     mV0sTmp[i].clear();
     mCascadesTmp[i].clear();
   }
-#endif
   LOG(debug) << "DONE : " << mV0sTmp[0].size() << " " << mCascadesTmp[0].size();
 }
 
@@ -229,7 +267,6 @@ void SVertexer::buildT2V(const o2::globaltracking::RecoContainer& recoData) // a
       if (tvid.getSource() == GIndex::TPC && processTPCTrack(recoData.getTPCTrack(tvid), tvid, iv)) { // processTPCTrack may decide that this track does not need special treatment (e.g. it is constrained...)
         continue;
       }
-      std::decay_t<decltype(tmap.find(tvid))> tref{};
       if (tvid.isAmbiguous()) { // was this track already processed?
         auto tref = tmap.find(tvid);
         if (tref != tmap.end()) {

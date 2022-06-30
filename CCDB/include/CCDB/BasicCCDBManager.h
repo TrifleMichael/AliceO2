@@ -23,8 +23,6 @@
 #include <unordered_map>
 #include <memory>
 
-// #include <FairLogger.h>
-
 class TGeoManager; // we need to forward-declare those classes which should not be cleaned up
 
 namespace o2::ccdb
@@ -47,11 +45,21 @@ class CCDBManagerInstance
     void* noCleanupPtr = nullptr; // if assigned instead of objPtr, no cleanup will be done on exit (for global objects cleaned up by the root, e.g. gGeoManager)
     std::string uuid;
     long startvalidity = 0;
-    long endvalidity = 0;
+    long endvalidity = -1;
     bool isValid(long ts) { return ts < endvalidity && ts > startvalidity; }
+    void clear()
+    {
+      noCleanupPtr = nullptr;
+      objPtr.reset();
+      uuid = "";
+      startvalidity = 0;
+      endvalidity = -1;
+    }
   };
 
  public:
+  using MD = std::map<std::string, std::string>;
+
   CCDBManagerInstance(std::string const& path) : mCCDBAccessor{}
   {
     mCCDBAccessor.init(path);
@@ -79,7 +87,7 @@ class CCDBManagerInstance
 
   /// retrieve an object of type T from CCDB as stored under path, timestamp and metaData
   template <typename T>
-  T* getSpecific(std::string const& path, long timestamp = -1, std::map<std::string, std::string> metaData = std::map<std::string, std::string>())
+  T* getSpecific(std::string const& path, long timestamp = -1, MD metaData = MD())
   {
     // TODO: add some error info/handling when failing
     mMetaData = metaData;
@@ -90,7 +98,6 @@ class CCDBManagerInstance
   template <typename T>
   T* get(std::string const& path)
   {
-    // TODO: add some error info/handling when failing
     return getForTimeStamp<T>(path, mTimestamp);
   }
 
@@ -112,6 +119,15 @@ class CCDBManagerInstance
     if (!v) {
       clearCache();
     }
+  }
+
+  /// Check if an object in cache is valid
+  bool isCachedObjectValid(std::string const& path, long timestamp)
+  {
+    if (!isCachingEnabled()) {
+      return false;
+    }
+    return mCache[path].isValid(timestamp);
   }
 
   /// check if checks of object validity before CCDB query is enabled
@@ -138,38 +154,57 @@ class CCDBManagerInstance
   /// reset the object upper validity limit
   void resetCreatedNotBefore() { mCreatedNotBefore = 0; }
 
+  /// get the fatalWhenNull state
+  bool getFatalWhenNull() const { return mFatalWhenNull; }
+  /// set the fatal property (when false; nullptr object responses will not abort)
+  void setFatalWhenNull(bool b) { mFatalWhenNull = b; }
+
+  /// a convenience function for MC to fetch
+  /// valid timestamps given an ALICE run number
+  std::pair<uint64_t, uint64_t> getRunDuration(int runnumber) const;
+
  private:
+  // method to print (fatal) error
+  void reportFatal(std::string_view s);
   // we access the CCDB via the CURL based C++ API
   o2::ccdb::CcdbApi mCCDBAccessor;
   std::unordered_map<std::string, CachedObject> mCache; //! map for {path, CachedObject} associations
-  std::map<std::string, std::string> mMetaData;         // some dummy object needed to talk to CCDB API
-  std::map<std::string, std::string> mHeaders;          // headers to retrieve tags
+  MD mMetaData;                                         // some dummy object needed to talk to CCDB API
+  MD mHeaders;                                          // headers to retrieve tags
   long mTimestamp{o2::ccdb::getCurrentTimestamp()};     // timestamp to be used for query (by default "now")
   bool mCanDefault = false;                             // whether default is ok --> useful for testing purposes done standalone/isolation
   bool mCachingEnabled = true;                          // whether caching is enabled
   bool mCheckObjValidityEnabled = false;                // wether the validity of cached object is checked before proceeding to a CCDB API query
   long mCreatedNotAfter = 0;                            // upper limit for object creation timestamp (TimeMachine mode) - If-Not-After HTTP header
   long mCreatedNotBefore = 0;                           // lower limit for object creation timestamp (TimeMachine mode) - If-Not-Before HTTP header
+  bool mFatalWhenNull = true;                           // if nullptr blob replies should be treated as fatal (can be set by user)
+
+  ClassDefNV(CCDBManagerInstance, 1);
 };
 
 template <typename T>
 T* CCDBManagerInstance::getForTimeStamp(std::string const& path, long timestamp)
 {
+  T* ptr = nullptr;
   if (!isCachingEnabled()) {
-    return mCCDBAccessor.retrieveFromTFileAny<T>(path, mMetaData, timestamp, nullptr, "",
-                                                 mCreatedNotAfter ? std::to_string(mCreatedNotAfter) : "",
-                                                 mCreatedNotBefore ? std::to_string(mCreatedNotBefore) : "");
+    ptr = mCCDBAccessor.retrieveFromTFileAny<T>(path, mMetaData, timestamp, nullptr, "",
+                                                mCreatedNotAfter ? std::to_string(mCreatedNotAfter) : "",
+                                                mCreatedNotBefore ? std::to_string(mCreatedNotBefore) : "");
+    if (!ptr && mFatalWhenNull) {
+      reportFatal(std::string("Got nullptr from CCDB for path ") + path + std::string(" and timestamp ") + std::to_string(timestamp));
+    }
+    return ptr;
   }
   auto& cached = mCache[path];
   if (mCheckObjValidityEnabled && cached.isValid(timestamp)) {
     return reinterpret_cast<T*>(cached.noCleanupPtr ? cached.noCleanupPtr : cached.objPtr.get());
   }
-
-  T* ptr = mCCDBAccessor.retrieveFromTFileAny<T>(path, mMetaData, timestamp, &mHeaders, cached.uuid,
-                                                 mCreatedNotAfter ? std::to_string(mCreatedNotAfter) : "",
-                                                 mCreatedNotBefore ? std::to_string(mCreatedNotBefore) : "");
+  ptr = mCCDBAccessor.retrieveFromTFileAny<T>(path, mMetaData, timestamp, &mHeaders, cached.uuid,
+                                              mCreatedNotAfter ? std::to_string(mCreatedNotAfter) : "",
+                                              mCreatedNotBefore ? std::to_string(mCreatedNotBefore) : "");
   if (ptr) { // new object was shipped, old one (if any) is not valid anymore
-    if constexpr (std::is_same<TGeoManager, T>::value) { // some special objects cannot be cached to shared_ptr since root may delete their raw global pointer
+    if constexpr (std::is_same<TGeoManager, T>::value || std::is_base_of<o2::conf::ConfigurableParam, T>::value) {
+      // some special objects cannot be cached to shared_ptr since root may delete their raw global pointer
       cached.noCleanupPtr = ptr;
     } else {
       cached.objPtr.reset(ptr);
@@ -184,6 +219,9 @@ T* CCDBManagerInstance::getForTimeStamp(std::string const& path, long timestamp)
   }
   mHeaders.clear();
   mMetaData.clear();
+  if (!ptr && mFatalWhenNull) {
+    reportFatal(std::string("Got nullptr from CCDB for path ") + path + std::string(" and timestamp ") + std::to_string(timestamp));
+  }
   return ptr;
 }
 

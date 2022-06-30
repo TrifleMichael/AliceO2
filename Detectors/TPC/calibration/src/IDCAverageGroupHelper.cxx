@@ -14,17 +14,16 @@
 #include "TPCCalibration/IDCContainer.h"
 #include "TPCCalibration/RobustAverage.h"
 
-void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupCRU>::setGroupedIDC(const unsigned int rowGrouped, const unsigned int padGrouped)
+float o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupCRU>::getGroupedIDC(const bool withweights) const
 {
   const static auto& paramIDCGroup = ParameterIDCGroup::Instance();
   switch (paramIDCGroup.method) {
     case o2::tpc::AveragingMethod::SLOW:
     default:
-      mIDCsGrouped(rowGrouped, padGrouped, mIntegrationInterval) = mRobustAverage[mThreadNum].getFilteredAverage(paramIDCGroup.sigma);
+      return mRobustAverage[mThreadNum].getFilteredAverage(paramIDCGroup.sigma);
       break;
     case o2::tpc::AveragingMethod::FAST:
-      const float mean = mRobustAverage[mThreadNum].getMean();
-      mIDCsGrouped(rowGrouped, padGrouped, mIntegrationInterval) = mRobustAverage[mThreadNum].getMean();
+      return withweights ? mRobustAverage[mThreadNum].getWeightedMean() : mRobustAverage[mThreadNum].getMean();
       break;
   }
 }
@@ -39,6 +38,11 @@ void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupCRU>::set(const unsi
 void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupCRU>::addValue(const unsigned int padInRegion, const float weight)
 {
   mRobustAverage[mThreadNum].addValue(getUngroupedIDCVal(padInRegion) * Mapper::INVPADAREA[getRegion()], weight);
+}
+
+void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupCRU>::addValue(const unsigned int padInRegion)
+{
+  mRobustAverage[mThreadNum].addValue(getUngroupedIDCVal(padInRegion) * Mapper::INVPADAREA[getRegion()]);
 }
 
 void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupCRU>::clearRobustAverage()
@@ -66,19 +70,20 @@ void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::setIntegration
 {
   mIntegrationInterval = integrationInterval;
   mOffsetUngrouped = (mIntegrationInterval * SECTORSPERSIDE + getSector() % SECTORSPERSIDE) * Mapper::getPadsInSector() + Mapper::GLOBALPADOFFSET[getRegion()];
-  mOffsetGrouped = mIDCGroupHelperSector.getIndexGrouped(getSector(), getRegion(), 0, 0, mIntegrationInterval) - mIDCGroupHelperSector.getGroupingParameter().getGroupPadsSectorEdges() * mIDCGroupHelperSector.getGroupingParameter().getGroupRows(getRegion());
+  const int offs = mIDCGroupHelperSector.getGroupingParameter().getEdgePadGroupingType() == EdgePadGroupingMethod::ROWS ? 1 : mIDCGroupHelperSector.getGroupingParameter().getGroupRows(getRegion());
+  mOffsetGrouped = mIDCGroupHelperSector.getIndexGrouped(getSector(), getRegion(), 0, 0, mIntegrationInterval) - mIDCGroupHelperSector.getGroupingParameter().getGroupedPadsSectorEdges() * offs;
 }
 
-void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::setGroupedIDC(const unsigned int rowGrouped, const unsigned int padGrouped)
+float o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::getGroupedIDC(const bool withweights) const
 {
   const static auto& paramIDCGroup = ParameterIDCGroup::Instance();
   switch (paramIDCGroup.method) {
     case o2::tpc::AveragingMethod::SLOW:
     default:
-      setGroupedIDC(rowGrouped, padGrouped, mRobustAverage[mThreadNum].getFilteredAverage(paramIDCGroup.sigma));
+      return mRobustAverage[mThreadNum].getFilteredAverage(paramIDCGroup.sigma);
       break;
     case o2::tpc::AveragingMethod::FAST:
-      setGroupedIDC(rowGrouped, padGrouped, mRobustAverage[mThreadNum].getMean());
+      return withweights ? mRobustAverage[mThreadNum].getWeightedMean() : mRobustAverage[mThreadNum].getMean();
       break;
   }
 }
@@ -88,13 +93,18 @@ void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::addValue(const
   mRobustAverage[mThreadNum].addValue(getUngroupedIDCVal(padInRegion), weight);
 }
 
+void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::addValue(const unsigned int padInRegion)
+{
+  mRobustAverage[mThreadNum].addValue(getUngroupedIDCVal(padInRegion));
+}
+
 void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::clearRobustAverage()
 {
   mRobustAverage[mThreadNum].clear();
 }
 
-void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::setSectorEdgeIDC(const unsigned int ulrow, const unsigned int upad, const unsigned int padInRegion)
+void o2::tpc::IDCAverageGroupHelper<o2::tpc::IDCAverageGroupTPC>::setSectorEdgeIDC(const unsigned int ulrow, const unsigned int upad)
 {
   const int index = mIDCGroupHelperSector.getIndexUngrouped(getSector(), getRegion(), ulrow, upad, mIntegrationInterval);
-  mIDCsGrouped.setValue(getUngroupedIDCVal(padInRegion), getSide(), index);
+  mIDCsGrouped.setValue(getGroupedIDC(false), getSide(), index);
 }

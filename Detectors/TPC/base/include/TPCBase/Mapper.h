@@ -233,24 +233,24 @@ class Mapper
     return pos;
   }
 
-  const PadPos padPosRegion(const int cruNumber, const int fecInRegion, const int sampaOnFEC,
+  const PadPos padPosRegion(const int cruNumber, const int fecInPartition, const int sampaOnFEC,
                             const int channelOnSAMPA) const
   {
     const CRU cru(cruNumber);
     const PadRegionInfo& regionInfo = mMapPadRegionInfo[cru.region()];
     const PartitionInfo& partInfo = mMapPartitionInfo[cru.partition()];
-    const int fecInSector = partInfo.getSectorFECOffset() + fecInRegion;
+    const int fecInSector = partInfo.getSectorFECOffset() + fecInPartition;
     const GlobalPadNumber padNumber = globalPadNumber(fecInSector, sampaOnFEC, channelOnSAMPA);
     PadPos pos = padPos(padNumber);
     pos.setRow(pos.getRow() - regionInfo.getGlobalRowOffset());
     return pos;
   }
 
-  const PadROCPos padROCPos(const CRU cru, const int fecInRegion, const int sampaOnFEC,
+  const PadROCPos padROCPos(const CRU cru, const int fecInPartition, const int sampaOnFEC,
                             const int channelOnSAMPA) const
   {
     const PartitionInfo& partInfo = mMapPartitionInfo[cru.partition()];
-    const int fecInSector = partInfo.getSectorFECOffset() + fecInRegion;
+    const int fecInSector = partInfo.getSectorFECOffset() + fecInPartition;
     const GlobalPadNumber padNumber = globalPadNumber(fecInSector, sampaOnFEC, channelOnSAMPA);
     const ROC roc = cru.roc();
     PadROCPos pos(roc, padPos(padNumber));
@@ -260,11 +260,11 @@ class Mapper
     return pos;
   }
 
-  const PadSecPos padSecPos(const CRU cru, const int fecInRegion, const int sampaOnFEC,
+  const PadSecPos padSecPos(const CRU cru, const int fecInPartition, const int sampaOnFEC,
                             const int channelOnSAMPA) const
   {
     const PartitionInfo& partInfo = mMapPartitionInfo[cru.partition()];
-    const int fecInSector = partInfo.getSectorFECOffset() + fecInRegion;
+    const int fecInSector = partInfo.getSectorFECOffset() + fecInPartition;
     const GlobalPadNumber padNumber = globalPadNumber(fecInSector, sampaOnFEC, channelOnSAMPA);
     PadSecPos pos(cru.sector(), padPos(padNumber));
     return pos;
@@ -295,6 +295,13 @@ class Mapper
 
   // ===| pad number and pad row mappings |=====================================
   int getNumberOfRows() const { return mNumberOfPadRowsIROC + mNumberOfPadRowsOROC; }
+
+  /// \return returns number of pad rows in IROCs
+  static constexpr auto getNumberOfRowsInIROC() { return mNumberOfPadRowsIROC; }
+
+  /// \return returns number of pad rows in OROCs
+  static constexpr auto getNumberOfRowsInOROC() { return mNumberOfPadRowsOROC; }
+
   int getNumberOfRowsROC(ROC roc) const
   {
     return (roc.rocType() == RocType::IROC) ? mNumberOfPadRowsIROC : mNumberOfPadRowsOROC;
@@ -428,6 +435,9 @@ class Mapper
     }
     return getPadsInOROC();
   }
+
+  const std::vector<PadPos>& getMapGlobalPadToPadPos() const { return mMapGlobalPadToPadPos; }
+  const std::vector<int>& getMapFECIDGlobalPad() const { return mMapFECIDGlobalPad; }
 
   const std::vector<float>& getTraceLengthsIROC() const { return mTraceLengthsIROC; }
   const std::vector<float>& getTraceLengthsOROC() const { return mTraceLengthsOROC; }

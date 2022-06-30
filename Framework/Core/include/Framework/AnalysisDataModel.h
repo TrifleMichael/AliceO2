@@ -17,6 +17,7 @@
 #include "Framework/DataTypes.h"
 #include "CommonConstants/MathConstants.h"
 #include "CommonConstants/PhysicsConstants.h"
+#include "CommonConstants/GeomConstants.h"
 
 using namespace o2::constants::math;
 
@@ -93,7 +94,7 @@ namespace track
 {
 // TRACKPAR TABLE definition
 DECLARE_SOA_INDEX_COLUMN(Collision, collision);    //! Collision to which this track belongs
-DECLARE_SOA_COLUMN(TrackType, trackType, uint8_t); //! Type of track. See enum TrackTypeEnum
+DECLARE_SOA_COLUMN(TrackType, trackType, uint8_t); //! Type of track. See enum TrackTypeEnum. This cannot be used to decide which detector has contributed to this track. Use hasITS, hasTPC, etc.
 DECLARE_SOA_COLUMN(X, x, float);                   //!
 DECLARE_SOA_COLUMN(Alpha, alpha, float);           //!
 DECLARE_SOA_COLUMN(Y, y, float);                   //!
@@ -103,12 +104,14 @@ DECLARE_SOA_COLUMN(Tgl, tgl, float);               //!
 DECLARE_SOA_COLUMN(Signed1Pt, signed1Pt, float);   //! (sign of charge)/Pt in c/GeV. Use pt() and sign() instead
 DECLARE_SOA_EXPRESSION_COLUMN(Phi, phi, float,     //! Phi of the track, in radians within [0, 2pi)
                               ifnode(nasin(aod::track::snp) + aod::track::alpha < 0.0f, nasin(aod::track::snp) + aod::track::alpha + TwoPI,
-                                     ifnode(nasin(aod::track::snp) + aod::track::alpha > TwoPI, nasin(aod::track::snp) + aod::track::alpha - TwoPI,
+                                     ifnode(nasin(aod::track::snp) + aod::track::alpha >= TwoPI, nasin(aod::track::snp) + aod::track::alpha - TwoPI,
                                             nasin(aod::track::snp) + aod::track::alpha)));
 DECLARE_SOA_EXPRESSION_COLUMN(Eta, eta, float, //! Pseudorapidity
                               -1.f * nlog(ntan(PIQuarter - 0.5f * natan(aod::track::tgl))));
 DECLARE_SOA_EXPRESSION_COLUMN(Pt, pt, float, //! Transverse momentum of the track in GeV/c
                               nabs(1.f / aod::track::signed1Pt));
+DECLARE_SOA_DYNAMIC_COLUMN(IsWithinBeamPipe, isWithinBeamPipe, //! Is the track within the beam pipe (= successfully propagated to a collision vertex)
+                           [](float x) -> bool { return (std::fabs(x) < o2::constants::geom::XBeamPipeOuterRef); });
 DECLARE_SOA_DYNAMIC_COLUMN(Sign, sign, //! Charge: positive: 1, negative: -1
                            [](float signed1Pt) -> short { return (signed1Pt > 0) ? 1 : -1; });
 DECLARE_SOA_DYNAMIC_COLUMN(Px, px, //! Momentum in x-direction in GeV/c
@@ -135,6 +138,21 @@ DECLARE_SOA_DYNAMIC_COLUMN(Pz, pz, //! Momentum in z-direction in GeV/c
 
 DECLARE_SOA_EXPRESSION_COLUMN(P, p, float, //! Momentum in Gev/c
                               0.5f * (ntan(PIQuarter - 0.5f * natan(aod::track::tgl)) + 1.f / ntan(PIQuarter - 0.5f * natan(aod::track::tgl))) / nabs(aod::track::signed1Pt));
+DECLARE_SOA_DYNAMIC_COLUMN(Energy, energy, //! Track energy, computed under the mass assumption given as input
+                           [](float signed1Pt, float tgl, float mass) -> float {
+                             const auto pt = 1.f / std::abs(signed1Pt);
+                             const auto pz = pt * tgl;
+                             const auto p = 0.5f * (tan(PIQuarter - 0.5f * atan(tgl)) + 1.f / tan(PIQuarter - 0.5f * atan(tgl))) * pt;
+                             return sqrt(p * p + mass * mass);
+                           });
+DECLARE_SOA_DYNAMIC_COLUMN(Rapidity, rapidity, //! Track rapidity, computed under the mass assumption given as input
+                           [](float signed1Pt, float tgl, float mass) -> float {
+                             const auto pt = 1.f / std::abs(signed1Pt);
+                             const auto pz = pt * tgl;
+                             const auto p = 0.5f * (tan(PIQuarter - 0.5f * atan(tgl)) + 1.f / tan(PIQuarter - 0.5f * atan(tgl))) * pt;
+                             const auto energy = sqrt(p * p + mass * mass);
+                             return 0.5f * log((energy + pz) / (energy - pz));
+                           });
 
 // TRACKPARCOV TABLE definition
 DECLARE_SOA_COLUMN(SigmaY, sigmaY, float);        //! Covariance matrix
@@ -218,7 +236,7 @@ DECLARE_SOA_DYNAMIC_COLUMN(HasTRD, hasTRD, //! Flag to check if track has a TRD 
                            [](uint8_t detectorMap) -> bool { return detectorMap & o2::aod::track::TRD; });
 DECLARE_SOA_DYNAMIC_COLUMN(HasTOF, hasTOF, //! Flag to check if track has a TOF measurement
                            [](uint8_t detectorMap) -> bool { return detectorMap & o2::aod::track::TOF; });
-DECLARE_SOA_DYNAMIC_COLUMN(IsPVContributor, isPVContributor, //! Has this track contributed to the collision vertex fit
+DECLARE_SOA_DYNAMIC_COLUMN(IsPVContributor, isPVContributor, //! Run 3: Has this track contributed to the collision vertex fit
                            [](uint8_t flags) -> bool { return (flags & o2::aod::track::PVContributor) == o2::aod::track::PVContributor; });
 DECLARE_SOA_DYNAMIC_COLUMN(PIDForTracking, pidForTracking, //! PID hypothesis used during tracking. See the constants in the class PID in PID.h
                            [](uint32_t flags) -> uint32_t { return flags >> 28; });
@@ -266,28 +284,71 @@ DECLARE_SOA_DYNAMIC_COLUMN(TPCFractionSharedCls, tpcFractionSharedCls, //! Fract
                            });
 } // namespace track
 
-DECLARE_SOA_TABLE_FULL(StoredTracks, "Tracks", "AOD", "TRACK", //! On disk version of the Track table
+DECLARE_SOA_TABLE_FULL(StoredTracks, "Tracks", "AOD", "TRACK", //! On disk version of the track parameters at collision vertex
                        o2::soa::Index<>, track::CollisionId, track::TrackType,
                        track::X, track::Alpha,
                        track::Y, track::Z, track::Snp, track::Tgl,
-                       track::Signed1Pt,
+                       track::Signed1Pt, track::IsWithinBeamPipe<track::X>,
                        track::Px<track::Signed1Pt, track::Snp, track::Alpha>,
                        track::Py<track::Signed1Pt, track::Snp, track::Alpha>,
                        track::Pz<track::Signed1Pt, track::Tgl>,
-                       track::Sign<track::Signed1Pt>);
+                       track::Energy<track::Signed1Pt, track::Tgl>,
+                       track::Rapidity<track::Signed1Pt, track::Tgl>,
+                       track::Sign<track::Signed1Pt>,
+                       o2::soa::Marker<1>);
 
-DECLARE_SOA_EXTENDED_TABLE(Tracks, StoredTracks, "TRACK", //! Basic track properties
+DECLARE_SOA_EXTENDED_TABLE(Tracks, StoredTracks, "TRACK", //! Track parameters at collision vertex
                            aod::track::Pt,
                            aod::track::P,
                            aod::track::Eta,
                            aod::track::Phi);
 
-DECLARE_SOA_TABLE_FULL(StoredTracksCov, "TracksCov", "AOD", "TRACKCOV", //! On disk version of the TracksCov table
+DECLARE_SOA_TABLE_FULL(StoredTracksIU, "Tracks_IU", "AOD", "TRACK_IU", //! On disk version of the track parameters at inner most update (e.g. ITS) as it comes from the tracking
+                       o2::soa::Index<>, track::CollisionId, track::TrackType,
+                       track::X, track::Alpha,
+                       track::Y, track::Z, track::Snp, track::Tgl,
+                       track::Signed1Pt, track::IsWithinBeamPipe<track::X>,
+                       track::Px<track::Signed1Pt, track::Snp, track::Alpha>,
+                       track::Py<track::Signed1Pt, track::Snp, track::Alpha>,
+                       track::Pz<track::Signed1Pt, track::Tgl>,
+                       track::Rapidity<track::Signed1Pt, track::Tgl>,
+                       track::Sign<track::Signed1Pt>,
+                       o2::soa::Marker<2>);
+
+DECLARE_SOA_EXTENDED_TABLE(TracksIU, StoredTracksIU, "TRACK_IU", //! Track parameters at inner most update (e.g. ITS) as it comes from the tracking
+                           aod::track::Pt,
+                           aod::track::P,
+                           aod::track::Eta,
+                           aod::track::Phi);
+
+DECLARE_SOA_TABLE_FULL(StoredTracksCov, "TracksCov", "AOD", "TRACKCOV", //! On disk version of the TracksCov table at collision vertex
                        track::SigmaY, track::SigmaZ, track::SigmaSnp, track::SigmaTgl, track::Sigma1Pt,
                        track::RhoZY, track::RhoSnpY, track::RhoSnpZ, track::RhoTglY, track::RhoTglZ,
-                       track::RhoTglSnp, track::Rho1PtY, track::Rho1PtZ, track::Rho1PtSnp, track::Rho1PtTgl);
+                       track::RhoTglSnp, track::Rho1PtY, track::Rho1PtZ, track::Rho1PtSnp, track::Rho1PtTgl, o2::soa::Marker<1>);
 
-DECLARE_SOA_EXTENDED_TABLE(TracksCov, StoredTracksCov, "TRACKCOV", //! Track covariance matrix
+DECLARE_SOA_EXTENDED_TABLE(TracksCov, StoredTracksCov, "TRACKCOV", //! Track covariance matrix at collision vertex
+                           aod::track::CYY,
+                           aod::track::CZY,
+                           aod::track::CZZ,
+                           aod::track::CSnpY,
+                           aod::track::CSnpZ,
+                           aod::track::CSnpSnp,
+                           aod::track::CTglY,
+                           aod::track::CTglZ,
+                           aod::track::CTglSnp,
+                           aod::track::CTglTgl,
+                           aod::track::C1PtY,
+                           aod::track::C1PtZ,
+                           aod::track::C1PtSnp,
+                           aod::track::C1PtTgl,
+                           aod::track::C1Pt21Pt2);
+
+DECLARE_SOA_TABLE_FULL(StoredTracksCovIU, "TracksCov_IU", "AOD", "TRACKCOV_IU", //! On disk version of the TracksCov table at inner most update (e.g. ITS) as it comes from the tracking
+                       track::SigmaY, track::SigmaZ, track::SigmaSnp, track::SigmaTgl, track::Sigma1Pt,
+                       track::RhoZY, track::RhoSnpY, track::RhoSnpZ, track::RhoTglY, track::RhoTglZ,
+                       track::RhoTglSnp, track::Rho1PtY, track::Rho1PtZ, track::Rho1PtSnp, track::Rho1PtTgl, o2::soa::Marker<2>);
+
+DECLARE_SOA_EXTENDED_TABLE(TracksCovIU, StoredTracksCovIU, "TRACKCOV_IU", //! Track covariance matrix at inner most update (e.g. ITS) as it comes from the tracking
                            aod::track::CYY,
                            aod::track::CZY,
                            aod::track::CZZ,
@@ -326,7 +387,9 @@ DECLARE_SOA_EXTENDED_TABLE(TracksExtra, StoredTracksExtra, "TRACKEXTRA", //! Add
                            track::DetectorMap);
 
 using Track = Tracks::iterator;
+using TrackIU = TracksIU::iterator;
 using TrackCov = TracksCov::iterator;
+using TrackCovIU = TracksCovIU::iterator;
 using TrackExtra = TracksExtra::iterator;
 
 } // namespace aod
@@ -459,7 +522,8 @@ DECLARE_SOA_TABLE_FULL(StoredMFTTracks, "MFTTracks", "AOD", "MFTTRACK", //!
                        fwdtrack::Px<fwdtrack::Pt, fwdtrack::Phi>,
                        fwdtrack::Py<fwdtrack::Pt, fwdtrack::Phi>,
                        fwdtrack::Pz<fwdtrack::Pt, fwdtrack::Tgl>,
-                       fwdtrack::Sign<fwdtrack::Signed1Pt>, fwdtrack::Chi2);
+                       fwdtrack::Sign<fwdtrack::Signed1Pt>, fwdtrack::Chi2,
+                       fwdtrack::TrackTime, fwdtrack::TrackTimeRes);
 
 DECLARE_SOA_EXTENDED_TABLE(MFTTracks, StoredMFTTracks, "MFTTRACK", //!
                            aod::fwdtrack::Pt,
@@ -584,9 +648,9 @@ DECLARE_SOA_COLUMN(CellType, cellType, int8_t);      //!
 DECLARE_SOA_COLUMN(CaloType, caloType, int8_t);      //!
 } // namespace calo
 
-DECLARE_SOA_TABLE(Calos, "AOD", "CALO", calo::BCId, //!
-                  calo::CellNumber, calo::Amplitude, calo::Time,
-                  calo::CellType, calo::CaloType);
+DECLARE_SOA_TABLE(Calos, "AOD", "CALO", //! Calorimeter cells
+                  o2::soa::Index<>, calo::BCId, calo::CellNumber, calo::Amplitude,
+                  calo::Time, calo::CellType, calo::CaloType);
 using Calo = Calos::iterator;
 
 namespace calotrigger
@@ -599,8 +663,8 @@ DECLARE_SOA_COLUMN(CaloType, caloType, int8_t);        //! Calorimeter type (-1 
 } // namespace calotrigger
 
 DECLARE_SOA_TABLE(CaloTriggers, "AOD", "CALOTRIGGER", //! Trigger information from the calorimeter detectors
-                  calotrigger::BCId, calotrigger::FastOrAbsID, calotrigger::LnAmplitude,
-                  calotrigger::TriggerBits, calotrigger::CaloType);
+                  o2::soa::Index<>, calotrigger::BCId, calotrigger::FastOrAbsID,
+                  calotrigger::LnAmplitude, calotrigger::TriggerBits, calotrigger::CaloType);
 using CaloTrigger = CaloTriggers::iterator;
 
 namespace zdc
@@ -633,37 +697,41 @@ using Zdc = Zdcs::iterator;
 
 namespace fv0a
 {
-DECLARE_SOA_INDEX_COLUMN(BC, bc);                      //! BC index
-DECLARE_SOA_COLUMN(Amplitude, amplitude, float[48]);   //! Amplitudes per cell
-DECLARE_SOA_COLUMN(Time, time, float);                 //! Time in ns
-DECLARE_SOA_COLUMN(TriggerMask, triggerMask, uint8_t); //!
+DECLARE_SOA_INDEX_COLUMN(BC, bc);                             //! BC index
+DECLARE_SOA_COLUMN(Amplitude, amplitude, std::vector<float>); //! Amplitudes of non-zero channels. The channel IDs are given in Channel (at the same index)
+DECLARE_SOA_COLUMN(Channel, channel, std::vector<uint8_t>);   //! Channel IDs which had non-zero amplitudes. There are at maximum 48 channels.
+DECLARE_SOA_COLUMN(Time, time, float);                        //! Time in ns
+DECLARE_SOA_COLUMN(TriggerMask, triggerMask, uint8_t);        //!
 } // namespace fv0a
 
 DECLARE_SOA_TABLE(FV0As, "AOD", "FV0A", //!
-                  o2::soa::Index<>, fv0a::BCId, fv0a::Amplitude, fv0a::Time, fv0a::TriggerMask);
+                  o2::soa::Index<>, fv0a::BCId, fv0a::Amplitude, fv0a::Channel, fv0a::Time, fv0a::TriggerMask);
 using FV0A = FV0As::iterator;
 
 // V0C table for Run2 only
 namespace fv0c
 {
-DECLARE_SOA_INDEX_COLUMN(BC, bc);                    //! BC index
-DECLARE_SOA_COLUMN(Amplitude, amplitude, float[32]); //! Amplitudes per cell
-DECLARE_SOA_COLUMN(Time, time, float);               //! Time in ns
+DECLARE_SOA_INDEX_COLUMN(BC, bc);                             //! BC index
+DECLARE_SOA_COLUMN(Amplitude, amplitude, std::vector<float>); //! Amplitudes of non-zero channels. The channel IDs are given in Channel (at the same index)
+DECLARE_SOA_COLUMN(Channel, channel, std::vector<uint8_t>);   //! Channel IDs which had non-zero amplitudes. There are at maximum 32 channels.
+DECLARE_SOA_COLUMN(Time, time, float);                        //! Time in ns
 } // namespace fv0c
 
 DECLARE_SOA_TABLE(FV0Cs, "AOD", "FV0C", //! Only for RUN 2 converted data: V0C table
-                  o2::soa::Index<>, fv0c::BCId, fv0c::Amplitude, fv0c::Time);
+                  o2::soa::Index<>, fv0c::BCId, fv0c::Amplitude, fv0a::Channel, fv0c::Time);
 using FV0C = FV0Cs::iterator;
 
 namespace ft0
 {
-DECLARE_SOA_INDEX_COLUMN(BC, bc);                       //! BC index
-DECLARE_SOA_COLUMN(AmplitudeA, amplitudeA, float[96]);  //!
-DECLARE_SOA_COLUMN(AmplitudeC, amplitudeC, float[112]); //!
-DECLARE_SOA_COLUMN(TimeA, timeA, float);                //!
-DECLARE_SOA_COLUMN(TimeC, timeC, float);                //!
-DECLARE_SOA_COLUMN(TriggerMask, triggerMask, uint8_t);  //!
-DECLARE_SOA_DYNAMIC_COLUMN(PosZ, posZ,                  //! Z position calculated from timeA and timeC in cm
+DECLARE_SOA_INDEX_COLUMN(BC, bc);                               //! BC index
+DECLARE_SOA_COLUMN(AmplitudeA, amplitudeA, std::vector<float>); //! Amplitudes of non-zero channels on the A-side. The channel IDs are given in ChannelA (at the same index)
+DECLARE_SOA_COLUMN(ChannelA, channelA, std::vector<uint8_t>);   //! Channel IDs on the A side which had non-zero amplitudes. There are at maximum 96 channels.
+DECLARE_SOA_COLUMN(AmplitudeC, amplitudeC, std::vector<float>); //! Amplitudes of non-zero channels on the C-side. The channel IDs are given in ChannelC (at the same index)
+DECLARE_SOA_COLUMN(ChannelC, channelC, std::vector<uint8_t>);   //! Channel IDs on the C side which had non-zero amplitudes. There are at maximum 112 channels.
+DECLARE_SOA_COLUMN(TimeA, timeA, float);                        //! Average A-side time
+DECLARE_SOA_COLUMN(TimeC, timeC, float);                        //! Average C-side time
+DECLARE_SOA_COLUMN(TriggerMask, triggerMask, uint8_t);          //!
+DECLARE_SOA_DYNAMIC_COLUMN(PosZ, posZ,                          //! Z position calculated from timeA and timeC in cm
                            [](float t0A, float t0C) -> float {
                              return o2::constants::physics::LightSpeedCm2NS * (t0C - t0A) / 2;
                            });
@@ -671,25 +739,38 @@ DECLARE_SOA_DYNAMIC_COLUMN(PosZ, posZ,                  //! Z position calculate
 
 DECLARE_SOA_TABLE(FT0s, "AOD", "FT0", //!
                   o2::soa::Index<>, ft0::BCId,
-                  ft0::AmplitudeA, ft0::AmplitudeC, ft0::TimeA, ft0::TimeC,
+                  ft0::AmplitudeA, ft0::ChannelA, ft0::AmplitudeC, ft0::ChannelC, ft0::TimeA, ft0::TimeC,
                   ft0::TriggerMask, ft0::PosZ<ft0::TimeA, ft0::TimeC>);
 using FT0 = FT0s::iterator;
 
 namespace fdd
 {
-DECLARE_SOA_INDEX_COLUMN(BC, bc);                      //! BC index
-DECLARE_SOA_COLUMN(AmplitudeA, amplitudeA, float[4]);  //!
-DECLARE_SOA_COLUMN(AmplitudeC, amplitudeC, float[4]);  //!
+DECLARE_SOA_INDEX_COLUMN(BC, bc);                     //! BC index
+DECLARE_SOA_COLUMN(AmplitudeA, amplitudeA, float[4]); //! Amplitude in adjacent pairs A-side
+DECLARE_SOA_COLUMN(AmplitudeC, amplitudeC, float[4]); //! Amplitude in adjacent pairs C-side
+
+DECLARE_SOA_COLUMN(ChargeA, chargeA, int16_t[8]); //! Amplitude per channel A-side
+DECLARE_SOA_COLUMN(ChargeC, chargeC, int16_t[8]); //! Amplitude per channel C-side
+
 DECLARE_SOA_COLUMN(TimeA, timeA, float);               //!
 DECLARE_SOA_COLUMN(TimeC, timeC, float);               //!
 DECLARE_SOA_COLUMN(TriggerMask, triggerMask, uint8_t); //!
 } // namespace fdd
 
-DECLARE_SOA_TABLE(FDDs, "AOD", "FDD", //!
+DECLARE_SOA_TABLE(FDDs_000, "AOD", "FDD", //! FDD table, version 000
                   o2::soa::Index<>, fdd::BCId,
                   fdd::AmplitudeA, fdd::AmplitudeC,
                   fdd::TimeA, fdd::TimeC,
                   fdd::TriggerMask);
+
+DECLARE_SOA_TABLE_VERSIONED(FDDs_001, "AOD", "FDD", 1, //! FDD table, version 001
+                            o2::soa::Index<>,
+                            fdd::BCId,
+                            fdd::ChargeA, fdd::ChargeC,
+                            fdd::TimeA, fdd::TimeC,
+                            fdd::TriggerMask);
+
+using FDDs = FDDs_001; //! this defines the current default version
 using FDD = FDDs::iterator;
 
 namespace v0
@@ -699,20 +780,14 @@ DECLARE_SOA_INDEX_COLUMN_FULL(NegTrack, negTrack, int, Tracks, "_Neg"); //! Nega
 DECLARE_SOA_INDEX_COLUMN(Collision, collision);                         //! Collision index
 } // namespace v0
 
-DECLARE_SOA_TABLE(StoredV0s, "AOD", "V0", //! On disk V0 table
+DECLARE_SOA_TABLE(V0s_000, "AOD", "V0", //! Run 2 V0 table (version 000)
                   o2::soa::Index<>,
                   v0::PosTrackId, v0::NegTrackId);
-DECLARE_SOA_TABLE(TransientV0s, "AOD", "V0INDEX", //! In-memory V0 table
-                  v0::CollisionId);
+DECLARE_SOA_TABLE_VERSIONED(V0s_001, "AOD", "V0", 1, //! Run 3 V0 table (version 001)
+                            o2::soa::Index<>, v0::CollisionId,
+                            v0::PosTrackId, v0::NegTrackId);
 
-} // namespace aod
-namespace soa
-{
-extern template struct Join<aod::TransientV0s, aod::StoredV0s>;
-}
-namespace aod
-{
-using V0s = soa::Join<TransientV0s, StoredV0s>;
+using V0s = V0s_001; //! this defines the current default version
 using V0 = V0s::iterator;
 
 namespace cascade
@@ -722,20 +797,23 @@ DECLARE_SOA_INDEX_COLUMN_FULL(Bachelor, bachelor, int, Tracks, ""); //! Bachelor
 DECLARE_SOA_INDEX_COLUMN(Collision, collision);                     //! Collision index
 } // namespace cascade
 
-DECLARE_SOA_TABLE(StoredCascades, "AOD", "CASCADE", //! On disk cascade table
+DECLARE_SOA_TABLE(Cascades_000, "AOD", "CASCADE", //! Run 2 cascade table
                   o2::soa::Index<>, cascade::V0Id, cascade::BachelorId);
-DECLARE_SOA_TABLE(TransientCascades, "AOD", "CASCADEINDEX", //! In-memory cascade table
-                  cascade::CollisionId);
-} // namespace aod
-namespace soa
-{
-extern template struct Join<aod::TransientCascades, aod::StoredCascades>;
-}
-namespace aod
-{
+DECLARE_SOA_TABLE_VERSIONED(Cascades_001, "AOD", "CASCADE", 1, //! Run 3 cascade table
+                            o2::soa::Index<>, cascade::CollisionId, cascade::V0Id, cascade::BachelorId);
 
-using Cascades = soa::Join<TransientCascades, StoredCascades>;
+using Cascades = Cascades_001; //! this defines the current default version
 using Cascade = Cascades::iterator;
+
+namespace origin
+{
+DECLARE_SOA_COLUMN(DataframeID, dataframeID, uint64_t); //! Data frame ID (what is usually found in directory name in the AO2D.root, i.e. DF_XXX)
+} // namespace origin
+
+DECLARE_SOA_TABLE(Origins, "AOD", "ORIGIN", //! Table which contains the IDs of all dataframes merged into this dataframe
+                  o2::soa::Index<>, origin::DataframeID);
+
+using Origin = Origins::iterator;
 
 // ---- Run 2 tables ----
 namespace run2
@@ -793,6 +871,8 @@ DECLARE_SOA_SELF_INDEX_COLUMN_FULL(Mother0, mother0, int, "McParticles_Mother0")
 DECLARE_SOA_SELF_INDEX_COLUMN_FULL(Mother1, mother1, int, "McParticles_Mother1");       //! Track index of the last mother
 DECLARE_SOA_SELF_INDEX_COLUMN_FULL(Daughter0, daughter0, int, "McParticles_Daughter0"); //! Track index of the first daugther
 DECLARE_SOA_SELF_INDEX_COLUMN_FULL(Daughter1, daughter1, int, "McParticles_Daughter1"); //! Track index of the last daugther
+DECLARE_SOA_SELF_ARRAY_INDEX_COLUMN(Mothers, mothers);                                  //! Mother tracks (possible empty) array. Iterate over mcParticle.mothers_as<aod::McParticles>())
+DECLARE_SOA_SELF_SLICE_INDEX_COLUMN(Daughters, daughters);                              //! Daughter tracks (possibly empty) slice. Check for non-zero with mcParticle.has_daughters(). Iterate over mcParticle.daughters_as<aod::McParticles>())
 DECLARE_SOA_COLUMN(Weight, weight, float);                                              //! MC weight
 DECLARE_SOA_COLUMN(Px, px, float);                                                      //! Momentum in x in GeV/c
 DECLARE_SOA_COLUMN(Py, py, float);                                                      //! Momentum in y in GeV/c
@@ -843,7 +923,7 @@ DECLARE_SOA_EXPRESSION_COLUMN(Y, y, float, //! Particle rapidity, conditionally 
                                                  (aod::mcparticle::e - aod::mcparticle::pz))));
 } // namespace mcparticle
 
-DECLARE_SOA_TABLE_FULL(StoredMcParticles, "McParticles", "AOD", "MCPARTICLE", //! On disk version of the MC particle table
+DECLARE_SOA_TABLE_FULL(StoredMcParticles_000, "McParticles", "AOD", "MCPARTICLE", //! MC particle table, version 000
                        o2::soa::Index<>, mcparticle::McCollisionId,
                        mcparticle::PdgCode, mcparticle::StatusCode, mcparticle::Flags,
                        mcparticle::Mother0Id, mcparticle::Mother1Id,
@@ -856,15 +936,43 @@ DECLARE_SOA_TABLE_FULL(StoredMcParticles, "McParticles", "AOD", "MCPARTICLE", //
                        mcparticle::GetProcess<mcparticle::Flags, mcparticle::StatusCode>,
                        mcparticle::IsPhysicalPrimary<mcparticle::Flags>);
 
-DECLARE_SOA_EXTENDED_TABLE(McParticles, StoredMcParticles, "MCPARTICLE", //! Basic MC particle properties
+DECLARE_SOA_TABLE_FULL_VERSIONED(StoredMcParticles_001, "McParticles", "AOD", "MCPARTICLE", 1, //! MC particle table, version 001
+                                 o2::soa::Index<>, mcparticle::McCollisionId,
+                                 mcparticle::PdgCode, mcparticle::StatusCode, mcparticle::Flags,
+                                 mcparticle::MothersIds, mcparticle::DaughtersIdSlice, mcparticle::Weight,
+                                 mcparticle::Px, mcparticle::Py, mcparticle::Pz, mcparticle::E,
+                                 mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt,
+                                 mcparticle::ProducedByGenerator<mcparticle::Flags>,
+                                 mcparticle::FromBackgroundEvent<mcparticle::Flags>,
+                                 mcparticle::GetGenStatusCode<mcparticle::Flags, mcparticle::StatusCode>,
+                                 mcparticle::GetProcess<mcparticle::Flags, mcparticle::StatusCode>,
+                                 mcparticle::IsPhysicalPrimary<mcparticle::Flags>);
+
+DECLARE_SOA_EXTENDED_TABLE(McParticles_000, StoredMcParticles_000, "MCPARTICLE", //! Basic MC particle properties
                            mcparticle::Phi,
                            mcparticle::Eta,
                            mcparticle::Pt,
                            mcparticle::P,
                            mcparticle::Y);
 
-using McParticle = McParticles::iterator;
+DECLARE_SOA_EXTENDED_TABLE(McParticles_001, StoredMcParticles_001, "MCPARTICLE", //! Basic MC particle properties
+                           mcparticle::Phi,
+                           mcparticle::Eta,
+                           mcparticle::Pt,
+                           mcparticle::P,
+                           mcparticle::Y);
 
+using McParticles = McParticles_001;
+using McParticle = McParticles::iterator;
+} // namespace aod
+namespace soa
+{
+DECLARE_EQUIVALENT_FOR_INDEX(aod::StoredMcParticles_000, aod::StoredMcParticles_001);
+DECLARE_EQUIVALENT_FOR_INDEX(aod::StoredTracks, aod::StoredTracksIU);
+} // namespace soa
+
+namespace aod
+{
 namespace mctracklabel
 {
 DECLARE_SOA_INDEX_COLUMN(McParticle, mcParticle); //! MC particle

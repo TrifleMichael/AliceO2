@@ -51,7 +51,7 @@ struct IDCDeltaContainer {
 /// storage for the factor used to compress IDCDelta.
 /// This factor is separated from the IDCDelta struct to able to store those values independently in the CCDB
 struct IDCDeltaCompressionFactors {
-  std::array<float, o2::tpc::SIDES> mFactors{1.f, 1.f}; ///< compression factors for each TPC side
+  std::array<std::pair<float, float>, o2::tpc::SIDES> mFactors{std::pair{1.f, 1.f}, std::pair{1.f, 1.f}}; ///< compression factors for each TPC side
 };
 
 /// struct to access and set Delta IDCs
@@ -72,21 +72,21 @@ struct IDCDelta {
   /// \return returns converted IDC value from float to new data type specified by template parameter of the object
   /// \param idcDelta Delta IDC value which will be set
   /// \param side side of the TPC
-  DataT compressValue(const float idcDelta, const o2::tpc::Side side) const
+  DataT compressValue(float idcDelta, const o2::tpc::Side side) const
   {
-    const static auto& paramIDCGroup = ParameterIDCCompression::Instance();
-    return (std::abs(idcDelta) >= paramIDCGroup.MaxIDCDeltaValue) ? static_cast<DataT>(std::copysign(paramIDCGroup.MaxIDCDeltaValue * mCompressionFactor.mFactors[side] + 0.5f, idcDelta)) : static_cast<DataT>(idcDelta * mCompressionFactor.mFactors[side] + std::copysign(0.5f, idcDelta));
+    idcDelta = (std::clamp(idcDelta, mCompressionFactor.mFactors[side].first, mCompressionFactor.mFactors[side].second) - mCompressionFactor.mFactors[side].first) * std::numeric_limits<DataT>::max() / (mCompressionFactor.mFactors[side].second - mCompressionFactor.mFactors[side].first);
+    return std::nearbyint(idcDelta);
   }
 
   /// \return returns stored Delta IDC value
   /// \param side side of the TPC
   /// \param index index in the storage (see: getIndexUngrouped int IDCGroupHelperSector)
-  float getValue(const o2::tpc::Side side, const unsigned int index) const { return (static_cast<float>(mIDCDelta.mIDCDeltaCont[side][index]) / mCompressionFactor.mFactors[side]); }
+  float getValue(const o2::tpc::Side side, const unsigned int index) const { return mCompressionFactor.mFactors[side].first + (mCompressionFactor.mFactors[side].second - mCompressionFactor.mFactors[side].first) * static_cast<float>(mIDCDelta.mIDCDeltaCont[side][index]) / std::numeric_limits<DataT>::max(); }
 
   /// set compression factor
   /// \param side side of the TPC
   /// \param factor factor which will be used for the compression
-  void setCompressionFactor(const o2::tpc::Side side, const float factor) { mCompressionFactor.mFactors[side] = factor; }
+  void setCompressionFactor(const o2::tpc::Side side, const float factorMin, const float factorMax) { mCompressionFactor.mFactors[side] = std::pair{factorMin, factorMax}; }
 
   /// \return returns vector of Delta IDCs for given side
   /// \param side side of the TPC
@@ -108,6 +108,10 @@ struct IDCDelta {
   /// \return returns compression factors to uncompress Delta IDC
   /// \param side side of the TPC
   auto getCompressionFactor(const o2::tpc::Side side) const { return mCompressionFactor.mFactors[side]; }
+
+  /// \return returns number of stored IDCs for given side
+  /// \param side side of the TPC
+  auto getNIDCs(const o2::tpc::Side side) const { return getIDCDelta(side).size(); }
 
   IDCDeltaContainer<DataT> mIDCDelta{};            ///< storage for Delta IDCs
   IDCDeltaCompressionFactors mCompressionFactor{}; ///< compression factor for Delta IDCs
@@ -146,7 +150,13 @@ struct IDCDelta<float> {
   /// \param val value of IDCDelta which will be stored
   void setIDCDelta(const o2::tpc::Side side, const unsigned int index, const float val) { mIDCDelta.mIDCDeltaCont[side][index] = val; }
 
+  /// resize the container
+  /// \param size new size of the container
   void resize(const o2::tpc::Side side, const unsigned int size) { mIDCDelta.mIDCDeltaCont[side].resize(size); }
+
+  /// \return returns number of stored IDCs for given side
+  /// \param side side of the TPC
+  auto getNIDCs(const o2::tpc::Side side) const { return getIDCDelta(side).size(); }
 
   IDCDeltaContainer<float> mIDCDelta{}; ///< storage for uncompressed Delta IDCs
   ClassDefNV(IDCDelta, 1)
@@ -175,30 +185,18 @@ class IDCDeltaCompressionHelper
   static void compress(const IDCDelta<float>& idcDeltaUncompressed, IDCDelta<DataT>& idcCompressed, const o2::tpc::Side side)
   {
     idcCompressed.getIDCDelta(side).reserve(idcDeltaUncompressed.getIDCDelta(side).size());
-    const float factor = getCompressionFactor(idcDeltaUncompressed, side);
-    idcCompressed.setCompressionFactor(side, factor);
+    const auto minmaxIDC = std::minmax_element(std::begin(idcDeltaUncompressed.getIDCDelta(side)), std::end(idcDeltaUncompressed.getIDCDelta(side)));
+    const auto& paramIDCGroup = ParameterIDCCompression::Instance();
+    const float minIDCDelta = std::clamp(*minmaxIDC.first, paramIDCGroup.minIDCDeltaValue, paramIDCGroup.maxIDCDeltaValue);
+    const float maxIDCDelta = std::clamp(*minmaxIDC.second, paramIDCGroup.minIDCDeltaValue, paramIDCGroup.maxIDCDeltaValue);
+    idcCompressed.setCompressionFactor(side, minIDCDelta, maxIDCDelta);
     for (auto& idc : idcDeltaUncompressed.getIDCDelta(side)) {
       idcCompressed.emplace_back(idc, side);
     }
   }
-
-  /// \return returns the factor which is used during the compression
-  static float getCompressionFactor(const IDCDelta<float>& idcDeltaUncompressed, const o2::tpc::Side side)
-  {
-    const float maxAbsIDC = getMaxValue(idcDeltaUncompressed.getIDCDelta(side));
-    const auto& paramIDCGroup = ParameterIDCCompression::Instance();
-    const float maxIDC = paramIDCGroup.MaxIDCDeltaValue;
-    return (maxAbsIDC > maxIDC || maxAbsIDC == 0) ? (std::numeric_limits<DataT>::max() / maxIDC) : (std::numeric_limits<DataT>::max() / maxAbsIDC);
-  }
-
-  /// \returns returns maximum abs value in vector
-  static float getMaxValue(const std::vector<float>& idcs)
-  {
-    return std::abs(*std::max_element(idcs.begin(), idcs.end(), [](const float a, const float b) -> bool { return (std::abs(a) < std::abs(b)); }));
-  };
 };
 
-///<struct containing the IDC1 values
+///< struct containing the IDC0 values
 struct IDCZero {
 
   /// set IDC zero for given index
@@ -252,6 +250,14 @@ struct IDCZero {
 
 ///<struct containing the IDC1
 struct IDCOne {
+
+  /// default constructor
+  IDCOne() = default;
+
+  /// constructor for initializing member with default value (this is used in the IDCFourierTransform class to perform calculation of the fourier coefficients for the first aggregation interval)
+  /// \param nIDC number of IDCs which will be initialized
+  IDCOne(const unsigned int nIDC) : mIDCOne{std::vector<float>(nIDC), std::vector<float>(nIDC)} {};
+
   /// set IDC one for given index
   /// \param idcOne Delta IDC value which will be set
   /// \param side side of the TPC
@@ -262,6 +268,10 @@ struct IDCOne {
   /// \param side side of the TPC
   /// \param index index in the storage
   float getValueIDCOne(const o2::tpc::Side side, const unsigned int index) const { return mIDCOne[side][index]; }
+
+  /// \return returns number of stored IDCs for given side
+  /// \param side side of the TPC
+  auto getNIDCs(const o2::tpc::Side side) const { return mIDCOne[side].size(); }
 
   /// clear values
   void clear()
@@ -288,80 +298,57 @@ struct IDCOne {
   ClassDefNV(IDCOne, 1)
 };
 
-/// struct containing 1D-IDCs
-struct OneDIDC {
-
-  /// default constructor
-  OneDIDC() = default;
-
-  /// constructor for initializing member with default value (this is used in the IDCFourierTransform class to perform calculation of the fourier coefficients for the first aggregation interval)
-  /// \param nIDC number of IDCs which will be initialized
-  OneDIDC(const unsigned int nIDC) : mOneDIDC{std::vector<float>(nIDC), std::vector<float>(nIDC)} {};
-
-  /// \return returns total number of 1D-IDCs for given side
-  /// \param side side of the TPC
-  unsigned int getNIDCs(const o2::tpc::Side side) const { return mOneDIDC[side].size(); }
-
-  std::array<std::vector<float>, o2::tpc::SIDES> mOneDIDC{}; ///< 1D-IDCs = <I(r,\phi,t)>_{r,\phi}
-  ClassDefNV(OneDIDC, 1)
-};
-
 /// Helper class for aggregation of 1D-IDCs from different CRUs
-class OneDIDCAggregator
+class IDCOneAggregator
 {
  public:
-  /// constructor
-  /// nTimeFrames number of time frames which will be aggregated
-  OneDIDCAggregator(const unsigned int nTimeFrames = 1) : mOneDIDCAgg(nTimeFrames), mWeight(nTimeFrames){};
-
   /// aggregate 1D-IDCs
   /// \param side side of the tpcCRUHeader
   /// \param idc vector containing the 1D-IDCs
-  /// \param timeframe of the input 1D-IDC
-  /// \param region region of the TPC
-  void aggregate1DIDCs(const o2::tpc::Side side, const std::vector<float>& idc, const unsigned int timeframe, const unsigned int region)
+  void aggregate1DIDCs(const o2::tpc::Side side, const std::vector<float>& idc)
   {
-    if (mOneDIDCAgg[timeframe].mOneDIDC[side].empty()) {
-      mOneDIDCAgg[timeframe].mOneDIDC[side] = idc;
-      mWeight[timeframe][side] = Mapper::REGIONAREA[region];
+    if (mIDCOneAgg.mIDCOne[side].empty()) {
+      mIDCOneAgg.mIDCOne[side] = idc;
     } else {
-      std::transform(mOneDIDCAgg[timeframe].mOneDIDC[side].begin(), mOneDIDCAgg[timeframe].mOneDIDC[side].end(), idc.begin(), mOneDIDCAgg[timeframe].mOneDIDC[side].begin(), std::plus<>());
-      mWeight[timeframe][side] += Mapper::REGIONAREA[region];
+      std::transform(mIDCOneAgg.mIDCOne[side].begin(), mIDCOneAgg.mIDCOne[side].end(), idc.begin(), mIDCOneAgg.mIDCOne[side].begin(), std::plus<>());
     }
   }
 
-  /// \return returns struct containing aggregated 1D IDCs normalized to number of channels weighted with the relative length of each region
-  OneDIDC getAggregated1DIDCs()
+  void aggregate1DIDCsWeights(const o2::tpc::Side side, const std::vector<unsigned int>& idcCount)
   {
-    OneDIDC oneDIDCTmp;
-    for (int iside = 0; iside < o2::tpc::SIDES; ++iside) {
-      const o2::tpc::Side side = iside == 0 ? o2::tpc::Side::A : o2::tpc::Side::C;
-      for (unsigned int i = 0; i < mOneDIDCAgg.size(); ++i) {
-        std::transform(mOneDIDCAgg[i].mOneDIDC[side].begin(), mOneDIDCAgg[i].mOneDIDC[side].end(), mOneDIDCAgg[i].mOneDIDC[side].begin(), [norm = mWeight[i][side]](auto& val) { return val / norm; });
-        oneDIDCTmp.mOneDIDC[side].insert(oneDIDCTmp.mOneDIDC[side].end(), mOneDIDCAgg[i].mOneDIDC[side].begin(), mOneDIDCAgg[i].mOneDIDC[side].end());
-        mOneDIDCAgg[i].mOneDIDC[side].clear();
-      }
+    if (mWeight[side].empty()) {
+      mWeight[side] = idcCount;
+    } else {
+      std::transform(mWeight[side].begin(), mWeight[side].end(), idcCount.begin(), mWeight[side].begin(), std::plus<>());
     }
-    return oneDIDCTmp;
   }
 
-  const auto& get() const { return mOneDIDCAgg; }
+  void normalizeIDCOne()
+  {
+    normalizeIDCOne(Side::A);
+    normalizeIDCOne(Side::C);
+  }
+
+  /// \return normalize aggregated IDC1 to number of channels
+  void normalizeIDCOne(const o2::tpc::Side side)
+  {
+    std::transform(mIDCOneAgg.mIDCOne[side].begin(), mIDCOneAgg.mIDCOne[side].end(), mWeight[side].begin(), mIDCOneAgg.mIDCOne[side].begin(), std::divides<>());
+  }
+
+  /// \return returns IDC1 data by move and clears weights
+  auto get() &&
+  {
+    mWeight[Side::A].clear();
+    mWeight[Side::C].clear();
+    return std::move(mIDCOneAgg);
+  }
+
+  /// \return returns weights for the stored values
   const auto& getWeight() const { return mWeight; }
 
-  /// \returns vector containing the number of integration intervals for each stored TF
-  std::vector<unsigned int> getIntegrationIntervalsPerTF(const o2::tpc::Side side = o2::tpc::Side::A) const
-  {
-    std::vector<unsigned int> integrationIntervalsPerTF;
-    integrationIntervalsPerTF.reserve(mOneDIDCAgg.size());
-    for (const auto& tf : mOneDIDCAgg) {
-      integrationIntervalsPerTF.emplace_back(tf.getNIDCs(side));
-    }
-    return integrationIntervalsPerTF;
-  }
-
  private:
-  std::vector<OneDIDC> mOneDIDCAgg{};                       ///< 1D-IDCs = <I(r,\phi,t)>_{r,\phi}
-  std::vector<std::array<float, o2::tpc::SIDES>> mWeight{}; ///< integrated pad area of received data used for normalization
+  IDCOne mIDCOneAgg{};                                             ///< 1D-IDCs = <I(r,\phi,t)>_{r,\phi}
+  std::array<std::vector<unsigned int>, o2::tpc::SIDES> mWeight{}; ///< Number of channels used for IDC1 calculation used for normalization
 };
 
 /// struct containing the fourier coefficients calculated from IDC0 for n timeframes
@@ -407,6 +394,43 @@ struct FourierCoeff {
   const unsigned int mCoeffPerTF{};                                      ///< number of real+imag coefficients per TF
 
   ClassDefNV(FourierCoeff, 1)
+};
+
+template <typename T>
+struct Enable_enum_class_bitfield {
+  static constexpr bool value = false;
+};
+
+// operator overload for allowing bitfiedls with enum
+template <typename T>
+typename std::enable_if<std::is_enum<T>::value && Enable_enum_class_bitfield<T>::value, T>::type
+  operator&(T lhs, T rhs)
+{
+  typedef typename std::underlying_type<T>::type integer_type;
+  return static_cast<T>(static_cast<integer_type>(lhs) & static_cast<integer_type>(rhs));
+}
+
+template <typename T>
+typename std::enable_if<std::is_enum<T>::value && Enable_enum_class_bitfield<T>::value, T>::type
+  operator|(T lhs, T rhs)
+{
+  typedef typename std::underlying_type<T>::type integer_type;
+  return static_cast<T>(static_cast<integer_type>(lhs) | static_cast<integer_type>(rhs));
+}
+
+enum class PadFlags : unsigned short {
+  flagGoodPad = 1 << 0,      ///< flag for a good pad binary 0001
+  flagDeadPad = 1 << 1,      ///< flag for a dead pad binary 0010
+  flagUnknownPad = 1 << 2,   ///< flag for unknown status binary 0100
+  flagSaturatedPad = 1 << 3, ///< flag for saturated status binary 0100
+  flagHighPad = 1 << 4,      ///< flag for pad with extremly high IDC value
+  flagLowPad = 1 << 5,       ///< flag for pad with extremly low IDC value
+  flagSkip = 1 << 6          ///< flag for defining a pad which is just ignored during the calculation of I1 and IDCDelta
+};
+
+template <>
+struct Enable_enum_class_bitfield<PadFlags> {
+  static constexpr bool value = true;
 };
 
 } // namespace tpc

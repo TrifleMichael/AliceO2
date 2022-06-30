@@ -22,8 +22,10 @@ o2_add_library(TPCCalibration
                        src/DigitDump.cxx
                        src/DigitDumpParam.cxx
                        src/CalibPadGainTracks.cxx
+                       src/CalibPadGainTracksBase.cxx
                        src/CalibLaserTracks.cxx
                        src/LaserTracksCalibrator.cxx
+                       src/SACDecoder.cxx
                        src/IDCAverageGroup.cxx
                        src/IDCAverageGroupBase.cxx
                        src/IDCAverageGroupHelper.cxx
@@ -40,11 +42,13 @@ o2_add_library(TPCCalibration
                        src/CalibdEdx.cxx
                        src/CalibratordEdx.cxx
                        src/TrackDump.cxx
+                       src/CalibratorPadGainTracks.cxx
                PUBLIC_LINK_LIBRARIES O2::DataFormatsTPC O2::TPCBase
                                      O2::TPCReconstruction ROOT::Minuit
                                      Microsoft.GSL::GSL
                                      O2::DetectorsCalibration
                                      O2::GPUO2Interface
+                                     O2::GPUTracking
                                      O2::CCDB)
 
 o2_target_root_dictionary(TPCCalibration
@@ -57,9 +61,11 @@ o2_target_root_dictionary(TPCCalibration
                                   include/TPCCalibration/DigitDump.h
                                   include/TPCCalibration/DigitDumpParam.h
                                   include/TPCCalibration/CalibPadGainTracks.h
+                                  include/TPCCalibration/CalibPadGainTracksBase.h
                                   include/TPCCalibration/FastHisto.h
                                   include/TPCCalibration/CalibLaserTracks.h
                                   include/TPCCalibration/LaserTracksCalibrator.h
+                                  include/TPCCalibration/SACDecoder.h
                                   include/TPCCalibration/IDCAverageGroup.h
                                   include/TPCCalibration/IDCAverageGroupBase.h
                                   include/TPCCalibration/IDCAverageGroupHelper.h
@@ -76,12 +82,8 @@ o2_target_root_dictionary(TPCCalibration
                                   include/TPCCalibration/CalibdEdx.h
                                   include/TPCCalibration/CalibratordEdx.h
                                   include/TPCCalibration/TrackDump.h
-                                  include/TPCCalibration/IDCDrawHelper.h)
-
-o2_add_executable(dcs-sim-workflow
-                  COMPONENT_NAME tpc
-                  SOURCES testWorkflow/tpc-dcs-sim-workflow.cxx
-                  PUBLIC_LINK_LIBRARIES O2::DCStestWorkflow)
+                                  include/TPCCalibration/IDCDrawHelper.h
+                                  include/TPCCalibration/CalibratorPadGainTracks.h)
 
 o2_add_test_root_macro(macro/comparePedestalsAndNoise.C
                        PUBLIC_LINK_LIBRARIES O2::TPCBase
@@ -107,15 +109,8 @@ o2_add_test_root_macro(macro/dumpDigits.C
                        PUBLIC_LINK_LIBRARIES O2::TPCCalibration
                        LABELS tpc
                        ENVIRONMENT O2_ROOT=${CMAKE_BINARY_DIR}/stage)
-o2_add_test_root_macro(macro/extractGainMap.C
-                       PUBLIC_LINK_LIBRARIES O2::TPCCalibration
-                       LABELS tpc
-                       ENVIRONMENT O2_ROOT=${CMAKE_BINARY_DIR}/stage)
 o2_add_test_root_macro(macro/preparePedestalFiles.C
                        PUBLIC_LINK_LIBRARIES O2::TPCCalibration
-                       LABELS tpc)
-o2_add_test_root_macro(macro/makeTPCCCDBEntryForDCS.C
-                       PUBLIC_LINK_LIBRARIES O2::DetectorsDCS
                        LABELS tpc)
 
 o2_add_test(IDCFourierTransform
@@ -124,6 +119,14 @@ o2_add_test(IDCFourierTransform
             SOURCES test/testO2TPCIDCFourierTransform.cxx
             ENVIRONMENT O2_ROOT=${CMAKE_BINARY_DIR}/stage
             LABELS tpc
+            CONFIGURATIONS RelWithDebInfo Release MinRelSize)
+
+o2_add_test(IDCAverageGroup
+            LABELS tpc
+            PUBLIC_LINK_LIBRARIES O2::TPCCalibration
+            COMPONENT_NAME tpc
+            SOURCES test/testO2TPCIDCAverageGroup.cxx
+            ENVIRONMENT O2_ROOT=${CMAKE_BINARY_DIR}/stage
             CONFIGURATIONS RelWithDebInfo Release MinRelSize)
 
 if (OpenMP_CXX_FOUND)

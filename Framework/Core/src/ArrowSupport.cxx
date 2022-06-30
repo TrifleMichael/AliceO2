@@ -31,7 +31,7 @@
 #include "Headers/DataHeader.h"
 #include "Headers/DataHeaderHelpers.h"
 
-#include <options/FairMQProgOptions.h>
+#include <fairmq/ProgOptions.h>
 
 #include <uv.h>
 #include <boost/program_options/variables_map.hpp>
@@ -42,8 +42,8 @@
 namespace o2::framework
 {
 
-struct EndOfStreamContext;
-struct ProcessingContext;
+class EndOfStreamContext;
+class ProcessingContext;
 
 enum struct RateLimitingState {
   UNKNOWN = 0,                   // No information received yet.
@@ -361,7 +361,8 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
                          if (input.header == nullptr) {
                            continue;
                          }
-                         auto dh = o2::header::get<DataHeader*>(input.header);
+                         auto const* dh = DataRefUtils::getHeader<DataHeader*>(input);
+                         auto payloadSize = DataRefUtils::getPayloadSize(input);
                          if (dh->serialization != o2::header::gSerializationMethodArrow) {
                            LOGP(debug, "Message {}/{} is not of kind arrow, therefore we are not accounting its shared memory", dh->dataOrigin, dh->dataDescription);
                            continue;
@@ -369,7 +370,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
                          auto dph = o2::header::get<DataProcessingHeader*>(input.header);
                          bool forwarded = false;
                          for (auto const& forward : ctx.services().get<DeviceSpec const>().forwards) {
-                           if (DataSpecUtils::match(forward.matcher, dh->dataOrigin, dh->dataDescription, dh->subSpecification)) {
+                           if (DataSpecUtils::match(forward.matcher, *dh)) {
                              forwarded = true;
                              break;
                            }
@@ -378,8 +379,8 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
                            LOGP(debug, "Message {}/{} is forwarded so we are not returning its memory.", dh->dataOrigin, dh->dataDescription);
                            continue;
                          }
-                         LOGP(debug, "Message {}/{} is being deleted. We will return {}MB.", dh->dataOrigin, dh->dataDescription, dh->payloadSize / 1000000.);
-                         totalBytes += dh->payloadSize;
+                         LOGP(debug, "Message {}/{} is being deleted. We will return {}MB.", dh->dataOrigin, dh->dataDescription, payloadSize / 1000000.);
+                         totalBytes += payloadSize;
                          totalMessages += 1;
                        }
                        arrow->updateBytesDestroyed(totalBytes);
@@ -415,87 +416,85 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
       auto builder = std::find_if(workflow.begin(), workflow.end(), [](DataProcessorSpec& spec) { return spec.name == "internal-dpl-aod-index-builder"; });
       auto reader = std::find_if(workflow.begin(), workflow.end(), [](DataProcessorSpec& spec) { return spec.name == "internal-dpl-aod-reader"; });
       auto writer = std::find_if(workflow.begin(), workflow.end(), [](DataProcessorSpec& spec) { return spec.name == "internal-dpl-aod-writer"; });
+      std::vector<InputSpec> requestedAODs;
+      std::vector<InputSpec> requestedDYNs;
+      std::vector<OutputSpec> providedDYNs;
 
-      if (spawner != workflow.end()) {
-        std::vector<InputSpec> requestedDYNs;
-        // collect currently requested DYNs
-        for (auto& d : workflow) {
-          if (d.name == spawner->name) {
-            continue;
-          }
-          for (auto& i : d.inputs) {
-            if (DataSpecUtils::partialMatch(i, header::DataOrigin{"DYN"})) {
-              requestedDYNs.emplace_back(i);
-            }
-          }
-          std::sort(requestedDYNs.begin(), requestedDYNs.end(), [](InputSpec const& a, InputSpec const& b) { return a.binding < b.binding; });
-          auto end = std::unique(requestedDYNs.begin(), requestedDYNs.end(), [](InputSpec const& a, InputSpec const& b) { return a.binding == b.binding; });
-          requestedDYNs.erase(end, requestedDYNs.end());
-        }
-
-        // remove unmatched outputs
-        auto o_end = std::remove_if(spawner->outputs.begin(), spawner->outputs.end(), [&](OutputSpec const& o) {
-          return std::none_of(requestedDYNs.begin(), requestedDYNs.end(), [&](InputSpec const& i) { return DataSpecUtils::match(i, o); });
-        });
-        spawner->outputs.erase(o_end, spawner->outputs.end());
-
-        // remove unmatched inputs
-        auto i_end = std::remove_if(spawner->inputs.begin(), spawner->inputs.end(), [&](InputSpec const& i) {
-          auto&& [origin, description] = DataSpecUtils::asConcreteDataTypeMatcher(i);
-          return std::none_of(spawner->outputs.begin(), spawner->outputs.end(), [description = description](OutputSpec const& o) {
-            return DataSpecUtils::partialMatch(o, description);
-          });
-        });
-        spawner->inputs.erase(i_end, spawner->inputs.end());
-
-        // replace AlgorithmSpec
-        // FIXME: it should be made more generic, so it does not need replacement...
-        spawner->algorithm = readers::AODReaderHelpers::aodSpawnerCallback(requestedDYNs);
-      }
+      auto inputSpecLessThan = [](InputSpec const& lhs, InputSpec const& rhs) { return DataSpecUtils::describe(lhs) < DataSpecUtils::describe(rhs); };
+      auto outputSpecLessThan = [](OutputSpec const& lhs, OutputSpec const& rhs) { return DataSpecUtils::describe(lhs) < DataSpecUtils::describe(rhs); };
 
       if (builder != workflow.end()) {
         // collect currently requested IDXs
         std::vector<InputSpec> requestedIDXs;
-        std::vector<InputSpec> dummy_i;
-        std::vector<OutputSpec> dummy_o;
         for (auto& d : workflow) {
           if (d.name == builder->name) {
             continue;
           }
           for (auto& i : d.inputs) {
             if (DataSpecUtils::partialMatch(i, header::DataOrigin{"IDX"})) {
-              requestedIDXs.emplace_back(i);
+              auto copy = i;
+              DataSpecUtils::updateInputList(requestedIDXs, std::move(copy));
             }
           }
-          std::sort(requestedIDXs.begin(), requestedIDXs.end(), [](InputSpec const& a, InputSpec const& b) { return a.binding < b.binding; });
-          auto end = std::unique(requestedIDXs.begin(), requestedIDXs.end(), [](InputSpec const& a, InputSpec const& b) { return a.binding == b.binding; });
-          requestedIDXs.erase(end, requestedIDXs.end());
         }
-
         // recreate inputs and outputs
-        builder->inputs = dummy_i;
-        builder->outputs = dummy_o;
-        auto copy = requestedIDXs;
-        WorkflowHelpers::addMissingOutputsToBuilder(std::move(copy), dummy_i, *builder);
-
-        //replace AlgorithmSpec
-        // FIXME: it should be made more generic, so it does not need replacement...
+        builder->inputs.clear();
+        builder->outputs.clear();
+        // replace AlgorithmSpec
+        //  FIXME: it should be made more generic, so it does not need replacement...
         builder->algorithm = readers::AODReaderHelpers::indexBuilderCallback(requestedIDXs);
+        WorkflowHelpers::addMissingOutputsToBuilder(requestedIDXs, requestedAODs, requestedDYNs, *builder);
       }
 
-      if (reader != workflow.end() && (spawner != workflow.end() || builder != workflow.end())) {
-        // If reader and/or builder were adjusted, remove unneeded outputs
-        std::vector<InputSpec> requestedAODs;
-        // collect currently requested AODs
+      if (spawner != workflow.end()) {
+        // collect currently requested DYNs
         for (auto& d : workflow) {
-          for (auto& i : d.inputs) {
-            if (DataSpecUtils::partialMatch(i, header::DataOrigin{"AOD"})) {
-              requestedAODs.emplace_back(i);
+          if (d.name == spawner->name) {
+            continue;
+          }
+          for (auto const& i : d.inputs) {
+            if (DataSpecUtils::partialMatch(i, header::DataOrigin{"DYN"})) {
+              auto copy = i;
+              DataSpecUtils::updateInputList(requestedDYNs, std::move(copy));
             }
           }
-          std::sort(requestedAODs.begin(), requestedAODs.end(), [](InputSpec const& a, InputSpec const& b) { return a.binding < b.binding; });
-          auto end = std::unique(requestedAODs.begin(), requestedAODs.end(), [](InputSpec const& a, InputSpec const& b) { return a.binding == b.binding; });
-          requestedAODs.erase(end, requestedAODs.end());
+          for (auto const& o : d.outputs) {
+            if (DataSpecUtils::partialMatch(o, header::DataOrigin{"DYN"})) {
+              providedDYNs.emplace_back(o);
+            }
+          }
+        }
+        std::sort(requestedDYNs.begin(), requestedDYNs.end(), inputSpecLessThan);
+        std::sort(providedDYNs.begin(), providedDYNs.end(), outputSpecLessThan);
+        std::vector<InputSpec> spawnerInputs;
+        for (auto& input : requestedDYNs) {
+          if (std::none_of(providedDYNs.begin(), providedDYNs.end(), [&input](auto const& x) { return DataSpecUtils::match(input, x); })) {
+            spawnerInputs.emplace_back(input);
+          }
+        }
+        // recreate inputs and outputs
+        spawner->outputs.clear();
+        spawner->inputs.clear();
+        // replace AlgorithmSpec
+        // FIXME: it should be made more generic, so it does not need replacement...
+        spawner->algorithm = readers::AODReaderHelpers::aodSpawnerCallback(spawnerInputs);
+        WorkflowHelpers::addMissingOutputsToSpawner({}, spawnerInputs, requestedAODs, *spawner);
+      }
+
+      if (writer != workflow.end()) {
+        workflow.erase(writer);
+      }
+
+      if (reader != workflow.end()) {
+        // If reader and/or builder were adjusted, remove unneeded outputs
+        // update currently requested AODs
+        for (auto& d : workflow) {
+          for (auto const& i : d.inputs) {
+            if (DataSpecUtils::partialMatch(i, header::DataOrigin{"AOD"})) {
+              auto copy = i;
+              DataSpecUtils::updateInputList(requestedAODs, std::move(copy));
+            }
+          }
         }
 
         // remove unmatched outputs
@@ -505,10 +504,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
         reader->outputs.erase(o_end, reader->outputs.end());
       }
 
-      if (writer != workflow.end()) {
-        workflow.erase(writer);
-      }
-        // replace writer as some outputs may have become dangling and some are now consumed
+      // replace writer as some outputs may have become dangling and some are now consumed
       auto [outputsInputs, isDangling] = WorkflowHelpers::analyzeOutputs(workflow);
 
       // create DataOutputDescriptor
@@ -518,7 +514,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
       // ATTENTION: if there are dangling outputs the getGlobalAODSink
       // has to be created in any case!
       std::vector<InputSpec> outputsInputsAOD;
-      auto isAOD = [](InputSpec const& spec) { return DataSpecUtils::partialMatch(spec, header::DataOrigin("AOD")); };
+      auto isAOD = [](InputSpec const& spec) { return (DataSpecUtils::partialMatch(spec, header::DataOrigin("AOD")) || DataSpecUtils::partialMatch(spec, header::DataOrigin("DYN"))); };
 
       for (auto ii = 0u; ii < outputsInputs.size(); ii++) {
         if (isAOD(outputsInputs[ii])) {

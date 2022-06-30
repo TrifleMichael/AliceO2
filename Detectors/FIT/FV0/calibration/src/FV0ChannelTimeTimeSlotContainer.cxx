@@ -11,8 +11,6 @@
 
 #include "FV0Calibration/FV0ChannelTimeTimeSlotContainer.h"
 #include "FV0Base/Constants.h"
-#include <numeric>
-#include <algorithm>
 #include "MathUtils/fit.h"
 
 using namespace o2::fv0;
@@ -36,6 +34,8 @@ void FV0ChannelTimeTimeSlotContainer::fill(const gsl::span<const FV0CalibrationI
 
   for (auto& entry : data) {
 
+    updateFirstCreation(entry.getTimeStamp());
+
     const auto chID = entry.getChannelIndex();
     const auto chTime = entry.getTime();
 
@@ -43,6 +43,7 @@ void FV0ChannelTimeTimeSlotContainer::fill(const gsl::span<const FV0CalibrationI
     if (chID < Constants::nFv0Channels) {
       mHistogram(chTime, chID);
       ++mEntriesPerChannel[chID];
+      LOG(debug) << "FV0ChannelTimeTimeSlotContainer::fill entries " << mEntriesPerChannel[chID] << " chID " << int(chID) << " time " << chTime << " tiestamp " << uint64_t(entry.getTimeStamp());
     }
     //else {
     //  LOG(fatal) << "Invalid channel data";
@@ -57,6 +58,7 @@ void FV0ChannelTimeTimeSlotContainer::merge(FV0ChannelTimeTimeSlotContainer* pre
   for (unsigned int iCh = 0; iCh < Constants::nFv0Channels; ++iCh) {
     mEntriesPerChannel[iCh] += prev->mEntriesPerChannel[iCh];
   }
+  mFirstCreation = std::min(mFirstCreation, prev->mFirstCreation);
 }
 
 int16_t FV0ChannelTimeTimeSlotContainer::getMeanGaussianFitValue(std::size_t channelID) const

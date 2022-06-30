@@ -28,8 +28,11 @@ list(APPEND O2_ROOT_MACRO_EXCLUSION_LIST
             Detectors/TRD/base/macros/OCDB2CCDBTrapConfig.C
             Detectors/TRD/base/macros/Readocdb.C
             Detectors/TRD/base/macros/PrintTrapConfig.C
-            Detectors/TRD/base/macros/ConvertRun2DigitsAndTracklets.C
+            Detectors/TRD/base/macros/TestTrapSim.C
             Detectors/TRD/macros/convertRun2ToRun3Digits.C
+            Detectors/TRD/simulation/macros/CheckTRDFST.C
+            Detectors/TRD/reconstruction/macros/checkTrackletCharges.C
+            Detectors/gconfig/g4Config.C
             Detectors/TRD/macros/ParseTrapRawOutput.C
             Detectors/EMCAL/calib/macros/ReadTestBadChannelMap_CCDBApi.C
             GPU/GPUTracking/display/filterMacros/TRDCandidate.C
@@ -58,7 +61,7 @@ list(APPEND O2_ROOT_MACRO_EXCLUSION_LIST
             macro/load_all_libs.C
             macro/putCondition.C
             macro/rootlogon.C
-            Detectors/FIT/FT0/calibration/macros/makeDummyFT0CalibObjectInCCDB.C)
+            Detectors/FIT/FT0/calibration/macros/makeChannelOffsetCalibObjectInCCDB.C)
 
 
 if(NOT BUILD_SIMULATION)

@@ -41,13 +41,14 @@ class GPUChain
   virtual ~GPUChain() = default;
   virtual void RegisterPermanentMemoryAndProcessors() = 0;
   virtual void RegisterGPUProcessors() = 0;
+  virtual int EarlyConfigure() { return 0; };
   virtual int Init() = 0;
   virtual int PrepareEvent() = 0;
   virtual int Finalize() = 0;
   virtual int RunChain() = 0;
   virtual void MemorySize(size_t& gpuMem, size_t& pageLockedHostMem) = 0;
   virtual void PrintMemoryStatistics(){};
-  virtual int CheckErrorCodes(bool cpuOnly = false) { return 0; }
+  virtual int CheckErrorCodes(bool cpuOnly = false, bool forceShowErrors = false) { return 0; }
   virtual bool SupportsDoublePipeline() { return false; }
   virtual int FinalizePipelinedProcessing() { return 0; }
 

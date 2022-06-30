@@ -192,7 +192,7 @@ class propagatorInterface<o2::base::Propagator>
 #include "GPUTPCGMPropagator.h"
 #include "GPUParam.h"
 #include "GPUDef.h"
-#ifdef GPUCA_O2_LIB
+#ifdef GPUCA_HAVE_O2HEADERS
 #include "DataFormatsTPC/TrackTPC.h"
 #include "ReconstructionDataFormats/TrackTPCITS.h"
 #endif
@@ -206,7 +206,7 @@ template <>
 class trackInterface<GPUTPCGMTrackParam> : public GPUTPCGMTrackParam
 {
  public:
-  GPUdDefault() trackInterface<GPUTPCGMTrackParam>() = default;
+  GPUdDefault() trackInterface<GPUTPCGMTrackParam>() CON_DEFAULT;
   GPUd() trackInterface<GPUTPCGMTrackParam>(const GPUTPCGMTrackParam& param) CON_DELETE;
   GPUd() trackInterface<GPUTPCGMTrackParam>(const GPUTPCGMMergedTrack& trk) : GPUTPCGMTrackParam(trk.GetParam()), mAlpha(trk.GetAlpha()) {}
   GPUd() trackInterface<GPUTPCGMTrackParam>(const gputpcgmmergertypes::GPUTPCOuterParam& param) : GPUTPCGMTrackParam(), mAlpha(param.alpha)
@@ -237,8 +237,8 @@ class trackInterface<GPUTPCGMTrackParam> : public GPUTPCGMTrackParam
     }
   };
 #endif
-#if defined(GPUCA_O2_LIB) && !defined(GPUCA_GPUCODE)
-  trackInterface<GPUTPCGMTrackParam>(const o2::dataformats::TrackTPCITS& param) : GPUTPCGMTrackParam(), mAlpha(param.getParamOut().getAlpha())
+#if defined(GPUCA_HAVE_O2HEADERS)
+  GPUd() trackInterface<GPUTPCGMTrackParam>(const o2::dataformats::TrackTPCITS& param) : GPUTPCGMTrackParam(), mAlpha(param.getParamOut().getAlpha())
   {
     SetX(param.getParamOut().getX());
     SetPar(0, param.getParamOut().getY());
@@ -250,7 +250,7 @@ class trackInterface<GPUTPCGMTrackParam> : public GPUTPCGMTrackParam
       SetCov(i, param.getParamOut().getCov()[i]);
     }
   }
-  trackInterface<GPUTPCGMTrackParam>(const o2::tpc::TrackTPC& param) : GPUTPCGMTrackParam(), mAlpha(param.getParamOut().getAlpha())
+  GPUd() trackInterface<GPUTPCGMTrackParam>(const o2::tpc::TrackTPC& param) : GPUTPCGMTrackParam(), mAlpha(param.getParamOut().getAlpha())
   {
     SetX(param.getParamOut().getX());
     SetPar(0, param.getParamOut().getY());

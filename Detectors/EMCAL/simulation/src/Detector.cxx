@@ -60,7 +60,8 @@ Detector::Detector(Bool_t active)
     mSmodPar0(0.),
     mSmodPar1(0.),
     mSmodPar2(0.),
-    mInnerEdge(0.)
+    mInnerEdge(0.),
+    mDCALInnerGap(7)
 {
   using boost::algorithm::contains;
   memset(mParEMOD, 0, sizeof(Double_t) * 5);
@@ -100,7 +101,8 @@ Detector::Detector(const Detector& rhs)
     mSmodPar0(rhs.mSmodPar0),
     mSmodPar1(rhs.mSmodPar1),
     mSmodPar2(rhs.mSmodPar2),
-    mInnerEdge(rhs.mInnerEdge)
+    mInnerEdge(rhs.mInnerEdge),
+    mDCALInnerGap(rhs.mDCALInnerGap)
 {
   for (int i = 0; i < 5; ++i) {
     mParEMOD[i] = rhs.mParEMOD[i];
@@ -153,13 +155,14 @@ void Detector::ConstructGeometry()
   SpaceFrame emcalframe;
   emcalframe.CreateGeometry();
 
-  //CreateEmcalEnvelope();
+  // CreateEmcalEnvelope();
 
   // COMPACT, TRD1
   LOG(debug2) << "Shish-Kebab geometry : " << GetTitle();
   CreateShiskebabGeometry();
 
   geom->DefineSamplingFraction(TVirtualMC::GetMC()->GetName(), TVirtualMC::GetMC()->GetTitle());
+  LOG(info) << "Using EMCAL sampling fraction " << geom->GetSampling() << " for " << TVirtualMC::GetMC()->GetName() << " / " << TVirtualMC::GetMC()->GetTitle();
 
   gGeoManager->CheckGeometry();
 }
@@ -249,24 +252,24 @@ Bool_t Detector::ProcessHits(FairVolume* v)
     //
     Int_t smNumber = offset + copySmod - 1, smTypeID = 1;
     auto [iphi, ieta] = geom->GetCellPhiEtaIndexInSModule(smNumber, copyMod - 1, copyPhi - 1, copyEta - 1);
-    //iphi = std::get<0>(posetaphi);
-    //ieta = std::get<1>(posetaphi);
+    // iphi = std::get<0>(posetaphi);
+    // ieta = std::get<1>(posetaphi);
     if (smNumber % 2 == 0) {
       if (supermoduletype == DCAL_STANDARD) {
-        smTypeID = 3; //DCal supermodule. previous design/idea
+        smTypeID = 3; // DCal supermodule. previous design/idea
       } else {
         smTypeID = 2;
       }
       ieta = ((geom->GetCentersOfCellsEtaDir()).size() * 2 / smTypeID - 1) - ieta; // 47/31-ieta, revert the ordering on A side in order to keep convention.
     } else {
       if (supermoduletype == EMCAL_HALF) {
-        smTypeID = 2; //half supermodule. previous design/idea
+        smTypeID = 2; // half supermodule. previous design/idea
       }
       if (supermoduletype == EMCAL_THIRD) {
-        smTypeID = 3; //one third (installed in 2012) supermodule
+        smTypeID = 3; // one third (installed in 2012) supermodule
       }
       if (supermoduletype == DCAL_EXT) {
-        smTypeID = 3; //one third (installed in 2012) supermodule
+        smTypeID = 3; // one third (installed in 2012) supermodule
       }
       iphi = ((geom->GetCentersOfCellsPhiDir()).size() / smTypeID - 1) - iphi; // 23/7-iphi, revert the ordering on C side in order to keep convention.
     }
@@ -819,7 +822,9 @@ void Detector::CreateSupermoduleGeometry(const std::string_view mother)
         case DCAL_STANDARD: {
           smName = "DCSM";
           parC[2] *= 2. / 3.;
-          zpos = mSmodPar2 + g->GetDCALInnerEdge() / 2.; // 21-sep-04
+          // Extend DCAL SM by 7 cm in inner direction in order to leave space for tilted towers
+          parC[2] += mDCALInnerGap / 2.;                                   // half gap as parameter uses half size (origin in centre of the SM)
+          zpos = mSmodPar2 + (g->GetDCALInnerEdge() - mDCALInnerGap) / 2.; // 21-sep-04
           break;
         }
         case DCAL_EXT: {
@@ -929,7 +934,9 @@ void Detector::CreateEmcalModuleGeometry(const std::string_view mother, const st
         if (iz < 8) {
           continue; //!!!DCSM from 8th to 23th
         }
-        zpos = mod.GetPosZ() - mSmodPar2 - g->GetDCALInnerEdge() / 2.;
+        // Correct pack supermodule center position after increasing size for extruding fix
+        // z-pos. := abs. module z - abs origin of the mother volume
+        zpos = mod.GetPosZ() - mSmodPar2 - (g->GetDCALInnerEdge() - mDCALInnerGap) / 2.;
       } else if (mother.compare("SMOD")) {
         LOG(error) << "Unknown super module Type!!";
       }

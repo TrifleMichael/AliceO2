@@ -32,34 +32,44 @@ uint32_t ChipStat::getNErrors() const
 
 ///_________________________________________________________________
 /// print link decoding statistics
-void ChipStat::addErrors(uint32_t mask, uint16_t chID, int verbosity)
+uint32_t ChipStat::addErrors(uint32_t mask, uint16_t chID, int verbosity)
 {
+  uint32_t res = 0;
   if (mask) {
     for (int i = NErrorsDefined; i--;) {
       if (mask & (0x1 << i)) {
+        res |= ErrActions[i] & ErrActPropagate;
         if (verbosity > -1 && (!errorCounts[i] || verbosity > 1)) {
-          LOGP(important, "New error registered on the FEEID:{:#04x}: chip#{}: {}", feeID, chID, ErrNames[i]);
+          LOGP(info, "New error registered on the FEEID:{:#04x}: chip#{}: {}", feeID, chID, ErrNames[i]);
+          res |= ErrActions[i] & ErrActDump;
         }
         errorCounts[i]++;
       }
     }
   }
+  return res;
 }
 
 ///_________________________________________________________________
 /// print link decoding statistics
-void ChipStat::addErrors(const ChipPixelData& d, int verbosity)
+uint32_t ChipStat::addErrors(const ChipPixelData& d, int verbosity)
 {
+  uint32_t res = 0;
   if (d.getErrorFlags()) {
     for (int i = NErrorsDefined; i--;) {
       if (d.getErrorFlags() & (0x1 << i)) {
+        res |= ErrActions[i] & ErrActPropagate;
         if (verbosity > -1 && (!errorCounts[i] || verbosity > 1)) {
-          LOGP(important, "New error registered on the FEEID:{:#04x} chip#{}: {}{}", feeID, int16_t(d.getChipID()), ErrNames[i], d.getErrorDetails(i));
+          LOGP(info, "New error registered at bc/orbit {}/{} on the FEEID:{:#04x} chip#{}: {}{}",
+               d.getInteractionRecord().bc, d.getInteractionRecord().orbit,
+               feeID, int16_t(d.getChipID()), ErrNames[i], d.getErrorDetails(i));
+          res |= ErrActions[i] & ErrActDump;
         }
         errorCounts[i]++;
       }
     }
   }
+  return res;
 }
 
 ///_________________________________________________________________
@@ -77,7 +87,7 @@ void ChipStat::print(bool skipNoErr, const std::string& pref) const
         rep += fmt::format(" | Err.: {}: {}", ErrNames[i].data(), errorCounts[i]);
       }
     }
-    LOG(important) << rep;
+    LOG(info) << rep;
   }
 }
 
@@ -110,6 +120,6 @@ void GBTLinkDecodingStat::print(bool skipNoErr) const
         rep += fmt::format(" [{}: {}]", ErrNames[i].data(), errorCounts[i]);
       }
     }
-    LOG(important) << rep;
+    LOG(info) << rep;
   }
 }

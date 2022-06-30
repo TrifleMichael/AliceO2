@@ -28,11 +28,12 @@
 #include <TObjArray.h>
 #include <TGeoMatrix.h>
 #include <cstdio>
+#include "DetectorsCommonDataFormats/AlignParam.h"
 #include "Align/DOFStatistics.h"
 #include "Align/DOFSet.h"
+#include <vector>
 
 class TObjArray;
-class TClonesArray;
 class TH1;
 
 namespace o2
@@ -143,25 +144,25 @@ class AlignableVolume : public DOFSet
   int getNDOFGeomFree() const { return mNDOFGeomFree; }
   //
   virtual void prepareMatrixT2L();
-  virtual void setTrackingFrame();
   //
   const TGeoHMatrix& getMatrixL2G() const { return mMatL2G; }
   const TGeoHMatrix& getMatrixL2GIdeal() const { return mMatL2GIdeal; }
   const TGeoHMatrix& getMatrixL2GReco() const { return mMatL2GReco; }
   const TGeoHMatrix& getGlobalDeltaRef() const { return mMatDeltaRefGlo; }
+  const TGeoHMatrix& getMatrixT2L() const { return mMatT2L; }
+
   void setMatrixL2G(const TGeoHMatrix& m) { mMatL2G = m; }
   void setMatrixL2GIdeal(const TGeoHMatrix& m) { mMatL2GIdeal = m; }
   void setMatrixL2GReco(const TGeoHMatrix& m) { mMatL2GReco = m; }
-  void setGlobalDeltaRef(TGeoHMatrix& mat) { mMatDeltaRefGlo = mat; }
+  void setGlobalDeltaRef(const TGeoHMatrix& mat) { mMatDeltaRefGlo = mat; }
+  void setMatrixT2L(const TGeoHMatrix& m) { mMatT2L = m; }
+
   //
   virtual void prepareMatrixL2G(bool reco = false);
   virtual void prepareMatrixL2GIdeal();
-  virtual void updateL2GRecoMatrices(const TClonesArray* algArr, const TGeoHMatrix* cumulDelta);
+  virtual void updateL2GRecoMatrices(const std::vector<o2::detectors::AlignParam>& algArr, const TGeoHMatrix* cumulDelta);
   //
   void getMatrixT2G(TGeoHMatrix& m) const;
-  //
-  const TGeoHMatrix& getMatrixT2L() const { return mMatT2L; }
-  void setMatrixT2L(const TGeoHMatrix& m);
   //
   void delta2Matrix(TGeoHMatrix& deltaM, const double* delta) const;
   //
@@ -177,7 +178,7 @@ class AlignableVolume : public DOFSet
   void createPreGloDeltaMatrix(TGeoHMatrix& deltaM) const;
   void createPreLocDeltaMatrix(TGeoHMatrix& deltaM) const;
   void createAlignmenMatrix(TGeoHMatrix& alg) const;
-  void createAlignmentObjects(TClonesArray* arr) const;
+  void createAlignmentObjects(std::vector<o2::detectors::AlignParam>& arr) const;
   //
   void setSkip(bool v = true) { SetBit(kSkipBit, v); }
   bool getSkip() const { return TestBit(kSkipBit); }

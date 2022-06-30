@@ -26,9 +26,11 @@
 #pragma link C++ class o2::track::TrackParametrizationWithError < float> + ;
 #pragma link C++ class o2::track::TrackParametrizationWithError < double> + ;
 #pragma link C++ class o2::track::TrackParFwd + ;
-#pragma link C++ class o2::track::TrackParCovFwd + ;
 #pragma link C++ class o2::track::PID + ;
 #pragma link C++ class o2::track::TrackLTIntegral + ;
+
+#pragma link C++ class o2::track::TrackParCovFwd + ;
+#pragma link C++ class std::vector < o2::track::TrackParCovFwd> + ;
 
 #pragma link C++ class o2::BaseCluster < float> + ;
 #pragma link C++ class o2::dataformats::TrackTPCITS + ;
@@ -50,6 +52,9 @@
 
 #pragma link C++ class o2::dataformats::MatchInfoFwd + ;
 #pragma link C++ class std::vector < o2::dataformats::MatchInfoFwd> + ;
+
+#pragma link C++ class o2::dataformats::MatchInfoHMP + ;
+#pragma link C++ class std::vector < o2::dataformats::MatchInfoHMP> + ;
 
 #pragma link C++ class o2::dataformats::GlobalFwdTrack + ;
 #pragma link C++ class std::vector < o2::dataformats::GlobalFwdTrack> + ;

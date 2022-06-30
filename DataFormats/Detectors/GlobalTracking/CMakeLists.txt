@@ -8,10 +8,12 @@
 # In applying this license CERN does not waive the privileges and immunities
 # granted to it by virtue of its status as an Intergovernmental Organization
 # or submit itself to any jurisdiction.
+add_compile_options(-O0 -g -fPIC)
 
 o2_add_library(
   DataFormatsGlobalTracking
   SOURCES src/RecoContainer.cxx
+          src/FilteredRecoTF.cxx
   PUBLIC_LINK_LIBRARIES
     O2::DataFormatsTPC
     O2::DataFormatsITSMFT
@@ -24,6 +26,7 @@ o2_add_library(
     O2::DataFormatsFDD
     O2::DataFormatsZDC
     O2::DataFormatsTOF
+    O2::DataFormatsHMP
     O2::DataFormatsEMCAL
     O2::ReconstructionDataFormats
     O2::DataFormatsTRD
@@ -34,3 +37,8 @@ o2_add_library(
     O2::GPUDataTypeHeaders
   PRIVATE_LINK_LIBRARIES
     O2::Framework)
+
+o2_target_root_dictionary(
+  DataFormatsGlobalTracking
+  HEADERS include/DataFormatsGlobalTracking/FilteredRecoTF.h
+)

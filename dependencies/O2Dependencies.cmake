@@ -74,7 +74,7 @@ set_package_properties(Microsoft.GSL
                        TYPE REQUIRED
                        PURPOSE "Mainly for its span")
 
-find_package(FairMQ CONFIG)
+find_package(FairMQ 1.4.41 CONFIG)
 set_package_properties(FairMQ PROPERTIES TYPE REQUIRED)
 
 # find_package(protobuf CONFIG)
@@ -97,6 +97,9 @@ set_package_properties(RapidJSON PROPERTIES TYPE REQUIRED)
 
 find_package(CURL)
 set_package_properties(CURL PROPERTIES TYPE REQUIRED)
+
+find_package(TBB)
+set_package_properties(TBB PROPERTIES TYPE REQUIRED)
 
 find_package(JAliEnROOT MODULE)
 set_package_properties(JAliEnROOT PROPERTIES TYPE RECOMMENDED)
@@ -138,12 +141,6 @@ set_package_properties(AliRoot
                        TYPE OPTIONAL
                        PURPOSE "For very specific use cases only")
 
-find_package(GLEW)
-set_package_properties(GLEW PROPERTIES TYPE OPTIONAL)
-find_package(X11)
-set_package_properties(X11 PROPERTIES TYPE OPTIONAL)
-find_package(GLUT)
-set_package_properties(GLUT PROPERTIES TYPE OPTIONAL)
 find_package(OpenGL)
 set_package_properties(OpenGL PROPERTIES TYPE OPTIONAL)
 

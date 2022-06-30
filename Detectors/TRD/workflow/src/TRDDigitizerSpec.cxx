@@ -63,8 +63,10 @@ class TRDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     bool mctruth = pc.outputs().isAllowed({"TRD", "LABELS", 0});
 
     Calibrations simcal;
-    auto timeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    simcal.getCCDBObjects(timeStamp);
+    // the timestamp can be extracted from the DPL header (it is set in SimReader)
+    const auto ref = pc.inputs().getFirstValid(true);
+    auto creationTime = DataRefUtils::getHeader<DataProcessingHeader*>(ref)->creation;
+    simcal.getCCDBObjects(creationTime);
     mDigitizer.setCalibrations(&simcal);
 
     // read collision context from input
@@ -92,7 +94,7 @@ class TRDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     timer.Start();
     // loop over all composite collisions given from context
     // (aka loop over all the interaction records)
-    for (int collID = 0; collID < irecords.size(); ++collID) {
+    for (size_t collID = 0; collID < irecords.size(); ++collID) {
       currentTime = irecords[collID];
       // Trigger logic implemented here
       bool isNewTrigger = true; // flag newly accepted readout trigger
@@ -153,7 +155,7 @@ class TRDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     LOGF(info, "TRD digitization timing: Cpu: %.3e Real: %.3e s", timer.CpuTime(), timer.RealTime());
 
     LOG(info) << "TRD: Sending " << digitsAccum.size() << " digits";
-    pc.outputs().snapshot(Output{"TRD", "DIGITS", 0, Lifetime::Timeframe}, digitsAccum);
+    pc.outputs().snapshot(Output{"TRD", "DIGITS", 1, Lifetime::Timeframe}, digitsAccum);
     if (mctruth) {
       LOG(info) << "TRD: Sending " << labelsAccum.getNElements() << " labels";
       // we are flattening the labels and write to managed shared memory container for further communication
@@ -163,7 +165,7 @@ class TRDDPLDigitizerTask : public o2::base::BaseDPLDigitizer
     LOG(info) << "TRD: Sending ROMode= " << mROMode << " to GRPUpdater";
     pc.outputs().snapshot(Output{"TRD", "ROMode", 0, Lifetime::Timeframe}, mROMode);
     LOG(info) << "TRD: Sending trigger records";
-    pc.outputs().snapshot(Output{"TRD", "TRGRDIG", 0, Lifetime::Timeframe}, triggers);
+    pc.outputs().snapshot(Output{"TRD", "TRKTRGRD", 1, Lifetime::Timeframe}, triggers);
     // we should be only called once; tell DPL that this process is ready to exit
     pc.services().get<ControlService>().readyToQuit(QuitRequest::Me);
     finished = true;
@@ -184,8 +186,8 @@ o2::framework::DataProcessorSpec getTRDDigitizerSpec(int channel, bool mctruth)
   //  algorithmic description (here a lambda getting called once to setup the actual processing function)
   //  options that can be used for this processor (here: input file names where to take the hits)
   std::vector<OutputSpec> outputs;
-  outputs.emplace_back("TRD", "DIGITS", 0, Lifetime::Timeframe);
-  outputs.emplace_back("TRD", "TRGRDIG", 0, Lifetime::Timeframe);
+  outputs.emplace_back("TRD", "DIGITS", 1, Lifetime::Timeframe);
+  outputs.emplace_back("TRD", "TRKTRGRD", 1, Lifetime::Timeframe);
   if (mctruth) {
     outputs.emplace_back("TRD", "LABELS", 0, Lifetime::Timeframe);
   }

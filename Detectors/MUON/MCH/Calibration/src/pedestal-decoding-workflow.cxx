@@ -9,13 +9,6 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-///
-/// \file    DatDecoderSpec.cxx
-/// \author  Andrea Ferrero
-///
-/// \brief Implementation of a data processor to run the raw decoding
-///
-
 #include <random>
 #include <iostream>
 #include <fstream>
@@ -391,13 +384,6 @@ using namespace o2::framework;
 
 const char* specName = "mch-pedestal-decoder";
 
-// customize the completion policy
-void customize(std::vector<o2::framework::CompletionPolicy>& policies)
-{
-  using o2::framework::CompletionPolicy;
-  policies.push_back(CompletionPolicyHelpers::defineByName(specName, CompletionPolicy::CompletionOp::Consume));
-}
-
 void customize(std::vector<ConfigParamSpec>& workflowOptions)
 {
   workflowOptions.push_back(ConfigParamSpec{"input-spec", VariantType::String, "TF:MCH/RAWDATA", {"selection string for the input data"}});
@@ -412,7 +398,7 @@ using namespace o2::framework;
 //_________________________________________________________________________________________________
 o2::framework::DataProcessorSpec getMCHPedestalDecodingSpec(const char* specName, std::string inputSpec)
 {
-  //o2::mch::raw::PedestalsTask task();
+  // o2::mch::raw::PedestalsTask task();
   return DataProcessorSpec{
     specName,
     o2::framework::select(inputSpec.c_str()),

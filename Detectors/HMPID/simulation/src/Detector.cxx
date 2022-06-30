@@ -30,7 +30,6 @@
 #include <TTree.h>
 #include "SimulationDataFormat/Stack.h"
 #include "SimulationDataFormat/TrackReference.h"
-
 #include "DetectorsBase/MaterialManager.h"
 
 #include "Framework/Logger.h"
@@ -47,20 +46,36 @@ Detector::Detector(const Detector& other) : mSensitiveVolumes(other.mSensitiveVo
 
 void Detector::InitializeO2Detector()
 {
+  TVirtualMC* fMC = TVirtualMC::GetMC();
   for (auto sensitiveHpad : mSensitiveVolumes) {
     LOG(debug) << "HMPID: registering sensitive " << sensitiveHpad->GetName();
     AddSensitiveVolume(sensitiveHpad);
+    mHpad0VolID = fMC->VolId("Hpad0");
+    mHpad1VolID = fMC->VolId("Hpad1");
+    mHpad2VolID = fMC->VolId("Hpad2");
+    mHpad3VolID = fMC->VolId("Hpad3");
+    mHpad4VolID = fMC->VolId("Hpad4");
+    mHpad5VolID = fMC->VolId("Hpad5");
+    mHpad6VolID = fMC->VolId("Hpad6");
+    mHcel0VolID = fMC->VolId("Hcel0");
+    mHcel1VolID = fMC->VolId("Hcel1");
+    mHcel2VolID = fMC->VolId("Hcel2");
+    mHcel3VolID = fMC->VolId("Hcel3");
+    mHcel4VolID = fMC->VolId("Hcel4");
+    mHcel5VolID = fMC->VolId("Hcel5");
+    mHcel6VolID = fMC->VolId("Hcel6");
   }
 }
 //*********************************************************************************************************
 bool Detector::ProcessHits(FairVolume* v)
 {
-  TString volname = fMC->CurrentVolName();
+  Int_t copy;
+  Int_t volID = fMC->CurrentVolID(copy);
   auto stack = (o2::data::Stack*)fMC->GetStack();
 
   //Treat photons
   //photon (Ckov or feedback) hits on module PC (Hpad)
-  if ((fMC->TrackPid() == 50000050 || fMC->TrackPid() == 50000051) && volname.Contains("Hpad")) {
+  if ((fMC->TrackPid() == 50000050 || fMC->TrackPid() == 50000051) && (volID == mHpad0VolID || volID == mHpad1VolID || volID == mHpad2VolID || volID == mHpad3VolID || volID == mHpad4VolID || volID == mHpad5VolID || volID == mHpad6VolID)) {
     if (fMC->Edep() > 0) { //photon survided QE test i.e. produces electron
       if (IsLostByFresnel()) {
         fMC->StopTrack();
@@ -72,9 +87,22 @@ bool Detector::ProcessHits(FairVolume* v)
       Double_t x[3];
       fMC->TrackPosition(x[0], x[1], x[2]);        //take MARS position at entrance to PC
       Float_t hitTime = (Float_t)fMC->TrackTime(); //hit formation time
-      TString tmpname = volname;
-      tmpname.Remove(0, 4);
-      Int_t idch = tmpname.Atoi(); //retrieve the chamber number
+      Int_t idch;                                  // chamber number
+      if (volID == mHpad0VolID) {
+        idch = 0;
+      } else if (volID == mHpad1VolID) {
+        idch = 1;
+      } else if (volID == mHpad2VolID) {
+        idch = 2;
+      } else if (volID == mHpad3VolID) {
+        idch = 3;
+      } else if (volID == mHpad4VolID) {
+        idch = 4;
+      } else if (volID == mHpad5VolID) {
+        idch = 5;
+      } else if (volID == mHpad6VolID) {
+        idch = 6;
+      }
       Double_t xl, yl;
       o2::hmpid::Param::instance()->mars2Lors(idch, x, xl, yl); //take LORS position
       AddHit(x[0], x[1], x[2], hitTime, etot, tid, idch); //HIT for photon, position at P, etot will be set to Q
@@ -88,7 +116,7 @@ bool Detector::ProcessHits(FairVolume* v)
   static Float_t eloss; //need to store mip parameters between different steps
   static Double_t in[3];
 
-  if (fMC->IsTrackEntering() && fMC->TrackCharge() && volname.Contains("Hpad")) {
+  if (fMC->IsTrackEntering() && fMC->TrackCharge() && (volID == mHpad0VolID || volID == mHpad1VolID || volID == mHpad2VolID || volID == mHpad3VolID || volID == mHpad4VolID || volID == mHpad5VolID || volID == mHpad6VolID)) {
     //Trackref stored when entering in the pad volume
     o2::TrackReference tr(*fMC, GetDetId());
     tr.setTrackID(stack->GetCurrentTrackNumber());
@@ -96,7 +124,8 @@ bool Detector::ProcessHits(FairVolume* v)
     stack->addTrackReference(tr);
   }
 
-  if (fMC->TrackCharge() && volname.Contains("Hcel")) {                                    //charged particle in amplification gap (Hcel)
+  if (fMC->TrackCharge() && (volID == mHcel0VolID || volID == mHcel1VolID || volID == mHcel2VolID || volID == mHcel3VolID || volID == mHcel4VolID || volID == mHcel5VolID || volID == mHcel6VolID)) {
+    // charged particle in amplification gap (Hcel)
     if (fMC->IsTrackEntering() || fMC->IsNewTrack()) {                                     //entering or newly created
       eloss = 0;                                                                           //reset Eloss collector
       fMC->TrackPosition(in[0], in[1], in[2]);                                             //take position at the entrance
@@ -110,9 +139,22 @@ bool Detector::ProcessHits(FairVolume* v)
       out[0] = 0.5 * (out[0] + in[0]);             //
       out[1] = 0.5 * (out[1] + in[1]);             //take hit position at the anod plane
       out[2] = 0.5 * (out[2] + in[2]);
-      TString tmpname = volname;
-      tmpname.Remove(0, 4);
-      Int_t idch = tmpname.Atoi(); //retrieve the chamber number
+      Int_t idch; // chamber number
+      if (volID == mHcel0VolID) {
+        idch = 0;
+      } else if (volID == mHcel1VolID) {
+        idch = 1;
+      } else if (volID == mHcel2VolID) {
+        idch = 2;
+      } else if (volID == mHcel3VolID) {
+        idch = 3;
+      } else if (volID == mHcel4VolID) {
+        idch = 4;
+      } else if (volID == mHcel5VolID) {
+        idch = 5;
+      } else if (volID == mHcel6VolID) {
+        idch = 6;
+      }
       Double_t xl, yl;
       o2::hmpid::Param::instance()->mars2Lors(idch, out, xl, yl); //take LORS position
       if (eloss > 0) {
@@ -1225,6 +1267,11 @@ void Detector::ConstructGeometry()
   // AliDebug(1,"Stop v3. HMPID option");
 }
 
+void Detector::ConstructOpGeometry()
+{
+  defineOpticalProperties(); // needs to be called within this hook
+}
+
 //*****************************************************************************************************************
 void Detector::defineOpticalProperties()
 {
@@ -1279,22 +1326,25 @@ void Detector::defineOpticalProperties()
     dQePc[i] = pQeF.Eval(eV);
     dReflMet[i] = 0.; // no reflection on the surface of the pc (?)
   }
-  fMC->SetCerenkov(getMediumID(kC6F14), kNbins, aEckov, aAbsRad, aQeAll, aIdxRad);
-  fMC->SetCerenkov(getMediumID(kSiO2), kNbins, aEckov, aAbsWin, aQeAll, aIdxWin);
-  fMC->SetCerenkov(getMediumID(kCH4), kNbins, aEckov, aAbsGap, aQeAll, aIdxGap);
-  fMC->SetCerenkov(getMediumID(kCu), kNbins, aEckov, aAbsMet, aQeAll, aIdxMet);
-  fMC->SetCerenkov(getMediumID(kW), kNbins, aEckov, aAbsMet, aQeAll,
+  // at this moment, the fMC member doesn't seem to be initialized
+  // so we fetch from the singleton
+  auto vmc = TVirtualMC::GetMC();
+  vmc->SetCerenkov(getMediumID(kC6F14), kNbins, aEckov, aAbsRad, aQeAll, aIdxRad);
+  vmc->SetCerenkov(getMediumID(kSiO2), kNbins, aEckov, aAbsWin, aQeAll, aIdxWin);
+  vmc->SetCerenkov(getMediumID(kCH4), kNbins, aEckov, aAbsGap, aQeAll, aIdxGap);
+  vmc->SetCerenkov(getMediumID(kCu), kNbins, aEckov, aAbsMet, aQeAll, aIdxMet);
+  vmc->SetCerenkov(getMediumID(kW), kNbins, aEckov, aAbsMet, aQeAll,
                    aIdxMet); // n=0 means reflect photons
-  fMC->SetCerenkov(getMediumID(kCsI), kNbins, aEckov, aAbsMet, aQePc,
+  vmc->SetCerenkov(getMediumID(kCsI), kNbins, aEckov, aAbsMet, aQePc,
                    aIdxPc); // n=1 means convert photons
-  fMC->SetCerenkov(getMediumID(kAl), kNbins, aEckov, aAbsMet, aQeAll, aIdxMet);
+  vmc->SetCerenkov(getMediumID(kAl), kNbins, aEckov, aAbsMet, aQeAll, aIdxMet);
 
   // Define a skin surface for the photocatode to enable 'detection' in G4
   for (Int_t i = 0; i < 7; i++) {
-    fMC->DefineOpSurface(Form("surfPc%i", i), kGlisur /*kUnified*/, kDielectric_metal, kPolished, 0.);
-    fMC->SetMaterialProperty(Form("surfPc%i", i), "EFFICIENCY", kNbins, dEckov, dQePc);
-    fMC->SetMaterialProperty(Form("surfPc%i", i), "REFLECTIVITY", kNbins, dEckov, dReflMet);
-    fMC->SetSkinSurface(Form("skinPc%i", i), Form("Hpad%i", i), Form("surfPc%i", i));
+    vmc->DefineOpSurface(Form("surfPc%i", i), kGlisur /*kUnified*/, kDielectric_metal, kPolished, 0.);
+    vmc->SetMaterialProperty(Form("surfPc%i", i), "EFFICIENCY", kNbins, dEckov, dQePc);
+    vmc->SetMaterialProperty(Form("surfPc%i", i), "REFLECTIVITY", kNbins, dEckov, dReflMet);
+    vmc->SetSkinSurface(Form("skinPc%i", i), Form("Hpad%i", i), Form("surfPc%i", i));
   }
 }
 

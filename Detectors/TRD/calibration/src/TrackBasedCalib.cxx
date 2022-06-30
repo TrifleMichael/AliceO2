@@ -19,10 +19,16 @@
 #include "DetectorsBase/GeometryManager.h"
 #include "TRDBase/Geometry.h"
 #include "TRDBase/PadPlane.h"
+#include "CommonUtils/NameConf.h"
 #include <fairlogger/Logger.h>
 
 using namespace o2::trd;
 using namespace o2::trd::constants;
+
+void TrackBasedCalib::reset()
+{
+  mAngResHistos.reset();
+}
 
 void TrackBasedCalib::init()
 {
@@ -56,6 +62,10 @@ void TrackBasedCalib::calculateAngResHistos()
     return;
   }
 
+  if (!mNoiseCalib) {
+    LOG(alarm) << "No MCM noise map available. Please upload valid object to CCDB.";
+  }
+
   LOGF(info, "As input tracks are available: %lu ITS-TPC-TRD tracks and %lu TPC-TRD tracks", mTracksInITSTPCTRD.size(), mTracksInTPCTRD.size());
 
   int nTracksSuccessITSTPCTRD = doTrdOnlyTrackFits(mTracksInITSTPCTRD);
@@ -80,10 +90,19 @@ int TrackBasedCalib::doTrdOnlyTrackFits(gsl::span<const TrackTRD>& tracks)
     trkWork.setChi2(0.f);
     trkWork.resetCovariance(20);
 
+    if (std::isnan(trkWork.getSnp())) {
+      LOG(alarm) << "Track with invalid parameters found: " << trkWork.getRefGlobalTrackId();
+      continue;
+    }
+
     // first inward propagation (TRD track fit)
     int currLayer = NLAYER;
     for (int iLayer = NLAYER - 1; iLayer >= 0; --iLayer) {
       if (trkWork.getTrackletIndex(iLayer) == -1) {
+        continue;
+      }
+      if (mNoiseCalib && mNoiseCalib->isTrackletFromNoisyMCM(mTrackletsRaw[trkWork.getTrackletIndex(iLayer)])) {
+        // ignore tracklets which originate from noisy MCMs
         continue;
       }
       if (propagateAndUpdate(trkWork, iLayer, true)) {
@@ -101,6 +120,10 @@ int TrackBasedCalib::doTrdOnlyTrackFits(gsl::span<const TrackTRD>& tracks)
       if (trkWork.getTrackletIndex(iLayer) == -1) {
         continue;
       }
+      if (mNoiseCalib && mNoiseCalib->isTrackletFromNoisyMCM(mTrackletsRaw[trkWork.getTrackletIndex(iLayer)])) {
+        // ignore tracklets which originate from noisy MCMs
+        continue;
+      }
       if (propagateAndUpdate(trkWork, iLayer, true)) {
         trackFailed = true;
         break;
@@ -116,6 +139,10 @@ int TrackBasedCalib::doTrdOnlyTrackFits(gsl::span<const TrackTRD>& tracks)
       if (trkWork.getTrackletIndex(iLayer) == -1) {
         continue;
       }
+      if (mNoiseCalib && mNoiseCalib->isTrackletFromNoisyMCM(mTrackletsRaw[trkWork.getTrackletIndex(iLayer)])) {
+        // ignore tracklets which originate from noisy MCMs
+        continue;
+      }
       if (propagateAndUpdate(trkWork, iLayer, false)) {
         trackFailed = true;
         break;
@@ -128,7 +155,6 @@ int TrackBasedCalib::doTrdOnlyTrackFits(gsl::span<const TrackTRD>& tracks)
         // track impact angle out of histogram range
         continue;
       }
-      //++nAngularResidualsCollected;
     }
 
     // here we can count the number of successfully processed tracks

@@ -39,6 +39,7 @@
 #include "TPCBase/CalDet.h"
 #include "TPCWorkflow/CalDetMergerPublisherSpec.h"
 #include "TPCWorkflow/ProcessingHelpers.h"
+#include "CommonUtils/NameConf.h"
 
 using namespace o2::framework;
 using namespace o2::tpc;
@@ -165,7 +166,7 @@ class CalDetMergerPublisherSpec : public o2::framework::Task
     // perhaps should be changed to time of the run
     const auto now = std::chrono::system_clock::now();
     const long timeStart = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-    const long timeEnd = 99999999999999;
+    const long timeEnd = o2::ccdb::CcdbObjectInfo::INFINITE_TIMESTAMP;
 
     std::map<std::string, std::string> md;
 
@@ -178,7 +179,7 @@ class CalDetMergerPublisherSpec : public o2::framework::Task
       w.setEndValidityTimestamp(timeEnd);
 
       md = w.getMetaData();
-      md["runNumber"] = std::to_string(mRunNumber);
+      md[o2::base::NameConf::CCDBRunTag.data()] = std::to_string(mRunNumber);
       w.setMetaData(md);
 
       LOGP(info, "Sending object {}/{} of size {} bytes, valid for {} : {}", w.getPath(), w.getFileName(), image->size(), w.getStartValidityTimestamp(), w.getEndValidityTimestamp());
@@ -197,7 +198,7 @@ class CalDetMergerPublisherSpec : public o2::framework::Task
       w.setEndValidityTimestamp(timeEnd);
 
       md = w.getMetaData();
-      md["runNumber"] = std::to_string(mRunNumber);
+      md[o2::base::NameConf::CCDBRunTag.data()] = std::to_string(mRunNumber);
       w.setMetaData(md);
 
       LOG(info) << "Sending object " << w.getPath() << "/" << w.getFileName() << " of size " << image->size()

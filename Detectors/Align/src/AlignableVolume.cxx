@@ -336,6 +336,10 @@ void AlignableVolume::prepareMatrixT2L()
   // for non-sensors we define the fake tracking frame with the alpha angle being
   // the average angle of centers of its children
   //
+  if (isSensor()) {
+    LOGP(fatal, "Sensor {} must provide its own prepareMatrixT2L method", getSymName());
+  }
+
   double tot[3] = {0, 0, 0}, loc[3] = {0, 0, 0}, glo[3];
   int nch = getNChildren();
   for (int ich = nch; ich--;) {
@@ -364,26 +368,6 @@ void AlignableVolume::prepareMatrixT2L()
   const TGeoHMatrix& l2gi = getMatrixL2GIdeal().Inverse();
   mMatT2L.MultiplyLeft(&l2gi);
   //
-}
-
-//____________________________________________
-void AlignableVolume::setMatrixT2L(const TGeoHMatrix& m)
-{
-  // set the T2L matrix and define tracking frame
-  // Note that this method is used for the externally set matrices
-  // (in case of sensors). For other volumes the tracking frame and matrix
-  // is defined in the prepareMatrixT2L method
-  mMatT2L = m;
-  setTrackingFrame();
-}
-
-//__________________________________________________________________
-void AlignableVolume::setTrackingFrame()
-{
-  // Define tracking frame of the sensor
-  // This method should be implemented for sensors, which receive the T2L
-  // matrix from the geometry
-  LOG(error) << "Volume " << GetName() << " was supposed to implement its own method";
 }
 
 //__________________________________________________________________
@@ -764,18 +748,15 @@ void AlignableVolume::createAlignmenMatrix(TGeoHMatrix& alg) const
 */
 
 //_________________________________________________________________
-void AlignableVolume::createAlignmentObjects(TClonesArray* arr) const
+void AlignableVolume::createAlignmentObjects(std::vector<o2::detectors::AlignParam>& arr) const
 {
   // add to supplied array alignment object for itself and children
-  TClonesArray& parr = *arr;
   TGeoHMatrix algM;
   createAlignmenMatrix(algM);
   //  new (parr[parr.GetEntriesFast()]) AliAlignObjParams(GetName(), getVolID(), algM, true);
   const double* translation = algM.GetTranslation();
   const double* rotation = algM.GetRotationMatrix();
-  new (parr[parr.GetEntriesFast()]) detectors::AlignParam(GetName(), getVolID(),
-                                                          translation[0], translation[1], translation[2],
-                                                          rotation[0], rotation[1], rotation[2], true);
+  arr.emplace_back(getSymName(), getVolID(), translation[0], translation[1], translation[2], rotation[0], rotation[1], rotation[2], true);
   int nch = getNChildren();
   for (int ich = 0; ich < nch; ich++) {
     getChild(ich)->createAlignmentObjects(arr);
@@ -783,7 +764,7 @@ void AlignableVolume::createAlignmentObjects(TClonesArray* arr) const
 }
 
 //_________________________________________________________________
-void AlignableVolume::updateL2GRecoMatrices(const TClonesArray* algArr, const TGeoHMatrix* cumulDelta)
+void AlignableVolume::updateL2GRecoMatrices(const std::vector<o2::detectors::AlignParam>& algArr, const TGeoHMatrix* cumulDelta)
 {
   // recreate mMatL2GReco matrices from ideal L2G matrix and alignment objects
   // used during data reconstruction. For the volume at level J we have
@@ -791,23 +772,21 @@ void AlignableVolume::updateL2GRecoMatrices(const TClonesArray* algArr, const TG
   // cumulDelta is Delta_{J-1} * ... * Delta_0, supplied by the parent
   //
   mMatL2GReco = mMatL2GIdeal;
-  // find alignment object for this volume
-  int nalg = algArr->GetEntriesFast();
+  // find alignment object for this volume;
   const detectors::AlignParam* par = nullptr;
-  for (int i = 0; i < nalg; i++) {
-    par = (detectors::AlignParam*)algArr->At(i);
-    if (!strcmp(par->getSymName().c_str(), getSymName())) {
+  int selPar = -1;
+  for (size_t i = 0; i < algArr.size(); i++) {
+    if (algArr[i].getSymName() == getSymName()) {
+      selPar = int(i);
       break;
     }
-    par = nullptr;
   }
   TGeoHMatrix delta;
-  if (!par) {
+  if (selPar < 0) {
     LOG(info) << "Alignment for " << getSymName() << " is absent in Reco-Time alignment object";
   } else {
-    delta = par->createMatrix();
+    delta = algArr[selPar].createMatrix();
   }
-  //    par->GetMatrix(delta);
   if (cumulDelta) {
     delta *= *cumulDelta;
   }

@@ -26,9 +26,10 @@
 #include "Framework/ProcessingPolicies.h"
 #include "Framework/Tracing.h"
 #include "Framework/RunningWorkflowInfo.h"
+#include "Framework/ObjectCache.h"
 
-#include <fairmq/FairMQDevice.h>
-#include <fairmq/FairMQParts.h>
+#include <fairmq/Device.h>
+#include <fairmq/Parts.h>
 
 #include <memory>
 #include <mutex>
@@ -62,7 +63,9 @@ struct DeviceContext {
   ComputingQuotaEvaluator* quotaEvaluator = nullptr;
   DataProcessingStats* stats = nullptr;
   ComputingQuotaStats* quotaStats = nullptr;
+  uv_timer_t* gracePeriodTimer = nullptr;
   int expectedRegionCallbacks = 0;
+  int exitTransitionTimeout = 0;
 };
 
 struct DataProcessorContext {
@@ -90,6 +93,7 @@ struct DataProcessorContext {
   /// Wether or not the associated DataProcessor can forward things early
   bool canForwardEarly = true;
   bool isSink = false;
+  bool balancingInputs = true;
 
   std::function<void(o2::framework::RuntimeErrorRef e, InputRecord& record)>* errorHandling = nullptr;
 };
@@ -115,7 +119,7 @@ struct DeviceConfigurationHelpers {
 
 /// A device actually carrying out all the DPL
 /// Data Processing needs.
-class DataProcessingDevice : public FairMQDevice
+class DataProcessingDevice : public fair::mq::Device
 {
  public:
   DataProcessingDevice(RunningDeviceRef ref, ServiceRegistry&, ProcessingPolicies& policies);
@@ -139,6 +143,10 @@ class DataProcessingDevice : public FairMQDevice
   void fillContext(DataProcessorContext& context, DeviceContext& deviceContext);
 
  private:
+  /// Initialise the socket pollers / timers
+  void initPollers();
+  void startPollers();
+  void stopPollers();
   DeviceContext mDeviceContext;
   /// The specification used to create the initial state of this device
   DeviceSpec const& mSpec;
@@ -152,7 +160,6 @@ class DataProcessingDevice : public FairMQDevice
   std::function<void(RuntimeErrorRef e, InputRecord& record)> mErrorHandling;
   std::unique_ptr<ConfigParamRegistry> mConfigRegistry;
   ServiceRegistry& mServiceRegistry;
-  TimingInfo mTimingInfo;
   DataAllocator mAllocator;
   DataRelayer* mRelayer = nullptr;
   /// Expiration handler
@@ -164,7 +171,7 @@ class DataProcessingDevice : public FairMQDevice
   uint64_t mLastMetricFlushedTimestamp = 0;          /// The timestamp of the last time we actually flushed metrics
   uint64_t mBeginIterationTimestamp = 0;             /// The timestamp of when the current ConditionalRun was started
   DataProcessingStats mStats;                        /// Stats about the actual data processing.
-  std::vector<FairMQRegionInfo> mPendingRegionInfos; /// A list of the region infos not yet notified.
+  std::vector<fair::mq::RegionInfo> mPendingRegionInfos; /// A list of the region infos not yet notified.
   std::mutex mRegionInfoMutex;
   ProcessingPolicies mProcessingPolicies;                        /// User policies related to data processing
   bool mWasActive = false;                                       /// Whether or not the device was active at last iteration.

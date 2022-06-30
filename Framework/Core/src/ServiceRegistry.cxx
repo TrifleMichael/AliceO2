@@ -16,6 +16,31 @@
 namespace o2::framework
 {
 
+ServiceRegistry::ServiceRegistry(ServiceRegistry const& other)
+{
+  for (size_t i = 0; i < MAX_SERVICES; ++i) {
+    mServicesKey[i].store(other.mServicesKey[i].load());
+  }
+  mServicesValue = other.mServicesValue;
+  mServicesMeta = other.mServicesMeta;
+  for (size_t i = 0; i < other.mServicesBooked.size(); ++i) {
+    this->mServicesBooked[i] = other.mServicesBooked[i].load();
+  }
+}
+
+ServiceRegistry& ServiceRegistry::operator=(ServiceRegistry const& other)
+{
+  for (size_t i = 0; i < MAX_SERVICES; ++i) {
+    mServicesKey[i].store(other.mServicesKey[i].load());
+  }
+  mServicesValue = other.mServicesValue;
+  mServicesMeta = other.mServicesMeta;
+  for (size_t i = 0; i < other.mServicesBooked.size(); ++i) {
+    this->mServicesBooked[i] = other.mServicesBooked[i].load();
+  }
+  return *this;
+}
+
 ServiceRegistry::ServiceRegistry()
 {
   for (size_t i = 0; i < MAX_SERVICES; ++i) {
@@ -80,31 +105,40 @@ void ServiceRegistry::bindService(ServiceSpec const& spec, void* service)
   static TracyLockableN(std::mutex, bindMutex, "bind mutex");
   std::scoped_lock<LockableBase(std::mutex)> lock(bindMutex);
   if (spec.preProcessing) {
-    mPreProcessingHandles.push_back(ServiceProcessingHandle{spec.preProcessing, service});
+    mPreProcessingHandles.push_back(ServiceProcessingHandle{spec, spec.preProcessing, service});
   }
   if (spec.postProcessing) {
-    mPostProcessingHandles.push_back(ServiceProcessingHandle{spec.postProcessing, service});
+    mPostProcessingHandles.push_back(ServiceProcessingHandle{spec, spec.postProcessing, service});
   }
   if (spec.preDangling) {
-    mPreDanglingHandles.push_back(ServiceDanglingHandle{spec.preDangling, service});
+    mPreDanglingHandles.push_back(ServiceDanglingHandle{spec, spec.preDangling, service});
   }
   if (spec.postDangling) {
-    mPostDanglingHandles.push_back(ServiceDanglingHandle{spec.postDangling, service});
+    mPostDanglingHandles.push_back(ServiceDanglingHandle{spec, spec.postDangling, service});
   }
   if (spec.preEOS) {
-    mPreEOSHandles.push_back(ServiceEOSHandle{spec.preEOS, service});
+    mPreEOSHandles.push_back(ServiceEOSHandle{spec, spec.preEOS, service});
   }
   if (spec.postEOS) {
-    mPostEOSHandles.push_back(ServiceEOSHandle{spec.postEOS, service});
+    mPostEOSHandles.push_back(ServiceEOSHandle{spec, spec.postEOS, service});
   }
   if (spec.postDispatching) {
-    mPostDispatchingHandles.push_back(ServiceDispatchingHandle{spec.postDispatching, service});
+    mPostDispatchingHandles.push_back(ServiceDispatchingHandle{spec, spec.postDispatching, service});
+  }
+  if (spec.postForwarding) {
+    mPostForwardingHandles.push_back(ServiceForwardingHandle{spec, spec.postForwarding, service});
   }
   if (spec.start) {
-    mPreStartHandles.push_back(ServiceStartHandle{spec.start, service});
+    mPreStartHandles.push_back(ServiceStartHandle{spec, spec.start, service});
+  }
+  if (spec.stop) {
+    mPostStopHandles.push_back(ServiceStopHandle{spec, spec.stop, service});
   }
   if (spec.exit) {
-    mPreExitHandles.push_back(ServiceExitHandle{spec.exit, service});
+    mPreExitHandles.push_back(ServiceExitHandle{spec, spec.exit, service});
+  }
+  if (spec.domainInfoUpdated) {
+    mDomainInfoHandles.push_back(ServiceDomainInfoHandle{spec, spec.domainInfoUpdated, service});
   }
 }
 
@@ -134,6 +168,7 @@ void ServiceRegistry::preDanglingCallbacks(DanglingContext& danglingContext)
 void ServiceRegistry::postDanglingCallbacks(DanglingContext& danglingContext)
 {
   for (auto postDanglingHandle : mPostDanglingHandles) {
+    LOGP(debug, "Doing postDanglingCallback for service {}", postDanglingHandle.spec.name);
     postDanglingHandle.callback(danglingContext, postDanglingHandle.service);
   }
 }
@@ -162,13 +197,30 @@ void ServiceRegistry::postDispatchingCallbacks(ProcessingContext& processContext
   }
 }
 
-/// Callbacks to be called in FairMQDevice::PreRun()
+/// Invoke callbacks to be executed after every data Dispatching
+void ServiceRegistry::postForwardingCallbacks(ProcessingContext& processContext)
+{
+  for (auto& forwardingHandle : mPostForwardingHandles) {
+    forwardingHandle.callback(processContext, forwardingHandle.service);
+  }
+}
+
+/// Callbacks to be called in fair::mq::Device::PreRun()
 void ServiceRegistry::preStartCallbacks()
 {
   // FIXME: we need to call the callback only once for the global services
   /// I guess...
   for (auto startHandle = mPreStartHandles.begin(); startHandle != mPreStartHandles.end(); ++startHandle) {
     startHandle->callback(*this, startHandle->service);
+  }
+}
+
+void ServiceRegistry::postStopCallbacks()
+{
+  // FIXME: we need to call the callback only once for the global services
+  /// I guess...
+  for (auto& stopHandle : mPostStopHandles) {
+    stopHandle.callback(*this, stopHandle.service);
   }
 }
 
@@ -179,6 +231,13 @@ void ServiceRegistry::preExitCallbacks()
   /// I guess...
   for (auto exitHandle = mPreExitHandles.rbegin(); exitHandle != mPreExitHandles.rend(); ++exitHandle) {
     exitHandle->callback(*this, exitHandle->service);
+  }
+}
+
+void ServiceRegistry::domainInfoUpdatedCallback(ServiceRegistry& registry, size_t oldestPossibleTimeslice, ChannelIndex channelIndex)
+{
+  for (auto& handle : mDomainInfoHandles) {
+    handle.callback(*this, oldestPossibleTimeslice, channelIndex);
   }
 }
 

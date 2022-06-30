@@ -33,7 +33,7 @@ struct DeviceSpec;
 struct ServiceRegistry;
 struct DeviceState;
 struct ProcessingContext;
-struct EndOfStreamContext;
+class EndOfStreamContext;
 struct ConfigContext;
 struct WorkflowSpecNode;
 
@@ -41,9 +41,11 @@ class DanglingContext;
 
 /// A callback to create a given Service.
 using ServiceInit = std::function<ServiceHandle(ServiceRegistry&, DeviceState&, fair::mq::ProgOptions&)>;
-/// A callback invoked whenever we start running, before the user callback.
+/// A callback invoked whenever we start running, before the user processing callback.
 using ServiceStartCallback = std::function<void(ServiceRegistry&, void*)>;
-/// A callback invoked whenever we stop running, before we exit.
+/// A callback invoked whenever we stop running, after the user processing callback.
+using ServiceStopCallback = std::function<void(ServiceRegistry&, void*)>;
+/// A callback invoked whenever we stop running completely, before we exit.
 using ServiceExitCallback = std::function<void(ServiceRegistry&, void*)>;
 
 /// A callback to configure a given Service. Notice that the
@@ -90,6 +92,9 @@ using ServiceMetricHandling = std::function<void(ServiceRegistry&,
 /// Callback executed in the child after dispatching happened.
 using ServicePostDispatching = std::function<void(ProcessingContext&, void*)>;
 
+/// Callback executed in the child after late forwarding happened.
+using ServicePostForwarding = std::function<void(ProcessingContext&, void*)>;
+
 /// Callback invoked when the driver enters the init phase.
 using ServiceDriverInit = std::function<void(ServiceRegistry&, boost::program_options::variables_map const&)>;
 
@@ -101,6 +106,9 @@ using ServiceTopologyInject = std::function<void(WorkflowSpecNode&, ConfigContex
 
 /// Callback invoked when we amend the topology
 using ServiceTopologyAdjust = std::function<void(WorkflowSpecNode&, ConfigContext const&)>;
+
+/// Callback invoked whenever we get updated about the oldest possible timeslice we can process
+using ServiceDomainInfoUpdated = std::function<void(ServiceRegistry&, size_t tileslice, ChannelIndex channel)>;
 
 /// A specification for a Service.
 /// A Service is a utility class which does not perform
@@ -148,8 +156,12 @@ struct ServiceSpec {
   /// dispatched.
   ServicePostDispatching postDispatching = nullptr;
 
+  ServicePostForwarding postForwarding = nullptr;
+
   /// Callback invoked on Start
   ServiceStartCallback start = nullptr;
+  /// Callback invoked on Start
+  ServiceStopCallback stop = nullptr;
   /// Callback invoked on exit
   ServiceExitCallback exit = nullptr;
   /// Callback invoked on driver entering the INIT state
@@ -163,42 +175,70 @@ struct ServiceSpec {
   /// Callback invoked when finalising topology creation
   ServiceTopologyAdjust adjustTopology = nullptr;
 
+  /// Callback invoked when we get updated about the oldest possible timeslice we can process
+  ServiceDomainInfoUpdated domainInfoUpdated = nullptr;
+
   /// Kind of service being specified.
   ServiceKind kind = ServiceKind::Serial;
 };
 
 struct ServiceConfigureHandle {
+  ServiceSpec const& spec;
   ServiceConfigureCallback callback;
   void* service;
 };
 
 struct ServiceProcessingHandle {
+  ServiceSpec const& spec;
   ServiceProcessingCallback callback;
   void* service;
 };
 
 struct ServiceDanglingHandle {
+  ServiceSpec const& spec;
   ServiceDanglingCallback callback;
   void* service;
 };
 
 struct ServiceEOSHandle {
+  ServiceSpec const& spec;
   ServiceEOSCallback callback;
   void* service;
 };
 
 struct ServiceDispatchingHandle {
+  ServiceSpec const& spec;
   ServicePostDispatching callback;
   void* service;
 };
 
+struct ServiceForwardingHandle {
+  ServiceSpec const& spec;
+  ServicePostForwarding callback;
+  void* service;
+};
+
 struct ServiceStartHandle {
+  ServiceSpec const& spec;
   ServiceStartCallback callback;
   void* service;
 };
 
+struct ServiceStopHandle {
+  ServiceSpec const& spec;
+  ServiceStopCallback callback;
+  void* service;
+};
+
 struct ServiceExitHandle {
+  ServiceSpec const& spec;
   ServiceExitCallback callback;
+  void* service;
+};
+
+struct ServiceDomainInfoHandle {
+  ServiceSpec const& spec;
+  ServiceDomainInfoUpdated callback;
   void* service;
 };
 
