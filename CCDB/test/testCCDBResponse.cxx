@@ -35,6 +35,7 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseFullResponse)
   CCDBResponse ccdbResponse(*responseAsStr);
 
   BOOST_CHECK(ccdbResponse.countObjects() == 3); 
+  BOOST_CHECK(1 == 2);
   if (ccdbResponse.countObjects() == 3)
   {
     BOOST_CHECK(ccdbResponse.getStringAttribute(0, "id") == "407f3a65-4c7b-11ec-8cf8-200114580202");
