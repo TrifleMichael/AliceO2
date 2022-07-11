@@ -277,6 +277,6 @@ std::string CCDBResponse::sanitizeObjectName(const std::string& objectName)
                       tmpObjectName.end());
   return tmpObjectName;
 }
-
+// a
 } // namespace ccdb
 } // namespace o2
