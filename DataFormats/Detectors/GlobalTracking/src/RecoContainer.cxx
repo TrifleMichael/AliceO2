@@ -15,6 +15,7 @@
 
 #include <fmt/format.h>
 #include <chrono>
+#include "Framework/TimingInfo.h"
 #include "DataFormatsGlobalTracking/RecoContainerCreateTracksVariadic.h"
 #include "CommonDataFormat/TimeStamp.h"
 #include "CommonDataFormat/IRFrame.h"
@@ -548,8 +549,7 @@ void RecoContainer::collectData(ProcessingContext& pc, const DataRequest& reques
 {
   auto& reqMap = requests.requestMap;
 
-  const auto* dh = DataRefUtils::getHeader<o2::header::DataHeader*>(pc.inputs().getFirstValid(true));
-  startIR = {0, dh->firstTForbit};
+  startIR = {0, pc.services().get<o2::framework::TimingInfo>().firstTForbit};
 
   auto req = reqMap.find("trackITS");
   if (req != reqMap.end()) {
@@ -999,7 +999,6 @@ void RecoContainer::addMFTClusters(ProcessingContext& pc, bool mc)
   commonPool[GTrackID::MFT].registerContainer(pc.inputs().get<gsl::span<o2::itsmft::ROFRecord>>("clusMFTROF"), CLUSREFS);
   commonPool[GTrackID::MFT].registerContainer(pc.inputs().get<gsl::span<o2::itsmft::CompClusterExt>>("clusMFT"), CLUSTERS);
   commonPool[GTrackID::MFT].registerContainer(pc.inputs().get<gsl::span<unsigned char>>("clusMFTPatt"), PATTERNS);
-  pc.inputs().get<o2::itsmft::TopologyDictionary*>("cldictMFT"); // just to trigger the finaliseCCDB
   if (mc) {
     mcITSClusters = pc.inputs().get<const dataformats::MCTruthContainer<MCCompLabel>*>("clusMFTMC");
   }

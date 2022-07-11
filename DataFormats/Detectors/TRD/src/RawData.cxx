@@ -33,10 +33,10 @@ namespace trd
 std::ostream& operator<<(std::ostream& stream, const TrackletHCHeader halfchamberheader)
 {
   stream << "TrackletHCHeader : Raw:0x" << std::hex << halfchamberheader.word << " "
-         << halfchamberheader.format << " ;; " << halfchamberheader.MCLK << " :: "
-         << halfchamberheader.one << " :: (" << halfchamberheader.supermodule << ","
-         << halfchamberheader.stack << "," << halfchamberheader.layer << ") on side :"
-         << halfchamberheader.side << std::endl;
+         << (int)halfchamberheader.format << " ;; " << (int)halfchamberheader.MCLK << " :: "
+         << halfchamberheader.one << " :: (" << (int)halfchamberheader.supermodule << ","
+         << (int)halfchamberheader.stack << "," << (int)halfchamberheader.layer << ") on side :"
+         << (int)halfchamberheader.side << std::endl;
   return stream;
 }
 
@@ -152,14 +152,13 @@ std::ostream& operator<<(std::ostream& stream, const HalfCRUHeader& halfcru)
 void constructTrackletHCHeader(TrackletHCHeader& header, int sector, int stack, int layer, int side, int chipclock, int format)
 {
   header.word = 0;
-
   header.format = format;
   header.supermodule = ~sector;
   header.stack = ~stack;
   header.layer = ~layer;
   header.side = ~side;
   header.MCLK = chipclock;
-  header.one = 0;
+  header.one = 1;
 }
 
 void constructTrackletHCHeaderd(TrackletHCHeader& header, int detector, int rob, int chipclock, int format)
@@ -279,20 +278,16 @@ void constructTrackletMCMData(TrackletMCMData& trackletword, const int format, c
   trackletword.word = 0;
   // create a tracklet word as it would be sent from the FEE
   // slope and position have the 8-th bit flipped each
-  trackletword.word = 0;
   trackletword.slope = slope ^ 0x80;
   trackletword.pos = pos ^ 0x80;
   trackletword.checkbit = 0;
   if (format & 0x1) {
-    //length of q1 and q2 are 6 with a 2 bit offset.
-    //What happens when q2 and q1 dont share the same offset (upper 2 bits ?) ?
-    LOG(error) << "This tracklet format has not been tested yet";
-    trackletword.pid = (q0 & 0x3f) & ((q1 & 0x1) << 6);
-    //TODO check the 2 bit offset is still valid ... ??
+    //length of q1 and q2 are 6 with a 2 bit offset sitting in the header.
+    trackletword.pid = (q0 & 0x3f) | ((q1 & 0x3f) << 6);
   } else {
-    trackletword.pid = (q0 & 0x3f) & ((q1 & 0x1) << 6);
+    //q2 sits with upper 1 bit of q1 in the header pid word, hence the 0x3f so 6 bits of q1 are used here, shifted up above the 6 bits of q0.
+    trackletword.pid = (int)(q0 & 0x3f) | ((q1 & 0x3f) << 6);
   }
-  //q2 sits with upper 2 bits of q1 in the header pid word, hence the 0x1f so 5 bits are used here.
 }
 
 void constructTrackletMCMData(TrackletMCMData& trackletword, const Tracklet64& tracklet)
@@ -315,12 +310,12 @@ DigitMCMADCMask constructBlankADCMask()
 void printTrackletHCHeader(o2::trd::TrackletHCHeader& halfchamber)
 {
   LOGF(info, "TrackletHCHeader: Raw:0x%08x SM : %d stack %d layer %d side : %d MCLK: 0x%0x Format: 0x%0x Always1:0x%0x",
-       halfchamber.supermodule, halfchamber.stack, halfchamber.layer, halfchamber.side, halfchamber.MCLK, halfchamber.format, halfchamber.one);
+       halfchamber.word, (int)(~halfchamber.supermodule) & 0x1f, (int)(~halfchamber.stack) & 0x7, (int)(~halfchamber.layer) & 0x7, (int)(~halfchamber.side) & 0x1, (int)halfchamber.MCLK, (int)halfchamber.format, (int)halfchamber.one);
 }
 
 void printTrackletMCMData(o2::trd::TrackletMCMData& tracklet)
 {
-  LOGF(info, "TrackletMCMData: Raw:0x%08x pos:%d slope:%d pid:0x%08x checkbit:0x%02x",
+  LOGF(info, "TrackletMCMData: Raw:0x%08x pos:%d slope:%d pid:0x%03x checkbit:0x%02x",
        tracklet.word, tracklet.pos, tracklet.slope, tracklet.pid, tracklet.checkbit);
 }
 void printTrackletMCMHeader(o2::trd::TrackletMCMHeader& mcmhead)
@@ -422,22 +417,31 @@ bool sanityCheckTrackletMCMHeader(o2::trd::TrackletMCMHeader* header)
   return goodheader;
 }
 
-bool sanityCheckTrackletHCHeader(o2::trd::TrackletHCHeader& header)
+bool sanityCheckTrackletHCHeader(o2::trd::TrackletHCHeader& header, bool verbose)
 {
   bool goodheader = true;
-  if (header.one != -1) {
-    goodheader = false;
-  }
   if ((~header.supermodule) > 17) {
+    if (verbose) {
+      LOG(info) << " TrackletHCHeader : 0x" << std::hex << header.word << " failure header.supermodule=" << ~header.supermodule;
+    }
     goodheader = false;
   }
   if ((~header.layer) > 6) {
+    if (verbose) {
+      LOG(info) << " TrackletHCHeader : 0x" << std::hex << header.word << " failure header.layer=" << ~header.layer;
+    }
     goodheader = false;
   }
   if ((~header.stack) > 5) {
+    if (verbose) {
+      LOG(info) << " TrackletHCHeader : 0x" << std::hex << header.word << " failure header.stack=" << ~header.stack;
+    }
     goodheader = false;
   }
-  if (header.one != 0) {
+  if (header.one != 1) {
+    if (verbose) {
+      LOG(info) << " TrackletHCHeader : 0x" << std::hex << header.word << " failure header.one=" << header.one;
+    }
     goodheader = false;
   }
   int trackletmode = (header.format >> 2) & 0x3;
@@ -453,7 +457,6 @@ bool sanityCheckTrackletHCHeader(o2::trd::TrackletHCHeader& header)
       if ((header.format & 0x1) == 0x1) {
         dynamicqrange = true;
       }
-      //LOG(info) << "Tracklet sector:layer:stack " << ((~header.supermodule)&0x1f) <<":" << ((~header.layer)&0x7) << ":" << ((~header.stack)&0x7) << " Tracklet format is : " << std::hex << header.format << " last bit : " << (header.format&0x1) << " trackletmode : " << trackletmode;
       break;
   }
   return goodheader;
@@ -479,7 +482,7 @@ bool sanityCheckDigitMCMADCMask(o2::trd::DigitMCMADCMask& mask, int numberofbits
   count = (~count) & 0x1f;
   if (count != numberofbitsset) {
     goodadcmask=false;
-    LOG(warn) << "***DigitMCMADCMask bad bit count maskcount:" << ~mask.c << "::" << mask.c << " bitscounting:" << numberofbitsset << " bp: 0x" << std::hex << mask.adcmask;
+    LOG(info) << "***DigitMCMADCMask bad bit count maskcount:" << ((~mask.c) & 0x1f) << " bitscounting:" << numberofbitsset << " bp: 0x" << std::hex << mask.adcmask;
   }
   if (mask.n != 0x1) {
     goodadcmask = false;
@@ -488,6 +491,14 @@ bool sanityCheckDigitMCMADCMask(o2::trd::DigitMCMADCMask& mask, int numberofbits
     goodadcmask = false;
   }
   return goodadcmask;
+}
+
+void incrementADCMask(DigitMCMADCMask& mask, int channel)
+{
+  mask.adcmask |= 1UL << channel;
+  int bitcount = (~mask.c) & 0x1f;
+  bitcount++;
+  mask.c = ~((bitcount)&0x1f);
 }
 
 bool sanityCheckDigitMCMWord(o2::trd::DigitMCMData* word, int adcchannel)
@@ -535,13 +546,17 @@ void printDigitMCMData(o2::trd::DigitMCMData& digitmcmdata)
 
 int getDigitHCHeaderWordType(uint32_t word)
 {
+  //  LOG(info) << "getDigitHCHeaderwordtype : " << std::hex << word;
   if ((word & 0x3f) == 0b110001) {
+    //  LOG(info) << "getDigitHCHeaderwordtype  2 : " << std::hex << word << " returning 2 for :" << std::hex << (word&0x3f);
     return 2;
   }
   if ((word & 0x3f) == 0b110101) {
+    //  LOG(info) << "getDigitHCHeaderwordtype 3 : " << std::hex << word << " returning 3 for :" << std::hex << (word&0x3f);
     return 3;
   }
   if ((word & 0x3) == 0b01) {
+    //  LOG(info) << "getDigitHCHeaderwordtype 1 : " << std::hex << word << " returning 1 for :" << std::hex << (word&0x3f);
     return 1;
   }
   return -1;
@@ -584,6 +599,7 @@ void printDigitHCHeader(o2::trd::DigitHCHeader& header, uint32_t headers[3])
       case 1:
         DigitHCHeader1 header1;
         header1.word = headers[countheaderwords];
+        index = 0;
         if (header1.res != 0x1) {
           printDigitHCHeaders(header, headers, index, countheaderwords, false);
         } else {
@@ -593,6 +609,7 @@ void printDigitHCHeader(o2::trd::DigitHCHeader& header, uint32_t headers[3])
       case 2:
         DigitHCHeader2 header2;
         header2.word = headers[countheaderwords];
+        index = 1;
         if (header2.res != 0b110001) {
           printDigitHCHeaders(header, headers, index, countheaderwords, false);
         } else {
@@ -602,6 +619,7 @@ void printDigitHCHeader(o2::trd::DigitHCHeader& header, uint32_t headers[3])
       case 3:
         DigitHCHeader3 header3;
         header3.word = headers[countheaderwords];
+        index = 2;
         if (header3.res != 0b110101) {
           printDigitHCHeaders(header, headers, index, countheaderwords, false);
         } else {

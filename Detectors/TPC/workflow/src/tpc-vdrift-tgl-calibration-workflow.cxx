@@ -10,7 +10,7 @@
 // or submit itself to any jurisdiction.
 
 #include "Framework/DataProcessorSpec.h"
-#include "DetectorsCalibrationWorkflow/TPCVDriftTglCalibSpec.h"
+#include "TPCWorkflow/TPCVDriftTglCalibSpec.h"
 #include "CommonUtils/ConfigurableParam.h"
 
 using namespace o2::framework;
@@ -20,7 +20,7 @@ void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
 {
   // option allowing to set parameters
   std::vector<o2::framework::ConfigParamSpec> options{
-    {"nbins-tgl", o2::framework::VariantType::Int, 50, {"number of bins in tgL"}},
+    {"nbins-tgl", o2::framework::VariantType::Int, 20, {"number of bins in tgL"}},
     {"max-tgl-its", o2::framework::VariantType::Float, 1.f, {"max range for tgL of ITS tracks"}},
     {"nbins-dtgl", o2::framework::VariantType::Int, 100, {"number of bins in tgL_ITS - tgl_TPC"}},
     {"max-dtgl-itstpc", o2::framework::VariantType::Float, 0.2f, {"max range for tgL_ITS - tgl_TPC"}},
@@ -38,11 +38,11 @@ WorkflowSpec defineDataProcessing(ConfigContext const& configcontext)
 {
   WorkflowSpec specs;
   o2::conf::ConfigurableParam::updateFromString(configcontext.options().get<std::string>("configKeyValues"));
-  specs.emplace_back(o2::calibration::getTPCVDriftTglCalibSpec(configcontext.options().get<int>("nbins-tgl"),
-                                                               configcontext.options().get<float>("max-tgl-its"),
-                                                               configcontext.options().get<int>("nbins-dtgl"),
-                                                               configcontext.options().get<float>("max-dtgl-itstpc"),
-                                                               configcontext.options().get<int>("time-slot-length"),
-                                                               configcontext.options().get<int>("min-entries-per-slot")));
+  specs.emplace_back(o2::tpc::getTPCVDriftTglCalibSpec(configcontext.options().get<int>("nbins-tgl"),
+                                                       configcontext.options().get<float>("max-tgl-its"),
+                                                       configcontext.options().get<int>("nbins-dtgl"),
+                                                       configcontext.options().get<float>("max-dtgl-itstpc"),
+                                                       configcontext.options().get<int>("time-slot-length"),
+                                                       configcontext.options().get<int>("min-entries-per-slot")));
   return specs;
 }

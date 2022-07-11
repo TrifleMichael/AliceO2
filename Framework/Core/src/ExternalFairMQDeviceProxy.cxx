@@ -27,6 +27,7 @@
 #include "Framework/TimingInfo.h"
 #include "Headers/DataHeader.h"
 #include "Headers/Stack.h"
+#include "CommonConstants/LHCConstants.h"
 
 #include "./DeviceSpecHelpers.h"
 #include "Framework/DataProcessingHelpers.h"
@@ -242,9 +243,14 @@ InjectorFunction dplModelAdaptor(std::vector<OutputSpec> const& filterSpecs, DPL
         continue;
       }
       const_cast<DataProcessingHeader*>(dph)->startTime = dplCounter;
+      static bool override_creation = getenv("DPL_RAWPROXY_OVERRIDE_ORBITRESET");
+      if (override_creation) {
+        static uint64_t creationVal = std::stoul(getenv("DPL_RAWPROXY_OVERRIDE_ORBITRESET")) + (dh->firstTForbit * o2::constants::lhc::LHCOrbitNS * 0.000001f);
+        const_cast<DataProcessingHeader*>(dph)->creation = creationVal;
+      }
       timingInfo.timeslice = dph->startTime;
       timingInfo.creation = dph->creation;
-      timingInfo.firstTFOrbit = dh->firstTForbit;
+      timingInfo.firstTForbit = dh->firstTForbit;
       timingInfo.runNumber = dh->runNumber;
       timingInfo.tfCounter = dh->tfCounter;
       LOG(debug) << msgidx << ": " << DataSpecUtils::describe(OutputSpec{dh->dataOrigin, dh->dataDescription, dh->subSpecification}) << " part " << dh->splitPayloadIndex << " of " << dh->splitPayloadParts << "  payload " << parts.At(msgidx + 1)->GetSize();
@@ -411,6 +417,7 @@ DataProcessorSpec specifyExternalFairMQDeviceProxy(char const* name,
         .readPolled = false,
         .channel = nullptr,
         .id = {ChannelIndex::INVALID},
+        .channelType = ChannelAccountingType::RAW,
       });
     };
     ctx.services().get<CallbackService>().set(CallbackService::Id::Start, channelConfigurationChecker);
@@ -468,7 +475,7 @@ DataProcessorSpec specifyExternalFairMQDeviceProxy(char const* name,
         auto& timingInfo = ctx.services().get<TimingInfo>();
         if (dh != nullptr) {
           timingInfo.runNumber = dh->runNumber;
-          timingInfo.firstTFOrbit = dh->firstTForbit;
+          timingInfo.firstTForbit = dh->firstTForbit;
           timingInfo.tfCounter = dh->tfCounter;
         }
         auto const dph = o2::header::get<DataProcessingHeader*>(parts.At(0)->GetData());

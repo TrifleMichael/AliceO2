@@ -346,6 +346,8 @@ void spawnRemoteDevice(std::string const&,
   info.variablesViewIndex = Metric2DViewIndex{"matcher_variables", 0, 0, {}};
   info.queriesViewIndex = Metric2DViewIndex{"data_queries", 0, 0, {}};
   info.outputsViewIndex = Metric2DViewIndex{"output_matchers", 0, 0, {}};
+  info.inputChannelMetricsViewIndex = Metric2DViewIndex{"oldest_possible_timeslice", 0, 0, {}};
+  info.outputChannelMetricsViewIndex = Metric2DViewIndex{"oldest_possible_output", 0, 0, {}};
   // FIXME: use uv_now.
   info.lastSignal = uv_hrtime() - 10000000;
 
@@ -464,7 +466,8 @@ struct ControlWebSocketHandler : public WebSocketHandler {
     auto updateMetricsViews = Metric2DViewIndex::getUpdater({&(*mContext.infos)[mIndex].dataRelayerViewIndex,
                                                              &(*mContext.infos)[mIndex].variablesViewIndex,
                                                              &(*mContext.infos)[mIndex].queriesViewIndex,
-                                                             &(*mContext.infos)[mIndex].outputsViewIndex});
+                                                             &(*mContext.infos)[mIndex].outputsViewIndex,
+                                                             &(*mContext.infos)[mIndex].inputChannelMetricsViewIndex});
 
     auto newMetricCallback = [&updateMetricsViews, &hasNewMetric](std::string const& name, MetricInfo const& metric, int value, size_t metricIndex) {
       updateMetricsViews(name, metric, value, metricIndex);
@@ -826,6 +829,8 @@ void spawnDevice(DeviceRef ref,
   info.variablesViewIndex = Metric2DViewIndex{"matcher_variables", 0, 0, {}};
   info.queriesViewIndex = Metric2DViewIndex{"data_queries", 0, 0, {}};
   info.outputsViewIndex = Metric2DViewIndex{"output_matchers", 0, 0, {}};
+  info.inputChannelMetricsViewIndex = Metric2DViewIndex{"oldest_possible_timeslice", 0, 0, {}};
+  info.outputChannelMetricsViewIndex = Metric2DViewIndex{"oldest_possible_output", 0, 0, {}};
   info.tracyPort = driverInfo.tracyPort;
   info.lastSignal = uv_hrtime() - 10000000;
 
@@ -1579,6 +1584,8 @@ int runStateMachine(DataProcessorSpecs const& workflow,
             }
           }
 
+          // These allow services customization via an environment variable
+          OverrideServiceSpecs overrides = ServiceSpecHelpers::parseOverrides(getenv("DPL_OVERRIDE_SERVICES"));
           DeviceSpecHelpers::dataProcessorSpecs2DeviceSpecs(altered_workflow,
                                                             driverInfo.channelPolicies,
                                                             driverInfo.completionPolicies,
@@ -1592,7 +1599,8 @@ int runStateMachine(DataProcessorSpecs const& workflow,
                                                             *driverInfo.configContext,
                                                             !varmap["no-IPC"].as<bool>(),
                                                             driverInfo.resourcesMonitoringInterval,
-                                                            varmap["channel-prefix"].as<std::string>());
+                                                            varmap["channel-prefix"].as<std::string>(),
+                                                            overrides);
           metricProcessingCallbacks.clear();
           for (auto& device : runningWorkflow.devices) {
             for (auto& service : device.services) {
@@ -2503,7 +2511,8 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
   }
 
   /// This is the earlies the services are actually needed
-  std::vector<ServiceSpec> driverServices = CommonDriverServices::defaultServices();
+  OverrideServiceSpecs driverServicesOverride = ServiceSpecHelpers::parseOverrides(getenv("DPL_DRIVER_OVERRIDE_SERVICES"));
+  ServiceSpecs driverServices = ServiceSpecHelpers::filterDisabled(CommonDriverServices::defaultServices(), driverServicesOverride);
   // We insert the hash for the internal devices.
   WorkflowHelpers::injectServiceDevices(physicalWorkflow, configContext);
   auto reader = std::find_if(physicalWorkflow.begin(), physicalWorkflow.end(), [](DataProcessorSpec& spec) { return spec.name == "internal-dpl-aod-reader"; });
@@ -2657,6 +2666,28 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
   if (varmap.count("help")) {
     printHelp(varmap, executorOptions, physicalWorkflow, currentWorkflowOptions);
     exit(0);
+  }
+  /// Set the fair::Logger severity to the one specified in the command line
+  /// We do it by hand here, because FairMQ device is not initialsed until
+  /// much later and we need the logger before that.
+  if (varmap.count("severity")) {
+    auto logLevel = varmap["severity"].as<std::string>();
+    if (logLevel == "debug") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::debug);
+    } else if (logLevel == "detail") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::detail);
+    } else if (logLevel == "info") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::info);
+    } else if (logLevel == "warning") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::warning);
+    } else if (logLevel == "error") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::error);
+    } else if (logLevel == "fatal") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::fatal);
+    } else {
+      LOGP(error, "Invalid log level '{}'", logLevel);
+      exit(1);
+    }
   }
   DriverControl driverControl;
   initialiseDriverControl(varmap, driverControl);

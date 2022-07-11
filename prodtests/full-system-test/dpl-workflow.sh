@@ -77,38 +77,42 @@ fi
 if [[ $SYNCMODE == 1 ]]; then
   if [[ $BEAMTYPE == "PbPb" ]]; then
     ITS_CONFIG_KEY+="fastMultConfig.cutMultClusLow=30;fastMultConfig.cutMultClusHigh=2000;fastMultConfig.cutMultVtxHigh=500;"
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode sync"
-    [[ -z ${PVERTEXING_CONFIG_KEY+x} ]] && PVERTEXING_CONFIG_KEY+="pvertexer.maxChi2TZDebris=2000;"
-    workflow_has_parameter CALIB && TRD_CONFIG+=" --enable-trackbased-calib"
   elif [[ $BEAMTYPE == "pp" ]]; then
-    ITS_CONFIG_KEY+="fastMultConfig.cutMultClusLow=-1;fastMultConfig.cutMultClusHigh=-1;fastMultConfig.cutMultVtxHigh=-1;ITSVertexerParam.phiCut=0.5;ITSVertexerParam.clusterContributorsCut=3;ITSVertexerParam.tanLambdaCut=0.2"
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode sync"
-    [[ -z ${PVERTEXING_CONFIG_KEY+x} ]] && PVERTEXING_CONFIG_KEY+="pvertexer.maxChi2TZDebris=10;"
-    workflow_has_parameter CALIB && TRD_CONFIG+=" --enable-trackbased-calib"
-  elif [[ $BEAMTYPE == "cosmic" ]]; then
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode cosmics"
-  else
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode sync"
+    ITS_CONFIG_KEY+="fastMultConfig.cutMultClusLow=-1;fastMultConfig.cutMultClusHigh=-1;fastMultConfig.cutMultVtxHigh=-1;ITSVertexerParam.phiCut=0.5;ITSVertexerParam.clusterContributorsCut=3;ITSVertexerParam.tanLambdaCut=0.2;fastMultConfig.cutRandomFraction=0.8;"
+  fi
+
+  if [[ $EPNSYNCMODE == 1 ]]; then # add extra tolerance in sync mode to account for eventual time misalignment
+    PVERTEXING_CONFIG_KEY+="pvertexer.timeMarginVertexTime=1.3;"
   fi
   GPU_CONFIG_KEY+="GPU_global.synchronousProcessing=1;GPU_proc.clearO2OutputFromGPU=1;"
+  has_processing_step TPC_DEDX && GPU_CONFIG_KEY+="GPU_global.rundEdx=1;"
   TRD_CONFIG_KEY+="GPU_proc.ompThreads=1;"
   has_detector ITS && TRD_FILTER_CONFIG+=" --filter-trigrec"
 else
-  if [[ $BEAMTYPE == "PbPb" ]]; then
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode async"
-    [[ -z ${PVERTEXING_CONFIG_KEY+x} ]] && PVERTEXING_CONFIG_KEY+="pvertexer.maxChi2TZDebris=2000;"
-    workflow_has_parameter CALIB && TRD_CONFIG+=" --enable-trackbased-calib"
-  elif [[ $BEAMTYPE == "pp" ]]; then
-    ITS_CONFIG_KEY+="ITSVertexerParam.phiCut=0.5;ITSVertexerParam.clusterContributorsCut=3;ITSVertexerParam.tanLambdaCut=0.2"
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode async"
-    [[ -z ${PVERTEXING_CONFIG_KEY+x} ]] && PVERTEXING_CONFIG_KEY+="pvertexer.maxChi2TZDebris=10;"
-    workflow_has_parameter CALIB && TRD_CONFIG+=" --enable-trackbased-calib"
-  elif [[ $BEAMTYPE == "cosmic" ]]; then
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode cosmics"
-  else
-    [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode async"
+  if [[ $BEAMTYPE == "pp" ]]; then
+    ITS_CONFIG_KEY+="ITSVertexerParam.phiCut=0.5;ITSVertexerParam.clusterContributorsCut=3;ITSVertexerParam.tanLambdaCut=0.2;"
   fi
 fi
+
+if [[ $BEAMTYPE == "PbPb" ]]; then
+  PVERTEXING_CONFIG_KEY+="pvertexer.maxChi2TZDebris=2000;"
+elif [[ $BEAMTYPE == "pp" ]]; then
+  PVERTEXING_CONFIG_KEY+="pvertexer.maxChi2TZDebris=10;"
+fi
+
+if [[ $BEAMTYPE == "cosmic" ]]; then
+  [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode cosmics"
+elif [[ $SYNCMODE == 1 ]]; then
+  [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode sync"
+else
+  [[ -z ${ITS_CONFIG+x} ]] && ITS_CONFIG=" --tracking-mode async"
+fi
+
+if [[ $BEAMTYPE == "PbPb" || $BEAMTYPE == "pp" ]]; then
+  workflow_has_parameter CALIB && TRD_CONFIG+=" --enable-trackbased-calib"
+fi
+
+PVERTEXING_CONFIG_KEY+="${ITSMFT_STROBES};"
 
 has_processing_step ENTROPY_ENCODER && has_detector_ctf TPC && GPU_OUTPUT+=",compressed-clusters-ctf"
 
@@ -322,7 +326,7 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 # Raw decoder workflows - disabled in async mode
 if [[ $CTFINPUT == 0 && $DIGITINPUT == 0 ]]; then
-  if has_detector TPC && [[ $EPNSYNCMODE == 1 || "0$TPC_CONVERT_LINKZS_TO_RAW" == "01" ]] && [[ "0$TPC_NO_CONVERT_LINKZS_TO_RAW" != "01" ]]; then
+  if has_detector TPC && [[ "0$TPC_CONVERT_LINKZS_TO_RAW" == "01" ]] && [[ "0$TPC_NO_CONVERT_LINKZS_TO_RAW" != "01" ]]; then
     GPU_INPUT=zsonthefly
     add_W o2-tpc-raw-to-digits-workflow "--input-spec \"\" --remove-duplicates --pipeline $(get_N tpc-raw-to-digits-0 TPC RAW 1 TPCRAWDEC)"
     add_W o2-tpc-reco-workflow "--input-type digitizer --output-type zsraw,disable-writer --pipeline $(get_N tpc-zsEncoder TPC RAW 1 TPCRAWDEC)"

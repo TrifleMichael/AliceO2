@@ -25,6 +25,7 @@
 #include "DataFormatsTRD/RawData.h"
 #include "DataFormatsTRD/Tracklet64.h"
 #include "DataFormatsTRD/Constants.h"
+#include "DataFormatsCTP/TriggerOffsetsParam.h"
 #include "DetectorsRaw/HBFUtils.h"
 #include "DetectorsRaw/RawFileWriter.h"
 #include "TRDSimulation/Trap2CRU.h"
@@ -445,7 +446,7 @@ int Trap2CRU::buildDigitRawData(const int digitstartindex, const int digitendind
     }
     int channel = d->getChannel();
     //set adcmask for the channel we currently have.
-    adcmaskptr->adcmask |= 1UL << channel;
+    incrementADCMask(*adcmaskptr, channel); //adcmaskptr->adcmask |= 1UL << channel;
     for (int timebin = 0; timebin < o2::trd::constants::TIMEBINS; timebin += 3) {
       data.z = adcdata[timebin];
       data.y = adcdata[timebin + 1];
@@ -494,7 +495,7 @@ int Trap2CRU::buildTrackletRawData(const int trackletindex, const int linkid)
   while (linkid == HelperMethods::getLinkIDfromHCID(mTracklets[trackletindex + trackletcounter].getHCID()) && header.col == mTracklets[trackletindex + trackletcounter].getColumn() && header.padrow == mTracklets[trackletindex + trackletcounter].getPadRow()) {
     int trackletoffset = trackletindex + trackletcounter;
     constructTrackletMCMData(trackletdata[trackletcounter], mTracklets[trackletoffset]);
-    unsigned int headerqpart = ((mTracklets[trackletoffset].getQ2() & 0x2f) << 2) + ((mTracklets[trackletoffset].getQ1() >> 6) & 0x3);
+    unsigned int headerqpart = ((mTracklets[trackletoffset].getQ2() & 0x7f) << 1) + ((mTracklets[trackletoffset].getQ1() >> 6) & 0x3);
     //all 6 bits of Q1 and 2 upper bits of 7bit Q1
     if (mVerbosity) {
       if (mTracklets[trackletoffset].getQ2() > 0x3f) {
@@ -537,9 +538,17 @@ int Trap2CRU::buildTrackletRawData(const int trackletindex, const int linkid)
   if (!destroytracklets) {
     setNumberOfTrackletsInHeader(header, trackletcounter);
     if (trackletcounter > 0) { // dont write header if there are no tracklets.
+      if (mVerbosity) {
+        LOG(info) << " TTT TrackletMCMHeader : 0x" << std::hex << header << " pid : " << header.pid0 << " pid1: " << header.pid1;
+        printTrackletMCMHeader(header);
+      }
       memcpy((char*)mRawDataPtr, (char*)&header, sizeof(TrackletMCMHeader));
       mRawDataPtr += sizeof(TrackletMCMHeader);
       for (int i = 0; i < trackletcounter; ++i) {
+        if (mVerbosity) {
+          LOG(info) << " TTTx TrackletMCMData : 0x" << std::hex << trackletdata[i];
+          printTrackletMCMData(trackletdata[i]);
+        }
         memcpy((char*)mRawDataPtr, (char*)&trackletdata[i], sizeof(TrackletMCMData));
         mRawDataPtr += sizeof(TrackletMCMData);
       }
@@ -583,24 +592,23 @@ int Trap2CRU::writeTrackletHCHeader(const int eventcount)
 {
   int wordswritten = 0;
   //from linkid we can get supermodule, stack, layer, side
-  int linkid = mTracklets[mCurrentTracklet].getHCID();
+  int hcid = mTracklets[mCurrentTracklet].getHCID();
   int detector = mTracklets[mCurrentTracklet].getHCID() / 2;
-  TrackletHCHeader trackletheader;
-  trackletheader.supermodule = linkid / 60;
-  trackletheader.stack = (detector % (o2::trd::constants::NLAYER * o2::trd::constants::NSTACK)) / o2::trd::constants::NLAYER;
-  trackletheader.layer = (detector % o2::trd::constants::NLAYER);
-  trackletheader.one = 1;
+  TrackletHCHeader tracklethcheader;
+  unsigned int supermodule = hcid / 60;
+  unsigned int stack = (detector % (o2::trd::constants::NLAYER * o2::trd::constants::NSTACK)) / o2::trd::constants::NLAYER;
+  unsigned int layer = (detector % o2::trd::constants::NLAYER);
+  unsigned int side = (hcid % 2) ? 1 : 0;
+  unsigned int chipclock = eventcount * 42; // just has to be a constant increasing number per event for our purposes in sim to raw.
+  unsigned int format = 12;
+  constructTrackletHCHeader(tracklethcheader, supermodule, stack, layer, side, chipclock, format);
   if (mVerbosity) {
-    LOG(info) << "Tracklet linkid : " << linkid << ":"
-              << " " << trackletheader.supermodule << ":" << trackletheader.stack << ":" << trackletheader.layer << ":" << trackletheader.side;
+    printTrackletHCHeader(tracklethcheader);
   }
-  trackletheader.side = (linkid % 2) ? 1 : 0;
-  trackletheader.MCLK = eventcount * 42; // just has to be a constant increasing number per event for our purposes in sim to raw.
-  trackletheader.format = 12;
   if (mUseTrackletHCHeader) { // run 3 we also have a TrackletHalfChamber.
-    memcpy(mRawDataPtr, (char*)&trackletheader, sizeof(TrackletHCHeader));
+    memcpy(mRawDataPtr, (char*)&tracklethcheader, sizeof(TrackletHCHeader));
     if (mVerbosity) {
-      LOG(info) << "writing tracklethcheader of 0x" << std::hex << trackletheader.word;
+      LOG(info) << "writing tracklethcheader of 0x" << std::hex << tracklethcheader.word;
     }
     mRawDataPtr += 4;
     wordswritten++;
@@ -663,6 +671,7 @@ void Trap2CRU::convertTrapData(o2::trd::TriggerRecord const& triggerrecord, cons
   int endtrackletindex = triggerrecord.getFirstTracklet() + triggerrecord.getNumberOfTracklets();
   int64_t startdigitindex = triggerrecord.getFirstDigit();
   int64_t enddigitindex = triggerrecord.getFirstDigit() + triggerrecord.getNumberOfDigits();
+  const auto& ctpOffsets = o2::ctp::TriggerOffsetsParam::Instance();
 
   for (int halfcru = 0; halfcru < o2::trd::constants::NHALFCRU; halfcru++) {
     int halfcruwordswritten = 0;
@@ -869,15 +878,21 @@ void Trap2CRU::convertTrapData(o2::trd::TriggerRecord const& triggerrecord, cons
     std::vector<char> feeidpayload(halfcruwordswritten * 4);
     memcpy(feeidpayload.data(), &rawdatavector[0], halfcruwordswritten * 4);
     assert(halfcruwordswritten % 8 == 0);
-    mWriter.addData(mFeeID, mCruID, mLinkID, mEndPointID, triggerrecord.getBCData(), feeidpayload, false, triggercount);
-    if (mVerbosity) {
-      LOG(info) << "written file for trigger : " << triggercount << " feeid of 0x" << std::hex << mFeeID << " cruid : " << mCruID << " and linkid: " << mLinkID << " and EndPoint: " << mEndPointID << " orbit :0x" << std::hex << triggerrecord.getBCData().orbit << " bc:0x" << std::hex << triggerrecord.getBCData().bc << " and payload size of : " << halfcruwordswritten << " with  a half cru of: ";
-      printHalfCRUHeader(halfcruheader);
-      HalfCRUHeader* h;
-      h = (HalfCRUHeader*)feeidpayload.data();
-      HalfCRUHeader h1 = *h;
-      printHalfCRUHeader(h1);
-      LOG(info) << "+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+  ======   end of writing";
+    auto ir = triggerrecord.getBCData();
+    ir += ctpOffsets.LM_L0;
+    if (ctpOffsets.LM_L0 >= 0 || ir.toLong() > -ctpOffsets.LM_L0) {
+      mWriter.addData(mFeeID, mCruID, mLinkID, mEndPointID, ir, feeidpayload, false, triggercount);
+      if (mVerbosity) {
+        LOG(info) << "written file for trigger : " << triggercount << " feeid of 0x" << std::hex << mFeeID << " cruid : " << mCruID << " and linkid: " << mLinkID << " and EndPoint: " << mEndPointID << " orbit :0x" << std::hex << triggerrecord.getBCData().orbit << " bc:0x" << std::hex << triggerrecord.getBCData().bc << " and payload size of : " << halfcruwordswritten << " with  a half cru of: ";
+        printHalfCRUHeader(halfcruheader);
+        HalfCRUHeader* h;
+        h = (HalfCRUHeader*)feeidpayload.data();
+        HalfCRUHeader h1 = *h;
+        printHalfCRUHeader(h1);
+        LOG(info) << "+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+!+  ======   end of writing";
+      }
+    } else {
+      LOG(info) << "Skip writing IR " << triggerrecord.getBCData() << " as after applying LM_L0 shift of " << ctpOffsets.LM_L0 << " bunches the orbit would become negative";
     }
   }
 }

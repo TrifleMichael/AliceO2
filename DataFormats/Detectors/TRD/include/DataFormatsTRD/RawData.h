@@ -133,7 +133,7 @@ struct TrackletHCHeader {
     //             |   |              |    |  |  |---  1-3  stack
     //             |   |              |    |  |------  4-6  layer
     //             |   |              |    |--------  7-11 sector
-    //             |   |              |------------- 12 always 0
+    //             |   |              |------------- 12 always 1
     //             |   ----------------------------- 13-27 MCM Clock counter
     //             --------------------------------- 28-31 tracklet data format number
     uint32_t word;
@@ -142,7 +142,7 @@ struct TrackletHCHeader {
       uint32_t layer : 3;
       uint32_t stack : 3;
       uint32_t supermodule : 5;
-      uint32_t one : 1;   //always 0
+      uint32_t one : 1;   //always 1
       uint32_t MCLK : 15; // MCM clock counter 120MHz ... for simulation -- incrementing, and uniform across an event
       uint32_t format : 4;
       //  0 baseline PID 3 time slices, 7 bit each
@@ -192,7 +192,7 @@ struct TrackletMCMData {
     struct {
       uint8_t checkbit : 1; //
       uint16_t slope : 8;   // Deflection angle of tracklet
-      uint16_t pid : 12;    // Particle Identity 7 bits of Q0 and 5 bits of Q1
+      uint16_t pid : 12;    // Particle Identity 6 bits of Q0 and 6 bits of Q1
       uint16_t pos : 11;    // Position of tracklet, signed 11 bits, granularity 1/80 pad widths, -12.80 to +12.80, relative to centre of pad 10
     } __attribute__((__packed__));
   };
@@ -492,10 +492,11 @@ void printHalfCRUHeader(o2::trd::HalfCRUHeader& halfcru);
 void dumpHalfCRUHeader(o2::trd::HalfCRUHeader& halfcru);
 void clearHalfCRUHeader(o2::trd::HalfCRUHeader& halfcru);
 bool sanityCheckTrackletMCMHeader(o2::trd::TrackletMCMHeader* header);
-bool sanityCheckTrackletHCHeader(o2::trd::TrackletHCHeader& header);
+bool sanityCheckTrackletHCHeader(o2::trd::TrackletHCHeader& header, bool verbose = false);
 bool sanityCheckDigitMCMHeader(o2::trd::DigitMCMHeader* header);
 bool sanityCheckDigitMCMADCMask(o2::trd::DigitMCMADCMask& mask, int numberofbitsset);
 bool sanityCheckDigitMCMWord(o2::trd::DigitMCMData* word, int adcchannel);
+void incrementADCMask(DigitMCMADCMask& mask, int channel);
 void printDigitMCMHeader(o2::trd::DigitMCMHeader& header);
 int getDigitHCHeaderWordType(uint32_t word);
 void printDigitHCHeaders(o2::trd::DigitHCHeader& header, uint32_t headers[3], int index, int offset, bool good);
@@ -504,7 +505,7 @@ int getNumberOfTrackletsFromHeader(o2::trd::TrackletMCMHeader* header, bool verb
 void setNumberOfTrackletsInHeader(o2::trd::TrackletMCMHeader& header, int numberoftracklets);
 int getNextMCMADCfromBP(uint32_t& bp, int channel);
 
-inline bool isTrackletHCHeader(uint32_t& header) { return (((header >> 11) & 0x1) == 0x1); }
+inline bool isTrackletHCHeader(uint32_t& header) { return (((header >> 12) & 0x1) == 0x1); }
 inline bool isTrackletMCMHeader(uint32_t& header) { return ((header & 0x80000001) == 0x80000001); }
 }
 }

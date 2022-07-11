@@ -59,9 +59,9 @@ void RawToDigitConverterSpec::init(framework::InitContext& ctx)
   LOG(info) << "Task configuration is done.";
 }
 
-void finaliseCCDB(ConcreteDataMatcher& matcher, void* obj)
+void RawToDigitConverterSpec::finaliseCCDB(framework::ConcreteDataMatcher& matcher, void* obj)
 {
-  if (matcher == ConcreteDataMatcher("CTP", "Trig_Offset", 0)) {
+  if (matcher == framework::ConcreteDataMatcher("CTP", "Trig_Offset", 0)) {
     LOG(info) << "RawToDigitConverterSpec::finaliseCCDB() : CTP/Config/TriggerOffsets updated.";
     const auto& par = o2::ctp::TriggerOffsetsParam::Instance();
     par.printKeyValues();
@@ -284,7 +284,7 @@ void RawToDigitConverterSpec::run(framework::ProcessingContext& ctx)
   // Loop over BCs, sort digits with increasing digit ID and write to output containers
   mOutputDigits.clear();
   mOutputTriggerRecords.clear();
-  const auto tfOrbitFirst = o2::framework::DataRefUtils::getHeader<o2::header::DataHeader*>(ctx.inputs().getFirstValid(true))->firstTForbit;
+  const auto tfOrbitFirst = ctx.services().get<o2::framework::TimingInfo>().firstTForbit;
   const auto& ctpOffsets = o2::ctp::TriggerOffsetsParam::Instance();
   for (auto [bc, digits] : digitBuffer) {
     if (bc.differenceInBC({0, tfOrbitFirst}) < ctpOffsets.LM_L0) {

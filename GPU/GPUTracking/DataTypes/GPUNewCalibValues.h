@@ -9,18 +9,27 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-#ifndef O2_TPCVDRIFTTGL_CALIB_DEVICE_H
-#define O2_TPCVDRIFTTGL_CALIB_DEVICE_H
+/// \file GPUNewCalibValues.h
+/// \author David Rohr
 
-/// @file   TPCVDriftTglCalibratorSpec.h
-/// @brief  Device to calibrate vdrift with tg_lambda
+#ifndef GPUNEWCALIBVALUES_H
+#define GPUNEWCALIBVALUES_H
 
-#include "Framework/DataProcessorSpec.h"
+#include "GPUCommonDef.h"
 
-namespace o2::calibration
+namespace GPUCA_NAMESPACE
+{
+namespace gpu
 {
 
-o2::framework::DataProcessorSpec getTPCVDriftTglCalibSpec(int ntgl, float tglMax, int ndtgl, float dtglMax, size_t slotL, size_t minEnt);
-}
+struct GPUNewCalibValues {
+  bool newSolenoidField = false;
+  bool newContinuousMaxTimeBin = false;
+  float solenoidField = 0.f;
+  unsigned int continuousMaxTimeBin = 0;
+};
+
+} // namespace gpu
+} // namespace GPUCA_NAMESPACE
 
 #endif
