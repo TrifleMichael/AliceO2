@@ -20,6 +20,7 @@
 #include "CommonUtils/FileSystemUtils.h"
 #include "CommonUtils/MemFileHelper.h"
 #include "MemoryResources/MemoryResources.h"
+#include "CCDBResponse.h"
 #include <chrono>
 #include <memory>
 #include <sstream>
@@ -1670,5 +1671,51 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   upath.erase(remove(upath.begin(), upath.end(), '\"'), upath.end());
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
+
+// size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* userp)
+// {
+//   size_t newLength = size * nmemb;
+//   size_t oldLength = s->size();
+//   try {
+//     s->resize(oldLength + newLength);
+//   } catch (std::bad_alloc& e) {
+//     LOG(error) << "memory error when getting data from CCDB";
+//     return 0;
+//   }
+
+//   std::copy((char*)buffer, (char*)buffer + newLength, userp->begin() + oldLength);
+//   return size * nmemb;
+// }
+
+// void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const
+// {
+//   CURL* curlHandle;
+
+//   curlHandle = curl_easy_init();
+
+//   if (curlHandle != nullptr) {
+
+//     curlSetSSLOptions(curlHandle);
+//     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeToResponse); // added
+    
+//     //initCurlOptionsForRetrieve(curlHandle, dataHolder, writeCallback, followRedirect);
+//     //initHeadersForRetrieve(curlHandle, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+
+//     long responseCode = 0;
+//     CURLcode curlResultCode = CURL_LAST;
+
+//     for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
+//       string fullUrl = getFullUrlForRetrieval(curlHandle, path, metadata, timestamp, hostIndex);
+//       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
+
+//       curlResultCode = curl_easy_perform(curlHandle);
+
+//       if (curlResultCode != CURLE_OK) {
+//         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
+//       }
+//     }
+//     curl_easy_cleanup(curlHandle);
+//   }
+// }
 
 } // namespace o2
