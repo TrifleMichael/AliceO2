@@ -1695,6 +1695,7 @@ void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::st
 
   if (curlHandle != nullptr) {
 
+    CCDBResponse* firstResponse = NULL;
     std::string result;
 
     curlSetSSLOptions(curlHandle);
@@ -1715,7 +1716,20 @@ void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::st
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
+      } else {
+        if (firstResponse == NULL) {
+          CCDBResponse* firstResponse = new CCDBResponse(result);
+        } else {
+          CCDBResponse* nextResponse = new CCDBResponse(result);
+          firstResponse->browseFromTwoServers(nextResponse);
+          delete nextResponse;         
+        }
       }
+    }
+
+    if (firstResponse != NULL) {
+      string response = firstResponse->JsonToString();
+      delete firstResponse;
     }
     curl_easy_cleanup(curlHandle);
   }
