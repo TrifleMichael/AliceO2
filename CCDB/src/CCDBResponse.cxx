@@ -34,6 +34,11 @@ const char* CCDBResponse::JsonToString(rapidjson::Document *document)
   return strdup( buffer.GetString() );
 }
 
+const char* CCDBResponse::toString()
+{
+    return JsonToString(&document);
+}
+
 // void CCDBResponse::printObjectAttributes(rapidjson::Document *document)
 // {
 //     auto objectsArray = (*document)["objects"].GetArray();
