@@ -33,7 +33,9 @@ class CCDBResponse
   //CCDBResponse(CCDBResponse& other);
   ~CCDBResponse() = default;
 
-  const char *JsonToString(rapidjson::Document *document);
+  char* JsonToString(rapidjson::Document *document);
+  char* toString();
+
   //void printObjectAttributes(rapidjson::Document *document);
 
   void removeObject(rapidjson::Document *document, int ind);
@@ -49,8 +51,6 @@ class CCDBResponse
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
   rapidjson::Document *getDocument();
   std::string sanitizeObjectName(const std::string& objectName);
-  const char* toString();
-
   rapidjson::Document document; // should be moved to private
 
   // UNCOMMENT SUBFOLDERS AND PARSE SUBFOLDERS IN CCDBAPI

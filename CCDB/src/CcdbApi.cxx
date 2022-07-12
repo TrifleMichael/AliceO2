@@ -1727,8 +1727,9 @@ void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::st
       }
     }
 
+    char* response = NULL;
     if (firstResponse != NULL) {
-      const char* response = firstResponse->toString();
+      response = firstResponse->toString();
       delete firstResponse;
     }
     curl_easy_cleanup(curlHandle);

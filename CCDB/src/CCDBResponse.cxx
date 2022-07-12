@@ -25,7 +25,7 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
 //   document.CopyFrom((*other).document, document.GetAllocator());
 // }
 
-const char* CCDBResponse::JsonToString(rapidjson::Document *document)
+char* CCDBResponse::JsonToString(rapidjson::Document *document)
 {
   rapidjson::StringBuffer buffer;
   buffer.Clear();
@@ -34,7 +34,7 @@ const char* CCDBResponse::JsonToString(rapidjson::Document *document)
   return strdup( buffer.GetString() );
 }
 
-const char* CCDBResponse::toString()
+char* CCDBResponse::toString()
 {
     return JsonToString(&document);
 }
