@@ -72,6 +72,7 @@ int CCDBResponse::countObjects()
     return objectsArray.Size();
 }
 
+// Merges two rapidjson objects
 bool CCDBResponse::mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &srcObject, rapidjson::Document::AllocatorType &allocator)
 {    
     for (auto srcIt = srcObject.MemberBegin(); srcIt != srcObject.MemberEnd(); ++srcIt)
@@ -121,6 +122,7 @@ bool CCDBResponse::mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &s
     return true;
 }
 
+// Removes objects at indexes holding "true" value in the toBeRemoved vector.
 void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved)
 {
     int objectsIndex = 0;
@@ -138,6 +140,7 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
     }
 }
 
+// Returns string attribute of object at a given index
 std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 {
     auto objArray = document["objects"].GetArray();
@@ -269,14 +272,14 @@ rapidjson::Document *CCDBResponse::getDocument()
  * @param objectName
  * @return a new string following the rule enounced above.
  */
-std::string CCDBResponse::sanitizeObjectName(const std::string& objectName)
-{
-  std::string tmpObjectName = objectName;
-  tmpObjectName.erase(std::remove_if(tmpObjectName.begin(), tmpObjectName.end(),
-                                     [](auto const& c) -> bool { return (!std::isalnum(c) && c != '_' && c != '/'); }),
-                      tmpObjectName.end());
-  return tmpObjectName;
-}
-// a
+// std::string CCDBResponse::sanitizeObjectName(const std::string& objectName)
+// {
+//   std::string tmpObjectName = objectName;
+//   tmpObjectName.erase(std::remove_if(tmpObjectName.begin(), tmpObjectName.end(),
+//                                      [](auto const& c) -> bool { return (!std::isalnum(c) && c != '_' && c != '/'); }),
+//                       tmpObjectName.end());
+//   return tmpObjectName;
+// }
+
 } // namespace ccdb
 } // namespace o2
