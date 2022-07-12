@@ -16,11 +16,11 @@
 
 #include "CCDB/CcdbApi.h"
 #include "CCDB/CCDBQuery.h"
+#include "CCDB/CCDBResponse.h"
 #include "CommonUtils/StringUtils.h"
 #include "CommonUtils/FileSystemUtils.h"
 #include "CommonUtils/MemFileHelper.h"
 #include "MemoryResources/MemoryResources.h"
-#include "CCDBResponse.h"
 #include <chrono>
 #include <memory>
 #include <sstream>
@@ -1672,50 +1672,53 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
-// size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* userp)
-// {
-//   size_t newLength = size * nmemb;
-//   size_t oldLength = s->size();
-//   try {
-//     s->resize(oldLength + newLength);
-//   } catch (std::bad_alloc& e) {
-//     LOG(error) << "memory error when getting data from CCDB";
-//     return 0;
-//   }
+// same as one of above write functions
+size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* userp)
+{
+  size_t newLength = size * nmemb;
+  size_t oldLength = userp->size();
+  try {
+    userp->resize(oldLength + newLength);
+  } catch (std::bad_alloc& e) {
+    LOG(error) << "memory error when getting data from CCDB";
+    return 0;
+  }
 
-//   std::copy((char*)buffer, (char*)buffer + newLength, userp->begin() + oldLength);
-//   return size * nmemb;
-// }
+  std::copy((char*)buffer, (char*)buffer + newLength, userp->begin() + oldLength);
+  return size * nmemb;
+}
 
-// void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const
-// {
-//   CURL* curlHandle;
+void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const
+{
+  CURL* curlHandle;
+  curlHandle = curl_easy_init();
 
-//   curlHandle = curl_easy_init();
+  if (curlHandle != nullptr) {
 
-//   if (curlHandle != nullptr) {
+    std::string result;
 
-//     curlSetSSLOptions(curlHandle);
-//     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeToResponse); // added
+    curlSetSSLOptions(curlHandle);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeToResponse);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
     
-//     //initCurlOptionsForRetrieve(curlHandle, dataHolder, writeCallback, followRedirect);
-//     //initHeadersForRetrieve(curlHandle, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+    //initCurlOptionsForRetrieve(curlHandle, dataHolder, writeCallback, followRedirect);
+    //initHeadersForRetrieve(curlHandle, timestamp, headers, etag, createdNotAfter, createdNotBefore);
 
-//     long responseCode = 0;
-//     CURLcode curlResultCode = CURL_LAST;
+    long responseCode = 0;
+    CURLcode curlResultCode = CURL_LAST;
 
-//     for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
-//       string fullUrl = getFullUrlForRetrieval(curlHandle, path, metadata, timestamp, hostIndex);
-//       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
+    for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
+      string fullUrl = getFullUrlForRetrieval(curlHandle, path, metadata, timestamp, hostIndex);
+      curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
-//       curlResultCode = curl_easy_perform(curlHandle);
+      curlResultCode = curl_easy_perform(curlHandle);
 
-//       if (curlResultCode != CURLE_OK) {
-//         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
-//       }
-//     }
-//     curl_easy_cleanup(curlHandle);
-//   }
-// }
+      if (curlResultCode != CURLE_OK) {
+        LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
+      }
+    }
+    curl_easy_cleanup(curlHandle);
+  }
+}
 
 } // namespace o2

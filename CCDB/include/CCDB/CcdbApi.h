@@ -504,6 +504,8 @@ class CcdbApi //: public DatabaseInterface
 
   std::string getHostUrl(int hostIndex) const;
 
+  void browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
+
   /**
    * Function to check the keys for metadata
    * see https://developers.cloudflare.com/rules/transform/request-header-modification/reference/header-format/
