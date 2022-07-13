@@ -1704,14 +1704,10 @@ char* CcdbApi::browse()
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeToResponse);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
     
-    //initCurlOptionsForRetrieve(curlHandle, dataHolder, writeCallback, followRedirect);
-    //initHeadersForRetrieve(curlHandle, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-
     long responseCode = 0;
     CURLcode curlResultCode = CURL_LAST;
 
     for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
-      //string fullUrl = getFullUrlForRetrieval(curlHandle, path, metadata, timestamp, hostIndex);
       string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*";
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 

@@ -20,11 +20,6 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
   document.Parse(jsonString.c_str());
 }
 
-// CCDBResponse::CCDBResponse(CCDBResponse::CCDBResponse& other)
-// {
-//   document.CopyFrom((*other).document, document.GetAllocator());
-// }
-
 char* CCDBResponse::JsonToString(rapidjson::Document *document)
 {
   rapidjson::StringBuffer buffer;
@@ -152,8 +147,7 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
     const char* attrNameChar = attributeName.c_str();
     if ( objArray.Size() <= ind )
     {
-        // needs proper error handleing
-        return "ATTRIBUTE_NOT_FOUND";
+        return "";
     }
     else
     {
@@ -176,7 +170,7 @@ long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
     }
 }
 
-// removes elements according to browse
+// Removes elements according to browse
 void CCDBResponse::browse()
 {
     auto objArray = document["objects"].GetArray(); // what about subfolders
@@ -196,8 +190,8 @@ void CCDBResponse::browse()
     removeObjects(&document, toBeRemoved);
 }
 
-// removes elements according to latest
-// assumes document contains response from only one server
+// Removes elements according to latest
+// Assumes document contains response from only one server
 void CCDBResponse::latest()
 {
     browse();
@@ -222,7 +216,7 @@ void CCDBResponse::latest()
     removeObjects(&document, toBeRemoved);
 }
 
-// concatenates other response into this response according to browse
+// Concatenates other response into this response according to browse
 void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 {
     browse();
@@ -244,7 +238,7 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
 }
 
-// concatenates other response into this response according to latest
+// Concatenates other response into this response according to latest
 void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 {
     latest();
@@ -271,20 +265,6 @@ rapidjson::Document *CCDBResponse::getDocument()
 {
   return &document;
 }
-
-/**
- * Keep only the alphanumeric characters plus '_' plus '/' from the string passed in argument.
- * @param objectName
- * @return a new string following the rule enounced above.
- */
-// std::string CCDBResponse::sanitizeObjectName(const std::string& objectName)
-// {
-//   std::string tmpObjectName = objectName;
-//   tmpObjectName.erase(std::remove_if(tmpObjectName.begin(), tmpObjectName.end(),
-//                                      [](auto const& c) -> bool { return (!std::isalnum(c) && c != '_' && c != '/'); }),
-//                       tmpObjectName.end());
-//   return tmpObjectName;
-// }
 
 } // namespace ccdb
 } // namespace o2

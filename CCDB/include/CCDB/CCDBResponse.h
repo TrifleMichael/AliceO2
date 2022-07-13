@@ -23,14 +23,10 @@ namespace o2
 namespace ccdb
 {
 
-
-
 class CCDBResponse
 {
  public:
-  //CCDBResponse() = default;
   CCDBResponse(const std::string& jsonString);
-  //CCDBResponse(CCDBResponse& other);
   ~CCDBResponse() = default;
 
   char* JsonToString(rapidjson::Document *document);
@@ -56,7 +52,6 @@ class CCDBResponse
   // UNCOMMENT SUBFOLDERS AND PARSE SUBFOLDERS IN CCDBAPI
 
  private:
-
 
   ClassDefNV(CCDBResponse, 1);
 };
