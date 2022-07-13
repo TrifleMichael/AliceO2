@@ -1712,20 +1712,24 @@ char* CcdbApi::browse()
 
     for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
       //string fullUrl = getFullUrlForRetrieval(curlHandle, path, metadata, timestamp, hostIndex);
-      string fullUrl = hostsPool.at(hostIndex) + "/browse/TCP/.";
+      string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*";
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
+      std::cout << "Starting curl easy perform for address " << fullUrl << "\n";
       curlResultCode = curl_easy_perform(curlHandle);
 
       if (curlResultCode != CURLE_OK) {
+        std::cout << "Curl is not ok.\n";
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
+        std::cout << "Curl ok.\n";
+        std::cout << "RESULT:\n" << result << "\nEND OF RESULT\n";
         if (firstResponse == NULL) {
           CCDBResponse* firstResponse = new CCDBResponse(result);
         } else {
           CCDBResponse* nextResponse = new CCDBResponse(result);
           firstResponse->browseFromTwoServers(nextResponse);
-          delete nextResponse;         
+          delete nextResponse;
         }
       }
     }
