@@ -1688,8 +1688,10 @@ size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* use
   return size * nmemb;
 }
 
-void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const
+char* CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const
 {
+  char* response = NULL;
+
   CURL* curlHandle;
   curlHandle = curl_easy_init();
 
@@ -1709,7 +1711,8 @@ void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::st
     CURLcode curlResultCode = CURL_LAST;
 
     for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
-      string fullUrl = getFullUrlForRetrieval(curlHandle, path, metadata, timestamp, hostIndex);
+      //string fullUrl = getFullUrlForRetrieval(curlHandle, path, metadata, timestamp, hostIndex);
+      string fullUrl = hostsPool.at(hostIndex) + "/browse/TCP/.";
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       curlResultCode = curl_easy_perform(curlHandle);
@@ -1727,13 +1730,13 @@ void CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::st
       }
     }
 
-    char* response = NULL;
     if (firstResponse != NULL) {
       response = firstResponse->toString();
       delete firstResponse;
     }
     curl_easy_cleanup(curlHandle);
   }
+  return response;
 }
 
 } // namespace o2
