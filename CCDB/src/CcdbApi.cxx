@@ -1708,7 +1708,8 @@ char* CcdbApi::browse()
     CURLcode curlResultCode = CURL_LAST;
 
     for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
-      string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*";
+      //string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*";
+      string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*?Accept=application/json";
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       std::cout << "Starting curl easy perform for address " << fullUrl << "\n";
