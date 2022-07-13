@@ -151,7 +151,9 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
     }
     else
     {
-        return objArray[ind][attrNameChar].GetString();
+        std::string arg = objArray[ind][attrNameChar].GetString();
+        delete attrNameChar;
+        return arg;
     }
 }
 
@@ -166,7 +168,9 @@ long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
     }
     else
     {
-        return objArray[ind][attrNameChar].GetUint64();
+        long attr = objArray[ind][attrNameChar].GetUint64();
+        delete attrNameChar;
+        return attr;
     }
 }
 
