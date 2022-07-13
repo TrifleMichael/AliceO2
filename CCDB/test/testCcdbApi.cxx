@@ -102,6 +102,16 @@ struct test_fixture {
   map<string, string> metadata;
 };
 
+BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
+{
+  test_fixture f;
+  char* response = f.api.browse();
+  BOOST_CHECK(response != NULL);
+  std::cout << "Response:" << std::endl << response << std::endl;
+  std::cout << "End of response" << std::endl;
+  BOOST_CHECK_EQUAL(1, 2); // mock to see response
+}
+
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))
 {
   test_fixture f;

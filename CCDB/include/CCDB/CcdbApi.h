@@ -439,6 +439,9 @@ class CcdbApi //: public DatabaseInterface
                           long timestamp = -1, std::map<std::string, std::string>* headers = nullptr, std::string const& etag = "",
                           const std::string& createdNotAfter = "", const std::string& createdNotBefore = "") const;
 
+
+  char* browse();
+
  private:
   /**
    * A helper function to extract object from a local ROOT file
@@ -503,8 +506,6 @@ class CcdbApi //: public DatabaseInterface
   void initHostsPool(std::string hosts);
 
   std::string getHostUrl(int hostIndex) const;
-
-  char* browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
 
   /**
    * Function to check the keys for metadata

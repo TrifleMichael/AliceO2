@@ -1688,7 +1688,7 @@ size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* use
   return size * nmemb;
 }
 
-char* CcdbApi::browse(void* dataHolder, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const
+char* CcdbApi::browse()
 {
   char* response = NULL;
 
