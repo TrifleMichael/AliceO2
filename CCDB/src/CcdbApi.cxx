@@ -1672,21 +1672,21 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
-// same as one of above write functions
-size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* userp)
-{
-  size_t newLength = size * nmemb;
-  size_t oldLength = userp->size();
-  try {
-    userp->resize(oldLength + newLength);
-  } catch (std::bad_alloc& e) {
-    LOG(error) << "memory error when getting data from CCDB";
-    return 0;
-  }
+// // same as one of above write functions
+// size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* userp)
+// {
+//   size_t newLength = size * nmemb;
+//   size_t oldLength = userp->size();
+//   try {
+//     userp->resize(oldLength + newLength);
+//   } catch (std::bad_alloc& e) {
+//     LOG(error) << "memory error when getting data from CCDB";
+//     return 0;
+//   }
 
-  std::copy((char*)buffer, (char*)buffer + newLength, userp->begin() + oldLength);
-  return size * nmemb;
-}
+//   std::copy((char*)buffer, (char*)buffer + newLength, userp->begin() + oldLength);
+//   return size * nmemb;
+// }
 
 char* CcdbApi::browse()
 {
@@ -1701,7 +1701,7 @@ char* CcdbApi::browse()
     std::string result;
 
     curlSetSSLOptions(curlHandle);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeToResponse);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
     
     long responseCode = 0;
@@ -1716,11 +1716,8 @@ char* CcdbApi::browse()
       curlResultCode = curl_easy_perform(curlHandle);
 
       if (curlResultCode != CURLE_OK) {
-        std::cout << "Curl is not ok.\n";
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
-        std::cout << "Curl ok.\n";
-        std::cout << "RESULT:\n" << result << "\nEND OF RESULT\n";
         if (firstResponse == NULL) {
           CCDBResponse* firstResponse = new CCDBResponse(result);
         } else {
