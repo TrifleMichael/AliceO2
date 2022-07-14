@@ -7,6 +7,7 @@
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 #include <algorithm>
+#include <iostream> // debug
 
 using namespace rapidjson;
 
@@ -26,12 +27,15 @@ char* CCDBResponse::JsonToString(rapidjson::Document *document)
   buffer.Clear();
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   (*document).Accept(writer);
-  return strdup( buffer.GetString() );
+  return strdup(buffer.GetString());
 }
 
 char* CCDBResponse::toString()
 {
-    return JsonToString(&document);
+  std::cout << std::endl;
+  std::cout << "To string called\n";
+  std::cout << std::endl;
+  return JsonToString(&document);
 }
 
 // void CCDBResponse::printObjectAttributes(rapidjson::Document *document)
@@ -177,7 +181,9 @@ long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
 // Removes elements according to browse
 void CCDBResponse::browse()
 {
+    //std::cout << "starting browse\n";
     auto objArray = document["objects"].GetArray(); // what about subfolders
+    //std::cout << "received array\n";
     int length = objArray.Size();    
     std::vector<bool> toBeRemoved(length, false);
 
@@ -191,7 +197,10 @@ void CCDBResponse::browse()
             }
         }
     }
+    
+    //std::cout << "mapped removal\n";
     removeObjects(&document, toBeRemoved);
+    //std::cout << "removal finished\n";
 }
 
 // Removes elements according to latest

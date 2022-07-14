@@ -1708,18 +1708,28 @@ char* CcdbApi::browse()
     CURLcode curlResultCode = CURL_LAST;
 
     for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
-      //string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*";
+      std::cout << std::endl;
+      std::cout << "Host number " << hostIndex << "\n";
       string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*?Accept=application/json";
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
+      std::cout << std::endl;
       std::cout << "Starting curl easy perform for address " << fullUrl << "\n";
+      std::cout << std::endl;
       curlResultCode = curl_easy_perform(curlHandle);
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
         if (firstResponse == NULL) {
-          CCDBResponse* firstResponse = new CCDBResponse(result);
+          firstResponse = new CCDBResponse(result);
+          std::cout << std::endl;
+          std::cout << "Response to string\n";
+          std::cout << std::endl;
+          std::cout << firstResponse->toString() << "\n";
+          std::cout << std::endl;
+          std::cout << "Response to string FINISHED\n";
+          std::cout << std::endl;
         } else {
           CCDBResponse* nextResponse = new CCDBResponse(result);
           firstResponse->browseFromTwoServers(nextResponse);
@@ -1729,11 +1739,18 @@ char* CcdbApi::browse()
     }
 
     if (firstResponse != NULL) {
+      std::cout << std::endl;
+      std::cout << "Preparing to parse to string\n";
+      std::cout << std::endl;
       response = firstResponse->toString();
+      std::cout << "Parsing to string\n";
+      std::cout << std::endl;
       delete firstResponse;
     }
     curl_easy_cleanup(curlHandle);
   }
+  std::cout << std::endl;
+  std::cout << "Returning response\n";
   return response;
 }
 
