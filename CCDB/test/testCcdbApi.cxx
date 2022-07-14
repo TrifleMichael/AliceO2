@@ -55,7 +55,7 @@ struct Fixture {
   Fixture()
   {
     CcdbApi api;
-    ccdbUrl = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
+    ccdbUrl = "http://ccdb-test.cern.ch:8080";
     api.init(ccdbUrl);
     cout << "ccdb url: " << ccdbUrl << endl;
     hostReachable = api.isHostReachable();
@@ -104,8 +104,10 @@ struct test_fixture {
 
 BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
 {
-  test_fixture f;
-  char* response = f.api.browse();
+  CcdbApi api;
+  string url = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
+  api.init(url);
+  char* response = api.browse();
   BOOST_CHECK(response != NULL);
   std::cout << "Response:" << std::endl << response << std::endl;
   std::cout << "End of response" << std::endl;
