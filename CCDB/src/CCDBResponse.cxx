@@ -32,9 +32,6 @@ char* CCDBResponse::JsonToString(rapidjson::Document *document)
 
 char* CCDBResponse::toString()
 {
-  std::cout << std::endl;
-  std::cout << "To string called\n";
-  std::cout << std::endl;
   return JsonToString(&document);
 }
 
@@ -58,25 +55,16 @@ char* CCDBResponse::toString()
 
 void CCDBResponse::removeObject(rapidjson::Document *document, int ind)
 {
-    std::cout << std::endl;
-    std::cout << "Remove Object called\n";
-    std::cout << std::endl;
     rapidjson::Value &objects = (*document)["objects"];
     if (objects.Size() > 0) {
         int i = 0;
         for (rapidjson::Value::ConstValueIterator object = objects.Begin(); object != objects.End(); object++) {
             if (i++ == ind) {
                 objects.Erase(object);
-                std::cout << std::endl;
-                std::cout << "Remove Object returning\n";
-                std::cout << std::endl;
                 return;
             }
         }
     }
-    std::cout << std::endl;
-    std::cout << "Remove Object returning\n";
-    std::cout << std::endl;
 }
 
 int CCDBResponse::countObjects() 
@@ -138,9 +126,6 @@ bool CCDBResponse::mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &s
 // Removes objects at indexes holding "true" value in the toBeRemoved vector.
 void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved)
 {
-  std::cout << std::endl;
-  std::cout << "Remove Objects called\n";
-  std::cout << std::endl;
   int objectsIndex = 0;
   int length = (*document)["objects"].GetArray().Size();
   for (int removedListIndex = 0; removedListIndex < length; removedListIndex++) {
@@ -189,13 +174,7 @@ long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
 // Removes elements according to browse
 void CCDBResponse::browse()
 {
-  std::cout << std::endl;
-  std::cout << "starting browse\n";
-  std::cout << std::endl;
   auto objArray = document["objects"].GetArray(); // what about subfolders
-  std::cout << std::endl;
-  std::cout << "received array\n";
-  std::cout << std::endl;
   int length = objArray.Size();
   std::vector<bool> toBeRemoved(length, false);
 
@@ -206,14 +185,7 @@ void CCDBResponse::browse()
       }
     }
   }
-
-  std::cout << std::endl;
-  std::cout << "mapped removal\n";
-  std::cout << std::endl;
   removeObjects(&document, toBeRemoved);
-  std::cout << std::endl;
-  std::cout << "removal finished\n";
-  std::cout << std::endl;
 }
 
 // Removes elements according to latest
@@ -245,22 +217,10 @@ void CCDBResponse::latest()
 // Concatenates other response into this response according to browse
 void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 {
-    std::cout << std::endl;
-    std::cout << "Browsing this\n";
-    std::cout << std::endl;
     browse();
-    std::cout << std::endl;
-    std::cout << "Browsing that\n";
-    std::cout << std::endl;
     other->browse();
-    std::cout << std::endl;
-    std::cout << "Counting objects\n";
-    std::cout << std::endl;
     int thisLength = countObjects();
     int otherLength = other->countObjects();
-    std::cout << std::endl;
-    std::cout << "Preparing vector and for's\n";
-    std::cout << std::endl;
     std::vector<bool> toBeRemoved(otherLength, false);
 
     for (int i = 0; i < thisLength; i++) {
@@ -271,18 +231,9 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
             }
         }
     }
-    std::cout << std::endl;
-    std::cout << "Removing objects\n";
-    std::cout << std::endl;
 
     removeObjects(other->getDocument(), toBeRemoved);
-    std::cout << std::endl;
-    std::cout << "Prepering to merge\n";
-    std::cout << std::endl;
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
-    std::cout << std::endl;
-    std::cout << "Merged\n";
-    std::cout << std::endl;
 }
 
 // Concatenates other response into this response according to latest
