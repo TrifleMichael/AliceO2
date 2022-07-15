@@ -109,12 +109,12 @@ BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
   api.init(url);
   char* response = api.browse();
   BOOST_CHECK(response != NULL);
-  // std::cout << std::endl;
-  // std::cout << "Response:\n";
-  // std::cout << std::endl;
-  // std::cout << response << std::endl;
-  // std::cout << std::endl;
-  // std::cout << "End of response" << std::endl;
+  std::cout << std::endl;
+  std::cout << "Response:\n";
+  std::cout << std::endl;
+  std::cout << response << std::endl;
+  std::cout << std::endl;
+  std::cout << "End of response" << std::endl;
   BOOST_CHECK_EQUAL(1, 2); // mock to see response
 }
 

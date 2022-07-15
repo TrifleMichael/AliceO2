@@ -128,14 +128,34 @@ bool CCDBResponse::mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &s
 // Removes objects at indexes holding "true" value in the toBeRemoved vector.
 void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved)
 {
-  int objectsIndex = 0;
-  int length = (*document)["objects"].GetArray().Size();
-  for (int removedListIndex = 0; removedListIndex < length; removedListIndex++) {
-    if (toBeRemoved[removedListIndex]) {
-      removeObject(document, objectsIndex);
-    } else {
-      objectsIndex++;
+//   int objectsIndex = 0;
+//   int length = (*document)["objects"].GetArray().Size();
+//   for (int removedListIndex = 0; removedListIndex < length; removedListIndex++) {
+//     if (toBeRemoved[removedListIndex]) {
+//       removeObject(document, objectsIndex);      
+//     } else {
+//       objectsIndex++;
+//     }
+//   }
+
+  rapidjson::Value& objects = (*document)["objects"];
+  if (objects.Size() > 1) {
+    int i = 1;
+    rapidjson::Value::ConstValueIterator pastObject = objects.Begin();
+    rapidjson::Value::ConstValueIterator nextObject = pastObject + 1;
+    while (nextObject != objects.End())
+    {
+        if (toBeRemoved[i]) {
+            objects.Erase(nextObject);
+            nextObject = pastObject + 1; // What if last was removed in line above?
+            objectNum -= 1;
+        }
+        i++;
     }
+  }
+  if (toBeRemoved[0])
+  {
+    objects.Erase(objects.Begin());
   }
 }
 
