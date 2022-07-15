@@ -19,6 +19,7 @@ namespace ccdb
 CCDBResponse::CCDBResponse(const std::string& jsonString)
 {
   document.Parse(jsonString.c_str());
+  objectNum = countObjects();
 }
 
 char* CCDBResponse::JsonToString(rapidjson::Document *document)
@@ -61,6 +62,7 @@ void CCDBResponse::removeObject(rapidjson::Document *document, int ind)
         for (rapidjson::Value::ConstValueIterator object = objects.Begin(); object != objects.End(); object++) {
             if (i++ == ind) {
                 objects.Erase(object);
+                objectNum -= 1;
                 return;
             }
         }
@@ -142,7 +144,7 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 {
     //auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
-    if ( countObjects() <= ind )
+    if ( objectNum <= ind )
     {
         return "";
     }
@@ -157,18 +159,20 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 
 long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
 {
-    auto objArray = document["objects"].GetArray();
+    // auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
-    if ( countObjects() <= ind )
+    if ( objectNum <= ind )
     {
         // needs proper error handleing
         return -9999;
     }
     else
     {
-        long attr = objArray[ind][attrNameChar].GetUint64();
-        return attr;
+        // long attr = objArray[ind][attrNameChar].GetUint64();
+        // return attr;
+        return document["objects"][ind][attrNameChar].GetUint64();
     }
+    return -9999;
 }
 
 // Removes elements according to browse
@@ -219,12 +223,10 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 {
     browse();
     other->browse();
-    int thisLength = countObjects();
-    int otherLength = other->countObjects();
-    std::vector<bool> toBeRemoved(otherLength, false);
+    std::vector<bool> toBeRemoved(other->objectNum, false);
 
-    for (int i = 0; i < thisLength; i++) {
-        for (int j = 0; j < otherLength; j++) {
+    for (int i = 0; i < objectNum; i++) {
+        for (int j = 0; j < other->objectNum; j++) {
             if (getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
             {
                 toBeRemoved[j] = true;
@@ -234,6 +236,7 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 
     removeObjects(other->getDocument(), toBeRemoved);
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
+    objectNum = countObjects();
 }
 
 // Concatenates other response into this response according to latest
@@ -241,12 +244,10 @@ void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 {
     latest();
     other->latest();
-    int thisLength = countObjects();
-    int otherLength = other->countObjects();
-    std::vector<bool> toBeRemoved(otherLength, false);
+    std::vector<bool> toBeRemoved(other->objectNum, false);
 
-    for (int i = 0; i < thisLength; i++) {
-        for (int j = 0; j < otherLength; j++) {
+    for (int i = 0; i < objectNum; i++) {
+        for (int j = 0; j < other->objectNum; j++) {
             if (getStringAttribute(i, "path").compare(other->getStringAttribute(j, "path")) == 0 
                 || getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
             {
@@ -257,6 +258,7 @@ void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 
     removeObjects(other->getDocument(), toBeRemoved);
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
+    objectNum = countObjects();
 }
 
 rapidjson::Document *CCDBResponse::getDocument()

@@ -31,6 +31,7 @@ class CCDBResponse
 
   char* JsonToString(rapidjson::Document *document);
   char* toString();
+  int objectNum;
 
   //void printObjectAttributes(rapidjson::Document *document);
 
