@@ -1695,10 +1695,6 @@ char* CcdbApi::browse()
 
   for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
 
-    std::cout << std::endl;
-    std::cout << "Preparing curl\n";
-    std::cout << std::endl;
-
     // Setting up CURL
     CURL* curlHandle;
     curlHandle = curl_easy_init();
@@ -1706,11 +1702,9 @@ char* CcdbApi::browse()
     CURLcode curlResultCode = CURL_LAST;
     std::string result;
 
-
     curlSetSSLOptions(curlHandle);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
-
 
     if (curlHandle != NULL) {
 
@@ -1719,7 +1713,6 @@ char* CcdbApi::browse()
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       curlResultCode = curl_easy_perform(curlHandle);
-
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));

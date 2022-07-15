@@ -140,25 +140,26 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
 // Returns string attribute of object at a given index
 std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 {
-    auto objArray = document["objects"].GetArray();
+    //auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
-    if ( objArray.Size() <= ind )
+    if ( countObjects() <= ind )
     {
         return "";
     }
     else
     {
-        std::string arg = objArray[ind][attrNameChar].GetString();
-        //delete attrNameChar; should be restored!!
-        return arg;
+        // std::string arg = objArray[ind][attrNameChar].GetString();
+        // return arg;
+        return document["objects"][ind][attrNameChar].GetString();
     }
+    return "";
 }
 
 long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
 {
     auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
-    if ( objArray.Size() <= ind )
+    if ( countObjects() <= ind )
     {
         // needs proper error handleing
         return -9999;
@@ -166,7 +167,6 @@ long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
     else
     {
         long attr = objArray[ind][attrNameChar].GetUint64();
-        //delete attrNameChar; should be restored!!
         return attr;
     }
 }
