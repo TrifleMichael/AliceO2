@@ -1711,94 +1711,35 @@ char* CcdbApi::browse()
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
 
-    std::cout << std::endl;
-    std::cout << "Finished preparing curl\n";
-    std::cout << std::endl;
 
     if (curlHandle != NULL) {
 
       // Connecting to host
-      std::cout << std::endl;
-      std::cout << "Host number " << hostIndex << "\n";
-      std::cout << std::endl;
       string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*?Accept=application/json";
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
-      std::cout << std::endl;
-      std::cout << "Starting curl easy perform for address " << fullUrl << "\n";
-      std::cout << std::endl;
       curlResultCode = curl_easy_perform(curlHandle);
 
-      std::cout << std::endl;
-      std::cout << "Finished curl easy perform for address " << fullUrl << "\n";
-      std::cout << std::endl;
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
         if (firstResponse == NULL) {
-          std::cout << std::endl;
-          std::cout << "creating ccdbResponse for the first time\n";
-          std::cout << std::endl;
           firstResponse = new CCDBResponse(result);
-          std::cout << std::endl;
-          std::cout << "Response to string\n";
-          std::cout << std::endl;
-          std::cout << firstResponse->toString() << "\n";
-          std::cout << std::endl;
-          std::cout << "Response to string FINISHED\n";
-          std::cout << std::endl;
         } else {
-          std::cout << std::endl;
-          std::cout << "Printing next result\n";
-          std::cout << std::endl;
-          std::cout << result << "\n";
-          std::cout << std::endl;
-          std::cout << "Creating next response";
-          std::cout << std::endl;
           CCDBResponse* nextResponse = new CCDBResponse(result);
-          std::cout << std::endl;
-          std::cout << "printing next response\n";
-          std::cout << std::endl;
-          std::cout << nextResponse->toString() << "\n";
-          std::cout << std::endl;
-          std::cout << "Preparing to browse\n";
-          std::cout << std::endl;
           firstResponse->browseFromTwoServers(nextResponse);
-          std::cout << std::endl;
-          std::cout << "Deleting next response\n";
-          std::cout << std::endl;
           delete nextResponse;
-          std::cout << std::endl;
-          std::cout << "Deleting finished\n";
-          std::cout << std::endl;
         }
       }
-      std::cout << std::endl;
-      std::cout << "Cleaning up curl handle\n";
-      std::cout << std::endl;
       curl_easy_cleanup(curlHandle);
-      std::cout << std::endl;
-      std::cout << "Curl handle cleaned\n";
-      std::cout << std::endl;
     }
-    std::cout << std::endl;
-    std::cout << "Exiting for\n";
-    std::cout << std::endl;
   }
 
   if (firstResponse != NULL) {
-    std::cout << std::endl;
-    std::cout << "Preparing to parse to string\n";
-    std::cout << std::endl;
     response = firstResponse->toString();
-    std::cout << "Parsing to string\n";
-    std::cout << std::endl;
     delete firstResponse;
   }
-
-  std::cout << std::endl;
-  std::cout << "Returning response\n";
   return response;
 }
 
