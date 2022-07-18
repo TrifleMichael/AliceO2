@@ -267,28 +267,36 @@ void CCDBResponse::latest()
 // Concatenates other response into this response according to browse
 void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 {
-    auto start = std::chrono::high_resolution_clock::now();
-    browse();
-    other->browse();
-    std::vector<bool> toBeRemoved(other->objectNum, false);
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    std::cout << std::endl;
-    std::cout << "Two browses duration: " << duration.count() << std::endl;
+    // auto start = std::chrono::high_resolution_clock::now();
+    // browse();
+    // other->browse();
+    // auto stop = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    // std::cout << std::endl;
+    // std::cout << "Two browses duration: " << duration.count() << std::endl;
 
     std::cout << std::endl;
     std::cout << "This objectNum " << objectNum << ". That object num: " << other->objectNum << std::endl;
     std::cout << std::endl;
 
     auto start1 = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < objectNum; i++) {
-        for (int j = 0; j < other->objectNum; j++) {
-            if (getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
-            {
-                toBeRemoved[j] = true;
-            }
+    std::vector<bool> toBeRemoved(other->objectNum, false);
+    for(int i = 0; i < other->objectNum; i++)
+    {
+        std::string id = other->getStringAttribute(i, "id");
+        if (idHashmap.find(id) != idHashmap.end() && idHashmap[id].compare(id) == 0)
+        {
+            toBeRemoved[i] = true;
         }
     }
+    // for (int i = 0; i < objectNum; i++) {
+    //     for (int j = 0; j < other->objectNum; j++) {
+    //         if (getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
+    //         {
+    //             toBeRemoved[j] = true;
+    //         }
+    //     }
+    // }
     auto stop1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(stop1 - start1);
     std::cout << std::endl;
