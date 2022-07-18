@@ -34,8 +34,7 @@ class CCDBResponse
   char* toString();
   int objectNum;
   std::unordered_map<std::string, std::string> idHashmap;
-
-  //void printObjectAttributes(rapidjson::Document *document);
+  void refreshIdHashmap();
 
   void removeObject(rapidjson::Document *document, int ind);
   int countObjects();
@@ -43,8 +42,6 @@ class CCDBResponse
 
   std::string getStringAttribute(int ind, std::string attributeName);
   long getLongAttribute(int ind, std::string attributeName);
-  void browse();
-  void latest();
   void latestFromTwoServers(CCDBResponse* other);
   void browseFromTwoServers(CCDBResponse* other);
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);

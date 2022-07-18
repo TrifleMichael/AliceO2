@@ -27,7 +27,11 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
   std::cout << std::endl;
   std::cout << "Parsing and counting objects: " << duration.count() << std::endl;
 
-  
+  refreshIdHashmap();
+}
+
+void CCDBResponse::refreshIdHashmap()
+{ 
   auto start2 = std::chrono::high_resolution_clock::now();  
   for(int i = 0; i < objectNum; i++)
   {
@@ -38,6 +42,7 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
   auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
   std::cout << std::endl;
   std::cout << "Filling idHashmap: " << duration2.count() << std::endl;
+
 }
 
 char* CCDBResponse::JsonToString(rapidjson::Document *document)
@@ -53,24 +58,6 @@ char* CCDBResponse::toString()
 {
   return JsonToString(&document);
 }
-
-// void CCDBResponse::printObjectAttributes(rapidjson::Document *document)
-// {
-//     auto objectsArray = (*document)["objects"].GetArray();
-//     if (objectsArray.Size() > 0) {
-//         for (rapidjson::Value::ConstValueIterator object = objectsArray.begin(); object != objectsArray.end(); object++) { // over objects
-            
-//             for (rapidjson::Value::ConstMemberIterator entry = object->MemberBegin(); entry != object->MemberEnd(); entry++) { // over attributes
-//                 auto& value = entry->value;
-//                 auto name = entry->name.GetString();
-//                 if (value.IsString()) {
-//                     std::cout << name << " " << value.GetString() << std::endl;
-//                 }
-//             }
-
-//         }
-//     }
-// }
 
 void CCDBResponse::removeObject(rapidjson::Document *document, int ind)
 {
@@ -146,15 +133,12 @@ bool CCDBResponse::mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &s
 // Removes objects at indexes holding "true" value in the toBeRemoved vector.
 void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved)
 {
-//   int objectsIndex = 0;
-//   int length = (*document)["objects"].GetArray().Size();
-//   for (int removedListIndex = 0; removedListIndex < length; removedListIndex++) {
-//     if (toBeRemoved[removedListIndex]) {
-//       removeObject(document, objectsIndex);      
-//     } else {
-//       objectsIndex++;
-//     }
-//   }
+  int count = 0;
+  for(int i = 0; i < toBeRemoved.size(); i++)
+  {
+    if (toBeRemoved[i]) count++;
+  }
+  std::cout << "\n\nTo be removed count: " << count << std::endl;
 
   auto start = std::chrono::high_resolution_clock::now();
   rapidjson::Value& objects = (*document)["objects"];
@@ -162,11 +146,11 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
     int i = 1;
     rapidjson::Value::ConstValueIterator pastObject = objects.Begin();
     rapidjson::Value::ConstValueIterator nextObject = pastObject + 1;
-    while (nextObject != objects.End())
+    while (pastObject != objects.End() && nextObject != objects.End())
     {
         if (toBeRemoved[i]) {
             objects.Erase(nextObject);
-            nextObject = pastObject + 1; // What if last was removed in line above?
+            nextObject = pastObject + 1;
             objectNum -= 1;
         } else {
             pastObject++;
@@ -178,6 +162,7 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
   if (toBeRemoved[0])
   {
     objects.Erase(objects.Begin());
+    objectNum -= 1;
   }
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
@@ -188,7 +173,6 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
 // Returns string attribute of object at a given index
 std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 {
-    //auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
     if ( objectNum <= ind )
     {
@@ -196,8 +180,6 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
     }
     else
     {
-        // std::string arg = objArray[ind][attrNameChar].GetString();
-        // return arg;
         return document["objects"][ind][attrNameChar].GetString();
     }
     return "";
@@ -205,76 +187,22 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 
 long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
 {
-    // auto objArray = document["objects"].GetArray();
     const char* attrNameChar = attributeName.c_str();
     if ( objectNum <= ind )
     {
-        // needs proper error handleing
+        // needs proper error handling
         return -9999;
     }
     else
     {
-        // long attr = objArray[ind][attrNameChar].GetUint64();
-        // return attr;
         return document["objects"][ind][attrNameChar].GetUint64();
     }
     return -9999;
 }
 
-// Removes elements according to browse
-void CCDBResponse::browse()
-{
-  auto objArray = document["objects"].GetArray(); // what about subfolders
-  int length = objArray.Size();
-  std::vector<bool> toBeRemoved(length, false);
-
-  for (int i = 0; i < length; i++) {
-    for (int j = i + 1; j < length; j++) {
-      if (getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0) {
-        toBeRemoved[j] = true;
-      }
-    }
-  }
-  removeObjects(&document, toBeRemoved);
-}
-
-// Removes elements according to latest
-// Assumes document contains response from only one server
-void CCDBResponse::latest()
-{
-    browse();
-
-    auto objArray = document["objects"].GetArray(); // what about subfolders
-    int length = objArray.Size();    
-    std::vector<bool> toBeRemoved(length, false);
-
-    for (int i = 0; i < length; i++)
-    {
-        for (int j = i + 1; j < length; j++)
-        {
-            if (getStringAttribute(i, "path").compare(getStringAttribute(j, "path")) == 0)
-            {
-                if (getLongAttribute(i, "createTime") > getLongAttribute(j, "createTime"))
-                    toBeRemoved[j] = true;
-                else
-                    toBeRemoved[i] = true;
-            }
-        }
-    }    
-    removeObjects(&document, toBeRemoved);
-}
-
 // Concatenates other response into this response according to browse
 void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 {
-    // auto start = std::chrono::high_resolution_clock::now();
-    // browse();
-    // other->browse();
-    // auto stop = std::chrono::high_resolution_clock::now();
-    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    // std::cout << std::endl;
-    // std::cout << "Two browses duration: " << duration.count() << std::endl;
-
     std::cout << std::endl;
     std::cout << "This objectNum " << objectNum << ". That object num: " << other->objectNum << std::endl;
     std::cout << std::endl;
@@ -289,14 +217,6 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
             toBeRemoved[i] = true;
         }
     }
-    // for (int i = 0; i < objectNum; i++) {
-    //     for (int j = 0; j < other->objectNum; j++) {
-    //         if (getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
-    //         {
-    //             toBeRemoved[j] = true;
-    //         }
-    //     }
-    // }
     auto stop1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(stop1 - start1);
     std::cout << std::endl;
@@ -314,10 +234,9 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 }
 
 // Concatenates other response into this response according to latest
+// NEEDS UPDATING
 void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 {
-    latest();
-    other->latest();
     std::vector<bool> toBeRemoved(other->objectNum, false);
 
     for (int i = 0; i < objectNum; i++) {
