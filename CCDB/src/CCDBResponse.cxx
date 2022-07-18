@@ -25,7 +25,19 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
   std::cout << std::endl;
-  std::cout << "CURL duration: " << duration.count() << std::endl;
+  std::cout << "Parsing and counting objects: " << duration.count() << std::endl;
+
+  
+  auto start2 = std::chrono::high_resolution_clock::now();  
+  for(int i = 0; i < objectNum; i++)
+  {
+    std::string id = getStringAttribute(i, "id");
+    idHashmap[id] = id;
+  }
+  auto stop2 = std::chrono::high_resolution_clock::now();
+  auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
+  std::cout << std::endl;
+  std::cout << "Filling idHashmap: " << duration2.count() << std::endl;
 }
 
 char* CCDBResponse::JsonToString(rapidjson::Document *document)

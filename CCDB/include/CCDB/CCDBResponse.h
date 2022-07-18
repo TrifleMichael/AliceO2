@@ -16,6 +16,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include "rapidjson/document.h"
 
 namespace o2
@@ -32,6 +33,7 @@ class CCDBResponse
   char* JsonToString(rapidjson::Document *document);
   char* toString();
   int objectNum;
+  std::unordered_map<std::string, std::string> idHashmap;
 
   //void printObjectAttributes(rapidjson::Document *document);
 
