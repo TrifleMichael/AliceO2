@@ -59,7 +59,7 @@ using namespace o2::ccdb;
 //   CCDBResponse ccdbResponse1(*responseAsStr);
 //   ccdbResponse1.latest();
 //   CCDBResponse ccdbResponse2(*responseAsStr);
-//   ccdbResponse1.browseFromTwoServers(&ccdbResponse2);
+//   ccdbResponse1.browseAndMerge(&ccdbResponse2);
 //   BOOST_CHECK(ccdbResponse1.countObjects() == 3);
 // }
 

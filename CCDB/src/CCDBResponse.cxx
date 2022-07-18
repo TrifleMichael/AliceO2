@@ -30,6 +30,20 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
   refreshIdHashmap();
 }
 
+void CCDBResponse::refreshPathHashmap()
+{ 
+  auto start2 = std::chrono::high_resolution_clock::now();  
+  for(int i = 0; i < objectNum; i++)
+  {
+    std::string path = getStringAttribute(i, "path");
+    pathHashmap[path] = path;
+  }
+  auto stop2 = std::chrono::high_resolution_clock::now();
+  auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
+  std::cout << std::endl;
+  std::cout << "Filling pathHashmap: " << duration2.count() << std::endl;
+}
+
 void CCDBResponse::refreshIdHashmap()
 { 
   auto start2 = std::chrono::high_resolution_clock::now();  
@@ -42,7 +56,6 @@ void CCDBResponse::refreshIdHashmap()
   auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
   std::cout << std::endl;
   std::cout << "Filling idHashmap: " << duration2.count() << std::endl;
-
 }
 
 char* CCDBResponse::JsonToString(rapidjson::Document *document)
@@ -200,8 +213,7 @@ long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
     return -9999;
 }
 
-// Concatenates other response into this response according to browse
-void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
+void CCDBResponse::browse(CCDBResponse* other)
 {
     std::cout << std::endl;
     std::cout << "This objectNum " << objectNum << ". That object num: " << other->objectNum << std::endl;
@@ -223,7 +235,12 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
     std::cout << "To remove create duration: " << duration1.count() << std::endl;
 
     removeObjects(other->getDocument(), toBeRemoved);
+}
 
+// Concatenates other response into this response according to browse
+void CCDBResponse::browseAndMerge(CCDBResponse* other)
+{
+    browse(other);
     auto start2 = std::chrono::high_resolution_clock::now();
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
     auto stop2 = std::chrono::high_resolution_clock::now();
@@ -237,17 +254,29 @@ void CCDBResponse::browseFromTwoServers(CCDBResponse* other)
 // NEEDS UPDATING
 void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 {
-    std::vector<bool> toBeRemoved(other->objectNum, false);
+    browse(other);
+    refreshPathHashmap();
+    other->refreshPathHashmap();
 
-    for (int i = 0; i < objectNum; i++) {
-        for (int j = 0; j < other->objectNum; j++) {
-            if (getStringAttribute(i, "path").compare(other->getStringAttribute(j, "path")) == 0 
-                || getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
-            {
-                toBeRemoved[j] = true;
-            }
+    std::vector<bool> toBeRemoved(other->objectNum, false);
+    for(int i = 0; i < other->objectNum; i++)
+    {
+        std::string path = other->getStringAttribute(i, "path");
+        if (pathHashmap.find(path) != pathHashmap.end() && pathHashmap[path].compare( other->pathHashmap[path] ) == 0)
+        {
+            toBeRemoved[i] = true;
         }
     }
+
+    // for (int i = 0; i < objectNum; i++) {
+    //     for (int j = 0; j < other->objectNum; j++) {
+    //         if (getStringAttribute(i, "path").compare(other->getStringAttribute(j, "path")) == 0 
+    //             || getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
+    //         {
+    //             toBeRemoved[j] = true;
+    //         }
+    //     }
+    // }
 
     removeObjects(other->getDocument(), toBeRemoved);
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
