@@ -102,23 +102,6 @@ struct test_fixture {
   map<string, string> metadata;
 };
 
-BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
-{
-  std::cout << "\n\nBrowse test start\n\n";
-  CcdbApi api;
-  string url = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
-  api.init(url);
-  char* response = api.browse();
-  BOOST_CHECK(response != NULL);
-  std::cout << std::endl;
-  std::cout << "Browse response:\n";
-  std::cout << std::endl;
-  //std::cout << response << std::endl;
-  std::cout << std::endl;
-  std::cout << "End of response" << std::endl;
-  BOOST_CHECK_EQUAL(1, 2); // mock to see response
-}
-
 BOOST_AUTO_TEST_CASE(CCDBResponseLatest)
 {
   std::cout << "\n\nLatest test start\n\n";
@@ -130,7 +113,24 @@ BOOST_AUTO_TEST_CASE(CCDBResponseLatest)
   std::cout << std::endl;
   std::cout << "Latest response:\n";
   std::cout << std::endl;
-  //std::cout << response << std::endl;
+  std::cout << response << std::endl;
+  std::cout << std::endl;
+  std::cout << "End of response" << std::endl;
+  //BOOST_CHECK_EQUAL(1, 2); // mock to see response
+}
+
+BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
+{
+  std::cout << "\n\nBrowse test start\n\n";
+  CcdbApi api;
+  string url = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
+  api.init(url);
+  char* response = api.browse();
+  BOOST_CHECK(response != NULL);
+  std::cout << std::endl;
+  std::cout << "Browse response:\n";
+  std::cout << std::endl;
+  std::cout << response << std::endl;
   std::cout << std::endl;
   std::cout << "End of response" << std::endl;
   BOOST_CHECK_EQUAL(1, 2); // mock to see response

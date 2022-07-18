@@ -27,6 +27,7 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
   std::cout << std::endl;
   std::cout << "Parsing and counting objects: " << duration.count() << std::endl;
 
+  std::cout << "\n\nObjects just after parsing: " << objectNum << std::endl;
   refreshIdHashmap();
 }
 
@@ -251,10 +252,10 @@ void CCDBResponse::browseAndMerge(CCDBResponse* other)
 }
 
 // Concatenates other response into this response according to latest
-// NEEDS UPDATING
 void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
 {
     browse(other);
+    other->objectNum = other->countObjects();
     refreshPathHashmap();
     other->refreshPathHashmap();
 
@@ -267,16 +268,6 @@ void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
             toBeRemoved[i] = true;
         }
     }
-
-    // for (int i = 0; i < objectNum; i++) {
-    //     for (int j = 0; j < other->objectNum; j++) {
-    //         if (getStringAttribute(i, "path").compare(other->getStringAttribute(j, "path")) == 0 
-    //             || getStringAttribute(i, "id").compare(getStringAttribute(j, "id")) == 0)
-    //         {
-    //             toBeRemoved[j] = true;
-    //         }
-    //     }
-    // }
 
     removeObjects(other->getDocument(), toBeRemoved);
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
