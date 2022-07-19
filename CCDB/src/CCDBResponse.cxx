@@ -19,44 +19,27 @@ namespace ccdb
 
 CCDBResponse::CCDBResponse(const std::string& jsonString)
 {
-  auto start = std::chrono::high_resolution_clock::now();
   document.Parse(jsonString.c_str());
   objectNum = countObjects();
-  auto stop = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-  std::cout << std::endl;
-  std::cout << "Parsing and counting objects: " << duration.count() << std::endl;
-
-  std::cout << "\n\nObjects just after parsing: " << objectNum << std::endl;
   refreshIdHashmap();
 }
 
 void CCDBResponse::refreshPathHashmap()
 { 
-  auto start2 = std::chrono::high_resolution_clock::now();  
   for(int i = 0; i < objectNum; i++)
   {
     std::string path = getStringAttribute(i, "path");
     pathHashmap[path] = path;
   }
-  auto stop2 = std::chrono::high_resolution_clock::now();
-  auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
-  std::cout << std::endl;
-  std::cout << "Filling pathHashmap: " << duration2.count() << std::endl;
 }
 
 void CCDBResponse::refreshIdHashmap()
 { 
-  auto start2 = std::chrono::high_resolution_clock::now();  
   for(int i = 0; i < objectNum; i++)
   {
     std::string id = getStringAttribute(i, "id");
     idHashmap[id] = id;
   }
-  auto stop2 = std::chrono::high_resolution_clock::now();
-  auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
-  std::cout << std::endl;
-  std::cout << "Filling idHashmap: " << duration2.count() << std::endl;
 }
 
 char* CCDBResponse::JsonToString(rapidjson::Document *document)
@@ -154,7 +137,6 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
   }
   std::cout << "\n\nTo be removed count: " << count << std::endl;
 
-  auto start = std::chrono::high_resolution_clock::now();
   rapidjson::Value& objects = (*document)["objects"];
   if (objects.Size() > 1) {
     int i = 1;
@@ -178,10 +160,6 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
     objects.Erase(objects.Begin());
     objectNum -= 1;
   }
-  auto stop = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-  std::cout << std::endl;
-  std::cout << "Remove objects duration: " << duration.count() << std::endl;
 }
 
 // Returns string attribute of object at a given index
@@ -216,10 +194,6 @@ long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
 
 void CCDBResponse::browse(CCDBResponse* other)
 {
-    std::cout << std::endl;
-    std::cout << "This objectNum " << objectNum << ". That object num: " << other->objectNum << std::endl;
-    std::cout << std::endl;
-
     auto start1 = std::chrono::high_resolution_clock::now();
     std::vector<bool> toBeRemoved(other->objectNum, false);
     for(int i = 0; i < other->objectNum; i++)
@@ -230,11 +204,6 @@ void CCDBResponse::browse(CCDBResponse* other)
             toBeRemoved[i] = true;
         }
     }
-    auto stop1 = std::chrono::high_resolution_clock::now();
-    auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(stop1 - start1);
-    std::cout << std::endl;
-    std::cout << "To remove create duration: " << duration1.count() << std::endl;
-
     removeObjects(other->getDocument(), toBeRemoved);
 }
 
@@ -242,12 +211,7 @@ void CCDBResponse::browse(CCDBResponse* other)
 void CCDBResponse::browseAndMerge(CCDBResponse* other)
 {
     browse(other);
-    auto start2 = std::chrono::high_resolution_clock::now();
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
-    auto stop2 = std::chrono::high_resolution_clock::now();
-    auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
-    std::cout << std::endl;
-    std::cout << "Merge objects duration: " << duration2.count() << std::endl;
     objectNum = countObjects();
 }
 

@@ -1680,8 +1680,6 @@ char* CcdbApi::browse()
 
   for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
     
-    auto start = std::chrono::high_resolution_clock::now();
-
     // Setting up CURL
     CURL* curlHandle;
     curlHandle = curl_easy_init();
@@ -1700,10 +1698,6 @@ char* CcdbApi::browse()
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       curlResultCode = curl_easy_perform(curlHandle);
-      auto stop = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-      std::cout << std::endl;
-      std::cout << "CURL duration: " << duration.count() << std::endl;
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
@@ -1733,8 +1727,6 @@ char* CcdbApi::latest()
   CCDBResponse* firstResponse = NULL;
 
   for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
-    
-    auto start = std::chrono::high_resolution_clock::now();
 
     // Setting up CURL
     CURL* curlHandle;
@@ -1754,11 +1746,6 @@ char* CcdbApi::latest()
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       curlResultCode = curl_easy_perform(curlHandle);
-      auto stop = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-      std::cout << std::endl;
-      std::cout << "CURL duration: " << duration.count() << std::endl;
-
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
