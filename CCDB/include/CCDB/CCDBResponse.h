@@ -16,6 +16,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include "rapidjson/document.h"
 
 namespace o2
@@ -31,8 +32,13 @@ class CCDBResponse
 
   char* JsonToString(rapidjson::Document *document);
   char* toString();
+  int objectNum;
+  std::unordered_map<std::string, std::string> idHashmap;
+  std::unordered_map<std::string, std::string> pathHashmap;
+  void refreshIdHashmap();
+  void refreshPathHashmap();
 
-  //void printObjectAttributes(rapidjson::Document *document);
+  void browse(CCDBResponse* other);
 
   void removeObject(rapidjson::Document *document, int ind);
   int countObjects();
@@ -40,16 +46,12 @@ class CCDBResponse
 
   std::string getStringAttribute(int ind, std::string attributeName);
   long getLongAttribute(int ind, std::string attributeName);
-  void browse();
-  void latest();
   void latestFromTwoServers(CCDBResponse* other);
-  void browseFromTwoServers(CCDBResponse* other);
+  void browseAndMerge(CCDBResponse* other);
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
   rapidjson::Document *getDocument();
   std::string sanitizeObjectName(const std::string& objectName);
   rapidjson::Document document; // should be moved to private
-
-  // UNCOMMENT SUBFOLDERS AND PARSE SUBFOLDERS IN CCDBAPI
 
  private:
 

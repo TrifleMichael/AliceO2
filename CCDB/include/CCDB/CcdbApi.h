@@ -441,6 +441,7 @@ class CcdbApi //: public DatabaseInterface
 
 
   char* browse();
+  char* latest();
 
  private:
   /**

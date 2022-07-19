@@ -44,6 +44,7 @@
 #include <boost/interprocess/sync/named_semaphore.hpp>
 #include <regex>
 #include <cstdio>
+#include <chrono> // debug and optimization
 
 namespace o2::ccdb
 {
@@ -1672,28 +1673,14 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
-// // same as one of above write functions
-// size_t writeToResponse(void* buffer, size_t size, size_t nmemb, std::string* userp)
-// {
-//   size_t newLength = size * nmemb;
-//   size_t oldLength = userp->size();
-//   try {
-//     userp->resize(oldLength + newLength);
-//   } catch (std::bad_alloc& e) {
-//     LOG(error) << "memory error when getting data from CCDB";
-//     return 0;
-//   }
-
-//   std::copy((char*)buffer, (char*)buffer + newLength, userp->begin() + oldLength);
-//   return size * nmemb;
-// }
-
 char* CcdbApi::browse()
 {
   char* response = NULL;
   CCDBResponse* firstResponse = NULL;
 
   for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
+    
+    auto start = std::chrono::high_resolution_clock::now();
 
     // Setting up CURL
     CURL* curlHandle;
@@ -1713,7 +1700,10 @@ char* CcdbApi::browse()
       curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       curlResultCode = curl_easy_perform(curlHandle);
-
+      auto stop = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+      std::cout << std::endl;
+      std::cout << "CURL duration: " << duration.count() << std::endl;
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
@@ -1722,7 +1712,61 @@ char* CcdbApi::browse()
           firstResponse = new CCDBResponse(result);
         } else {
           CCDBResponse* nextResponse = new CCDBResponse(result);
-          firstResponse->browseFromTwoServers(nextResponse);
+          firstResponse->browseAndMerge(nextResponse);
+          delete nextResponse;
+        }
+      }
+      curl_easy_cleanup(curlHandle);
+    }
+  }
+
+  if (firstResponse != NULL) {
+    response = firstResponse->toString();
+    delete firstResponse;
+  }
+  return response;
+}
+
+char* CcdbApi::latest()
+{
+  char* response = NULL;
+  CCDBResponse* firstResponse = NULL;
+
+  for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
+    
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Setting up CURL
+    CURL* curlHandle;
+    curlHandle = curl_easy_init();
+    long responseCode = 0;
+    CURLcode curlResultCode = CURL_LAST;
+    std::string result;
+
+    curlSetSSLOptions(curlHandle);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
+
+    if (curlHandle != NULL) {
+
+      // Connecting to host
+      string fullUrl = hostsPool.at(hostIndex) + "/latest/TPC/.*?Accept=application/json";
+      curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
+
+      curlResultCode = curl_easy_perform(curlHandle);
+      auto stop = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+      std::cout << std::endl;
+      std::cout << "CURL duration: " << duration.count() << std::endl;
+
+      if (curlResultCode != CURLE_OK) {
+        LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
+      } else {
+        if (firstResponse == NULL) {
+          firstResponse = new CCDBResponse(result);
+        } else {
+          CCDBResponse* nextResponse = new CCDBResponse(result);
+          firstResponse->latestFromTwoServers(nextResponse);
           delete nextResponse;
         }
       }
