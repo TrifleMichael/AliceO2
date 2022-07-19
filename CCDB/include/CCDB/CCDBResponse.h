@@ -46,7 +46,7 @@ class CCDBResponse
 
   std::string getStringAttribute(int ind, std::string attributeName);
   long getLongAttribute(int ind, std::string attributeName);
-  void latestFromTwoServers(CCDBResponse* other);
+  void latestAndMerge(CCDBResponse* other);
   void browseAndMerge(CCDBResponse* other);
   void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
   rapidjson::Document *getDocument();

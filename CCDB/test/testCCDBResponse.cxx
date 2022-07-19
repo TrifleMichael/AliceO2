@@ -28,45 +28,49 @@ using namespace o2::ccdb;
 //   return ccdbResponse;
 // }
 
-// BOOST_AUTO_TEST_CASE(TestCCDBResponseFullResponse)
-// {
+BOOST_AUTO_TEST_CASE(TestCCDBResponseParse)
+{
+  std::string* responseString = new std::string(secondFullResponse);
+  CCDBResponse ccdbResponse(*responseString);
+  BOOST_CHECK(ccdbResponse.countObjects() == 3);
+  BOOST_CHECK("407f3a65-4c7b-11ec-8cf8-200114580202" == ccdbResponse.getStringAttribute(0, "id"));
+  BOOST_CHECK("e5183d1a-4c7a-11ec-9d71-7f000001aa8b" == ccdbResponse.getStringAttribute(1, "id"));
+  BOOST_CHECK("52d3f61a-4c6b-11ec-a98e-7f000001aa8b" == ccdbResponse.getStringAttribute(2, "id"));
+}
 
-//   std::string* responseAsStr = new std::string(fullResponse);
-//   CCDBResponse ccdbResponse(*responseAsStr);
+BOOST_AUTO_TEST_CASE(TestCCDBResponseBrowse)
+{
+  std::cout << "\n BROWSE\n";
 
-//   BOOST_CHECK(ccdbResponse.countObjects() == 3); 
-//   if (ccdbResponse.countObjects() == 3)
-//   {
-//     BOOST_CHECK(ccdbResponse.getStringAttribute(0, "id") == "407f3a65-4c7b-11ec-8cf8-200114580202");
-//     BOOST_CHECK(ccdbResponse.getStringAttribute(1, "id") == "e5183d1a-4c7a-11ec-9d71-7f000001aa8b");
-//     BOOST_CHECK(ccdbResponse.getStringAttribute(2, "id") == "52d3f61a-4c6b-11ec-a98e-7f000001aa8b");
-//   }
-//   ccdbResponse.browse();
-//   BOOST_CHECK(ccdbResponse.countObjects() == 3);
-//   ccdbResponse.latest();
-//   BOOST_CHECK(ccdbResponse.countObjects() == 1);
-//   if (ccdbResponse.countObjects() == 1)
-//   {
-//     BOOST_CHECK(ccdbResponse.getLongAttribute(0, "createTime") == 1637685278841);
-//   }
-  
-//   // ADD SUBFOLDER HANDLEING
-// }
+  std::string* firstResponseString = new std::string(firstFullResponse);
+  std::string* secondResponseString = new std::string(secondFullResponse);
+  CCDBResponse firstCcdbResponse(*firstResponseString);
+  CCDBResponse secondCcdbResponse(*secondResponseString);
 
-// BOOST_AUTO_TEST_CASE(TestCCDBResponseConcatenate)
-// {
-//   std::string* responseAsStr = new std::string(fullResponse);
-//   CCDBResponse ccdbResponse1(*responseAsStr);
-//   ccdbResponse1.latest();
-//   CCDBResponse ccdbResponse2(*responseAsStr);
-//   ccdbResponse1.browseAndMerge(&ccdbResponse2);
-//   BOOST_CHECK(ccdbResponse1.countObjects() == 3);
-// }
+  firstCcdbResponse.browseAndMerge(&secondCcdbResponse);
+  BOOST_CHECK(firstCcdbResponse.objectNum == 3);
+  BOOST_CHECK("407f3a65-4c7b-11ec-8cf8-200114580202" == firstCcdbResponse.getStringAttribute(0, "id"));
+  std::cout << "\n Browse first " << firstCcdbResponse.getStringAttribute(0, "id") << "\n";
+  BOOST_CHECK("52d3f61a-4c6b-11ec-a98e-7f000001aa8b" == firstCcdbResponse.getStringAttribute(1, "id"));
+  std::cout << "\n Browse second " << firstCcdbResponse.getStringAttribute(1, "id") << "\n";
+  BOOST_CHECK("e5183d1a-4c7a-11ec-9d71-7f000001aa8b" == firstCcdbResponse.getStringAttribute(2, "id"));
+  std::cout << "\n Browse third " << firstCcdbResponse.getStringAttribute(2, "id") << "\n";
+}
 
-// BOOST_AUTO_TEST_CASE(TestCCDBResponseEmptyResponse)
-// {
+BOOST_AUTO_TEST_CASE(TestCCDBResponseLatest)
+{
+  std::cout << "\n LATEST\n";
+  std::string* firstResponseString = new std::string(firstFullResponse);
+  std::string* secondResponseString = new std::string(secondFullResponse);
+  CCDBResponse firstCcdbResponse(*firstResponseString);
+  CCDBResponse secondCcdbResponse(*secondResponseString);
 
-//   std::string* responseAsStr = new std::string(fullResponse);
-//   CCDBResponse ccdbResponse(*responseAsStr);
-//   BOOST_CHECK(ccdbResponse.countObjects() == 0);
-// }
+  firstCcdbResponse.latestAndMerge(&secondCcdbResponse);
+  BOOST_CHECK(firstCcdbResponse.objectNum == 2);
+  std::cout << "\n Latest object num" << firstCcdbResponse.countObjects() << "\n";
+  BOOST_CHECK("407f3a65-4c7b-11ec-8cf8-200114580202" == firstCcdbResponse.getStringAttribute(0, "id"));
+  std::cout << "\n Latest first " << firstCcdbResponse.getStringAttribute(0, "id") << "\n";
+  BOOST_CHECK("52d3f61a-4c6b-11ec-a98e-7f000001aa8b" == firstCcdbResponse.getStringAttribute(1, "id"));
+  std::cout << "\n Latest second " << firstCcdbResponse.getStringAttribute(1, "id") << "\n";
+  BOOST_CHECK(1 == 2);
+}

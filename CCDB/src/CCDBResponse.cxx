@@ -135,7 +135,6 @@ void CCDBResponse::removeObjects(rapidjson::Document *document, std::vector<bool
   {
     if (toBeRemoved[i]) count++;
   }
-  std::cout << "\n\nTo be removed count: " << count << std::endl;
 
   rapidjson::Value& objects = (*document)["objects"];
   if (objects.Size() > 1) {
@@ -205,6 +204,19 @@ void CCDBResponse::browse(CCDBResponse* other)
         }
     }
     removeObjects(other->getDocument(), toBeRemoved);
+    objectNum = countObjects(); // For testing - probably redundant
+
+    std::cout << "\nThis count after browse in browse: " << countObjects() << ", that count: " << other->countObjects() << "\n";
+    std::cout << "THIS:\n";
+    for(int i = 0; i< countObjects(); i++)
+    {
+        std::cout << "Id: " << getStringAttribute(i, "id") << ", path: " << getStringAttribute(i, "path") << "\n"; 
+    }
+    std::cout << "THAT:\n";
+    for(int i = 0; i< other->countObjects(); i++)
+    {
+        std::cout << "Id: " << other->getStringAttribute(i, "id") << ", path: " << other->getStringAttribute(i, "path") << "\n"; 
+    }
 }
 
 // Concatenates other response into this response according to browse
@@ -216,12 +228,24 @@ void CCDBResponse::browseAndMerge(CCDBResponse* other)
 }
 
 // Concatenates other response into this response according to latest
-void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
+void CCDBResponse::latestAndMerge(CCDBResponse* other)
 {
     browse(other);
     other->objectNum = other->countObjects();
     refreshPathHashmap();
     other->refreshPathHashmap();
+
+    std::cout << "\nThis count after browse in latest: " << countObjects() << ", that count: " << other->countObjects() << "\n";
+    std::cout << "THIS:\n";
+    for(int i = 0; i< countObjects(); i++)
+    {
+        std::cout << "Id: " << getStringAttribute(i, "id") << ", path: " << getStringAttribute(i, "path") << "\n"; 
+    }
+    std::cout << "THAT:\n";
+    for(int i = 0; i< other->countObjects(); i++)
+    {
+        std::cout << "Id: " << other->getStringAttribute(i, "id") << ", path: " << other->getStringAttribute(i, "path") << "\n"; 
+    }
 
     std::vector<bool> toBeRemoved(other->objectNum, false);
     for(int i = 0; i < other->objectNum; i++)
@@ -232,7 +256,6 @@ void CCDBResponse::latestFromTwoServers(CCDBResponse* other)
             toBeRemoved[i] = true;
         }
     }
-
     removeObjects(other->getDocument(), toBeRemoved);
     mergeObjects(document, *(other->getDocument()), document.GetAllocator());
     objectNum = countObjects();

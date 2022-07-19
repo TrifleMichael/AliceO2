@@ -110,13 +110,6 @@ BOOST_AUTO_TEST_CASE(CCDBResponseLatest)
   api.init(url);
   char* response = api.latest();
   BOOST_CHECK(response != NULL);
-  // std::cout << std::endl;
-  // std::cout << "Latest response:\n";
-  // std::cout << std::endl;
-  // std::cout << response << std::endl;
-  // std::cout << std::endl;
-  // std::cout << "End of response" << std::endl;
-  //BOOST_CHECK_EQUAL(1, 2); // mock to see response
 }
 
 BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
@@ -127,13 +120,6 @@ BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
   api.init(url);
   char* response = api.browse();
   BOOST_CHECK(response != NULL);
-  // std::cout << std::endl;
-  // std::cout << "Browse response:\n";
-  // std::cout << std::endl;
-  // std::cout << response << std::endl;
-  // std::cout << std::endl;
-  // std::cout << "End of response" << std::endl;
-  //BOOST_CHECK_EQUAL(1, 2); // mock to see response
 }
 
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))
