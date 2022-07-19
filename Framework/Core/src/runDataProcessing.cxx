@@ -696,14 +696,16 @@ void handle_crash(int /* sig */)
   {
     char const* msg = "*** Segmentation fault (O2)\nBacktrace:\n";
     int len = strlen(msg); /* the byte length of the string */
-    (void)write(STDERR_FILENO, msg, len);
+    auto retVal = write(STDERR_FILENO, msg, len);
+    (void)retVal;
   }
   demangled_backtrace_symbols(array, size, STDERR_FILENO);
   {
     char const* msg = "Backtrace complete.\n";
     int len = strlen(msg); /* the byte length of the string */
 
-    (void)write(STDERR_FILENO, msg, len);
+    auto retVal = write(STDERR_FILENO, msg, len);
+    (void)retVal;
     fsync(STDERR_FILENO);
   }
   _exit(1);
@@ -1478,7 +1480,7 @@ int runStateMachine(DataProcessorSpecs const& workflow,
       case DriverState::MATERIALISE_WORKFLOW:
         try {
           auto workflowState = WorkflowHelpers::verifyWorkflow(workflow);
-          if (driverInfo.batch == true && !varmap["dds"].as<bool>() && !varmap["dump-workflow"].as<bool>() && workflowState == WorkflowParsingState::Empty) {
+          if (driverInfo.batch == true && varmap["dds"].as<std::string>().empty() && !varmap["dump-workflow"].as<bool>() && workflowState == WorkflowParsingState::Empty) {
             LOGP(error, "Empty workflow provided while running in batch mode.");
             return 1;
           }
@@ -2228,17 +2230,23 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
       DriverState::IMPORT_CURRENT_WORKFLOW, //
       DriverState::MATERIALISE_WORKFLOW     //
     };
-  } else if (varmap["dds"].as<bool>()) {
+  } else if (!varmap["dds"].as<std::string>().empty()) {
     // Dump a DDS representation of what I will do.
     // Notice that compared to DDS we need to schedule things,
     // because DDS needs to be able to have actual Executions in
     // order to provide a correct configuration.
-    control.callbacks = {[workflowSuffix = varmap["dds-workflow-suffix"]](WorkflowSpec const&,
+    control.callbacks = {[filename = varmap["dds"].as<std::string>(),
+                          workflowSuffix = varmap["dds-workflow-suffix"]](WorkflowSpec const& workflow,
                                                                           DeviceSpecs const& specs,
                                                                           DeviceExecutions const& executions,
-                                                                          DataProcessorInfos&,
+                                                                          DataProcessorInfos& dataProcessorInfos,
                                                                           CommandInfo const& commandInfo) {
-      dumpDeviceSpec2DDS(std::cout, workflowSuffix.as<std::string>(), specs, executions, commandInfo);
+      if (filename == "-") {
+        DDSConfigHelpers::dumpDeviceSpec2DDS(std::cout, workflowSuffix.as<std::string>(), workflow, dataProcessorInfos, specs, executions, commandInfo);
+      } else {
+        std::ofstream out(filename);
+        DDSConfigHelpers::dumpDeviceSpec2DDS(out, workflowSuffix.as<std::string>(), workflow, dataProcessorInfos, specs, executions, commandInfo);
+      }
     }};
     control.forcedTransitions = {
       DriverState::EXIT,                    //
@@ -2425,8 +2433,8 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
     ("quiet,q", bpo::value<bool>()->zero_tokens()->default_value(false), "quiet operation")                                                                            //                                                                                                         //
     ("stop,s", bpo::value<bool>()->zero_tokens()->default_value(false), "stop before device start")                                                                    //                                                                                                           //
     ("single-step", bpo::value<bool>()->zero_tokens()->default_value(false), "start in single step mode")                                                              //                                                                                                             //
-    ("batch,b", bpo::value<bool>()->zero_tokens()->default_value(isatty(fileno(stdout)) == 0), "batch processing mode")                                                //                                                                                                               //
-    ("no-batch", bpo::value<bool>()->zero_tokens()->default_value(false), "force gui processing mode")                                                                 //                                                                                                            //
+    ("batch,b", bpo::value<std::vector<std::string>>()->zero_tokens()->composing(), "batch processing mode")                                                           //                                                                                                               //
+    ("no-batch", bpo::value<bool>()->zero_tokens(), "force gui processing mode")                                                                                       //                                                                                                            //
     ("no-cleanup", bpo::value<bool>()->zero_tokens()->default_value(false), "do not cleanup the shm segment")                                                          //                                                                                                               //
     ("hostname", bpo::value<std::string>()->default_value("localhost"), "hostname to deploy")                                                                          //                                                                                                                 //
     ("resources", bpo::value<std::string>()->default_value(""), "resources allocated for the workflow")                                                                //                                                                                                                   //
@@ -2441,7 +2449,7 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
     ("graphviz,g", bpo::value<bool>()->zero_tokens()->default_value(false), "produce graphviz output")                                                                 //                                                                                                                              //
     ("mermaid", bpo::value<std::string>()->default_value(""), "produce graph output in mermaid format in file under specified name or on stdout if argument is \"-\"") //                                                                                                                              //
     ("timeout,t", bpo::value<uint64_t>()->default_value(0), "forced exit timeout (in seconds)")                                                                        //                                                                                                                                //
-    ("dds,D", bpo::value<bool>()->zero_tokens()->default_value(false), "create DDS configuration")                                                                     //                                                                                                                                  //
+    ("dds,D", bpo::value<std::string>()->default_value(""), "create DDS configuration")                                                                                //                                                                                                                                  //
     ("dds-workflow-suffix,D", bpo::value<std::string>()->default_value(""), "suffix for DDS names")                                                                    //                                                                                                                                  //
     ("dump-workflow,dump", bpo::value<bool>()->zero_tokens()->default_value(false), "dump workflow as JSON")                                                           //                                                                                                                                    //
     ("dump-workflow-file", bpo::value<std::string>()->default_value("-"), "file to which do the dump")                                                                 //                                                                                                                                      //
@@ -2692,6 +2700,21 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
   DriverControl driverControl;
   initialiseDriverControl(varmap, driverControl);
 
+  auto evaluateBatchOption = [&varmap]() -> bool {
+    if (varmap.count("no-batch") > 0) {
+      return false;
+    }
+    if (varmap.count("batch") == 0) {
+      // default value
+      return isatty(fileno(stdout)) == 0;
+    }
+    // FIXME: should actually use the last value, but for some reason the
+    // values are not filled into the vector, even if specifying `-b true`
+    // need to find out why the boost program options example is not working
+    // in our case. Might depend on the parser options
+    //auto value = varmap["batch"].as<std::vector<std::string>>();
+    return true;
+  };
   DriverInfo driverInfo{
     .sendingPolicies = sendingPolicies,
     .callbacksPolicies = callbacksPolicies};
@@ -2704,7 +2727,7 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
   driverInfo.resourcePolicies = resourcePolicies;
   driverInfo.argc = argc;
   driverInfo.argv = argv;
-  driverInfo.batch = varmap["no-batch"].defaulted() ? varmap["batch"].as<bool>() : false;
+  driverInfo.batch = evaluateBatchOption();
   driverInfo.noSHMCleanup = varmap["no-cleanup"].as<bool>();
   driverInfo.processingPolicies.termination = varmap["completion-policy"].as<TerminationPolicy>();
   driverInfo.processingPolicies.earlyForward = varmap["early-forward-policy"].as<EarlyForwardPolicy>();

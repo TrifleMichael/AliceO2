@@ -54,7 +54,6 @@
 #include "TPCPadGainCalib.h"
 #include "TPCZSLinkMapping.h"
 #include "display/GPUDisplayInterface.h"
-#include "DataFormatsParameters/GRPObject.h"
 #include "TPCBase/Sector.h"
 #include "TPCBase/Utils.h"
 #include "TPCBase/CDBInterface.h"
@@ -329,8 +328,7 @@ void GPURecoWorkflowSpec::run(ProcessingContext& pc)
   mTimer->Start(false);
 
   GRPGeomHelper::instance().checkUpdates(pc);
-  const auto grp = o2::parameters::GRPObject::loadFrom();
-  if (mConfParam->tpcTriggeredMode ^ !grp->isDetContinuousReadOut(o2::detectors::DetID::TPC)) {
+  if (mConfParam->tpcTriggeredMode ^ !GRPGeomHelper::instance().getGRPECS()->isDetContinuousReadOut(o2::detectors::DetID::TPC)) {
     LOG(fatal) << "configKeyValue tpcTriggeredMode does not match GRP isDetContinuousReadOut(TPC) setting";
   }
 
@@ -422,7 +420,7 @@ void GPURecoWorkflowSpec::run(ProcessingContext& pc)
       }
       int rawcru = rdh_utils::getCRU(ptr);
       int rawendpoint = rdh_utils::getEndPoint(ptr);
-      if (o2::raw::RDHUtils::getDetectorField(ptr) == 2) {
+      if ((rdh_utils::getLink(ptr) == rdh_utils::UserLogicLinkID || rdh_utils::getLink(ptr) == rdh_utils::ILBZSLinkID) && o2::raw::RDHUtils::getDetectorField(ptr) == 2) {
         tpcZSmetaPointers[rawcru / 10][(rawcru % 10) * 2 + rawendpoint].emplace_back(ptr);
         tpcZSmetaSizes[rawcru / 10][(rawcru % 10) * 2 + rawendpoint].emplace_back(count);
       }
@@ -596,7 +594,6 @@ void GPURecoWorkflowSpec::run(ProcessingContext& pc)
   mTFSettings->hasNHBFPerTF = 1;
   mTFSettings->nHBFPerTF = GRPGeomHelper::instance().getGRPECS()->getNHBFPerTF();
   mTFSettings->hasRunStartOrbit = 0;
-  // mTFSettings->runStartOrbit = grp->getFirstOrbit();
   if (mVerbosity) {
     LOG(info) << "TF firstTForbit " << mTFSettings->tfStartOrbit << " nHBF " << mTFSettings->nHBFPerTF << " runStartOrbit " << mTFSettings->runStartOrbit << " simStartOrbit " << mTFSettings->simStartOrbit;
   }

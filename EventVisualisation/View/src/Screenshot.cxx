@@ -117,7 +117,7 @@ TASImage* Screenshot::ScaleImage(TASImage* image, UInt_t desiredWidth, UInt_t de
   return scaledImage;
 }
 
-void Screenshot::perform(o2::detectors::DetID::mask_t detectorsMask, int runNumber, int firstTForbit, std::string collisionTime)
+void Screenshot::perform(std::string fileName, o2::detectors::DetID::mask_t detectorsMask, int runNumber, int firstTFOrbit, std::string collisionTime)
 {
   TEnv settings;
   ConfigurationManager::getInstance().getConfig(settings);
@@ -138,6 +138,15 @@ void Screenshot::perform(o2::detectors::DetID::mask_t detectorsMask, int runNumb
   std::strftime(time_str, sizeof(time_str), "%Y_%m_%d_%H_%M_%S", std::localtime(&time));
 
   TASImage* scaledImage;
+
+  bool monthDirectory = settings.GetValue("screenshot.monthly", 0);
+
+  if (monthDirectory) {
+    char dir_str[32];
+    std::strftime(dir_str, sizeof(dir_str), "%Y-%d", std::localtime(&time));
+    outDirectory = outDirectory + "/" + dir_str;
+    std::filesystem::create_directory(outDirectory);
+  }
 
   std::ostringstream filepath;
   filepath << outDirectory << "/Screenshot_" << time_str << ".png";
@@ -168,8 +177,8 @@ void Screenshot::perform(o2::detectors::DetID::mask_t detectorsMask, int runNumb
     delete scaledImage;
   }
 
-  TImage* viewZrhoImage = MultiView::getInstance()->getView(MultiView::EViews::ViewZrho)->GetGLViewer()->GetPictureUsingBB();
-  scaledImage = ScaleImage((TASImage*)viewZrhoImage, width * 0.3, height * 0.45, backgroundColorHex);
+  TImage* viewZYImage = MultiView::getInstance()->getView(MultiView::EViews::ViewZY)->GetGLViewer()->GetPictureUsingBB();
+  scaledImage = ScaleImage((TASImage*)viewZYImage, width * 0.3, height * 0.45, backgroundColorHex);
   if (scaledImage) {
     CopyImage(&image, scaledImage, width * 0.68, height * 0.525, 0, 0, scaledImage->GetWidth(), scaledImage->GetHeight());
     delete scaledImage;
@@ -214,21 +223,19 @@ void Screenshot::perform(o2::detectors::DetID::mask_t detectorsMask, int runNumb
   std::vector<std::string> lines;
   if (!collisionTime.empty()) {
     lines.push_back((std::string)settings.GetValue("screenshot.message.line.0", TString::Format("Run number: %d", runNumber)));
-    lines.push_back((std::string)settings.GetValue("screenshot.message.line.1", TString::Format("First TF orbit: %d", firstTForbit)));
+    lines.push_back((std::string)settings.GetValue("screenshot.message.line.1", TString::Format("First TF orbit: %d", firstTFOrbit)));
     lines.push_back((std::string)settings.GetValue("screenshot.message.line.2", TString::Format("Date: %s", collisionTime.c_str())));
     lines.push_back((std::string)settings.GetValue("screenshot.message.line.3", TString::Format("Detectors: %s", detectorsString.c_str())));
   }
 
   image.BeginPaint();
+
   for (int i = 0; i < 4; i++) {
     image.DrawText(textX, textY + i * textLineHeight, lines[i].c_str(), fontSize, "#BBBBBB", "FreeSansBold.otf");
   }
   image.EndPaint();
 
-  if (!std::filesystem::is_directory(outDirectory)) {
-    std::filesystem::create_directory(outDirectory);
-  }
-  image.WriteImage(filepath.str().c_str(), TImage::kPng);
+  image.WriteImage(fileName.c_str(), TImage::kPng);
 }
 
 } // namespace event_visualisation
