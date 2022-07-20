@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(TestCCDBResponseParse)
 {
   std::string* responseString = new std::string(secondFullResponse);
   CCDBResponse ccdbResponse(*responseString);
-  BOOST_CHECK(ccdbResponse.countObjects() == 3);
+  BOOST_CHECK(ccdbResponse.objectNum == 3);
   BOOST_CHECK("407f3a65-4c7b-11ec-8cf8-200114580202" == ccdbResponse.getStringAttribute(0, "id"));
   BOOST_CHECK("e5183d1a-4c7a-11ec-9d71-7f000001aa8b" == ccdbResponse.getStringAttribute(1, "id"));
   BOOST_CHECK("52d3f61a-4c6b-11ec-a98e-7f000001aa8b" == ccdbResponse.getStringAttribute(2, "id"));

@@ -30,31 +30,65 @@ class CCDBResponse
   CCDBResponse(const std::string& jsonString);
   ~CCDBResponse() = default;
 
-  char* JsonToString(rapidjson::Document *document);
   char* toString();
+
+  /**
+   * Debug method. Print all attributes of all objects inside the document.
+   */
+  void printObjectAttributes(rapidjson::Document* document);
+
+  /**
+   * The number of objects inside the document.
+   */
   int objectNum;
-  std::unordered_map<std::string, std::string> idHashmap;
-  std::unordered_map<std::string, std::string> pathHashmap;
-  void refreshIdHashmap();
-  void refreshPathHashmap();
 
-  void browse(CCDBResponse* other);
-
-  void removeObject(rapidjson::Document *document, int ind);
-  int countObjects();
-  bool mergeObjects(rapidjson::Value &dstObject, rapidjson::Value &srcObject, rapidjson::Document::AllocatorType &allocator);
-
+  /**
+   * Return attribute in string type.
+   *
+   * @param ind - index of object inside document
+   * @param attributeName - name of attribute to be retrieved
+   */
   std::string getStringAttribute(int ind, std::string attributeName);
+
+  /**
+   * Return attribute in long type.
+   *
+   * @param ind - index of object inside document
+   * @param attributeName - name of attribute to be retrieved
+   */
   long getLongAttribute(int ind, std::string attributeName);
+
+  /**
+   * Merges objects with unique IDs and paths from another document into this one.
+   *
+   * @param other - Other CCDBResponse to be merged into this one.
+   */
   void latestAndMerge(CCDBResponse* other);
+
+  /**
+   * Merges objects with unique IDs from another document into this one.
+   *
+   * @param other - Other CCDBResponse to be merged into this one.
+   */
   void browseAndMerge(CCDBResponse* other);
-  void removeObjects(rapidjson::Document *document, std::vector<bool> toBeRemoved);
-  rapidjson::Document *getDocument();
-  std::string sanitizeObjectName(const std::string& objectName);
-  rapidjson::Document document; // should be moved to private
-  void printObjectAttributes(rapidjson::Document *document);
 
  private:
+  rapidjson::Document document;
+  rapidjson::Document* getDocument();
+
+  char* JsonToString(rapidjson::Document* document);
+
+  void browse(CCDBResponse* other);
+  void refreshObjectNum();
+  int countObjects();
+  void removeObjects(rapidjson::Document* document, std::vector<bool> toBeRemoved);
+  bool mergeObjects(rapidjson::Value& dstObject, rapidjson::Value& srcObject, rapidjson::Document::AllocatorType& allocator);
+
+  std::unordered_map<std::string, std::string> idHashmap;
+  std::unordered_map<std::string, std::string> pathHashmap;
+
+  void refreshIdHashmap();
+  void refreshPathHashmap();
 
   ClassDefNV(CCDBResponse, 1);
 };

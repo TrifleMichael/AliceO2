@@ -1728,7 +1728,6 @@ char* CcdbApi::latest()
 
   for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
 
-    // auto start = std::chrono::high_resolution_clock::now();
     // Setting up CURL
     CURL* curlHandle;
     curlHandle = curl_easy_init();
@@ -1741,20 +1740,11 @@ char* CcdbApi::latest()
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
     string fullUrl = hostsPool.at(hostIndex) + "/latest/TPC/.*?Accept=application/json";
     curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
-    // auto stop = std::chrono::high_resolution_clock::now();
-    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    // std::cout << std::endl;
-    // std::cout << "CURL setup benchmark: " << duration.count() << std::endl;
 
     if (curlHandle != NULL) {
 
       // Connecting to host
-      // auto start2 = std::chrono::high_resolution_clock::now();
       curlResultCode = curl_easy_perform(curlHandle);
-      // auto stop2 = std::chrono::high_resolution_clock::now();
-      // auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2);
-      // std::cout << std::endl;
-      // std::cout << "CURL downloading benchmark: " << duration2.count() << std::endl;
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
