@@ -266,5 +266,23 @@ rapidjson::Document *CCDBResponse::getDocument()
   return &document;
 }
 
+void CCDBResponse::printObjectAttributes(rapidjson::Document *document)
+{
+    auto objectsArray = (*document)["objects"].GetArray();
+    if (objectsArray.Size() > 0) {
+        for (rapidjson::Value::ConstValueIterator object = objectsArray.begin(); object != objectsArray.end(); object++) { // over objects
+            
+            for (rapidjson::Value::ConstMemberIterator entry = object->MemberBegin(); entry != object->MemberEnd(); entry++) { // over attributes
+                auto& value = entry->value;
+                auto name = entry->name.GetString();
+                if (value.IsString()) {
+                    std::cout << name << " " << value.GetString() << std::endl;
+                }
+            }
+            std::cout << "\n";
+        }
+    }
+}
+
 } // namespace ccdb
 } // namespace o2

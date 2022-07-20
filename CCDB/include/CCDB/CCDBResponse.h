@@ -52,6 +52,7 @@ class CCDBResponse
   rapidjson::Document *getDocument();
   std::string sanitizeObjectName(const std::string& objectName);
   rapidjson::Document document; // should be moved to private
+  void printObjectAttributes(rapidjson::Document *document);
 
  private:
 
