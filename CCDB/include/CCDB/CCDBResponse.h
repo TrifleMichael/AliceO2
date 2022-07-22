@@ -51,14 +51,6 @@ class CCDBResponse
   std::string getStringAttribute(int ind, std::string attributeName);
 
   /**
-   * Return attribute in long type.
-   *
-   * @param ind - index of object inside document
-   * @param attributeName - name of attribute to be retrieved
-   */
-  long getLongAttribute(int ind, std::string attributeName);
-
-  /**
    * Merges objects with unique IDs and paths from another document into this one.
    *
    * @param other - Other CCDBResponse to be merged into this one.

@@ -137,15 +137,6 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
   return "";
 }
 
-long CCDBResponse::getLongAttribute(int ind, std::string attributeName)
-{
-  if (ind < objectNum) {
-    const char* attrNameChar = attributeName.c_str();
-    return document["objects"][ind][attrNameChar].GetUint64();
-  }
-  return -9999;
-}
-
 void CCDBResponse::browse(CCDBResponse* other)
 {
   std::vector<bool> toBeRemoved(other->objectNum, false);

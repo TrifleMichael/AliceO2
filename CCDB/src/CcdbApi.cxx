@@ -1675,33 +1675,34 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
 
 char* CcdbApi::browse()
 {
-  char* response = NULL;
   CCDBResponse* firstResponse = NULL;
 
-  for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
-    
-    // Setting up CURL
-    CURL* curlHandle;
-    curlHandle = curl_easy_init();
-    long responseCode = 0;
-    CURLcode curlResultCode = CURL_LAST;
-    std::string result;
+  // Setting up CURL
+  CURL* curlHandle;
+  curlHandle = curl_easy_init();
+  curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
+  curlSetSSLOptions(curlHandle);
 
-    curlSetSSLOptions(curlHandle);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
+  // Making /browse/ request for each host
+  for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
+
+    CURLcode curlResultCode = CURL_LAST;
+
+    // Preparing options for connecting to host
+    std::string result;
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
+    string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*?Accept=application/json";
+    curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
     if (curlHandle != NULL) {
 
       // Connecting to host
-      string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*?Accept=application/json";
-      curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
-
       curlResultCode = curl_easy_perform(curlHandle);
 
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
+        // Parsing answer
         if (firstResponse == NULL) {
           firstResponse = new CCDBResponse(result);
         } else {
@@ -1710,33 +1711,38 @@ char* CcdbApi::browse()
           delete nextResponse;
         }
       }
-      curl_easy_cleanup(curlHandle);
     }
   }
 
+  if (curlHandle != NULL) {
+    curl_easy_cleanup(curlHandle);
+  }
+
+  char* parsedResponse = NULL;
   if (firstResponse != NULL) {
-    response = firstResponse->toString();
+    parsedResponse = firstResponse->toString();
     delete firstResponse;
   }
-  return response;
+  return parsedResponse;
 }
 
 char* CcdbApi::latest()
 {
-  char* response = NULL;
   CCDBResponse* firstResponse = NULL;
 
+  // Setting up CURL
+  CURL* curlHandle;
+  curlHandle = curl_easy_init();
+  curlSetSSLOptions(curlHandle);
+  curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
+
+  // Making /latest/ request for each host
   for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
 
-    // Setting up CURL
-    CURL* curlHandle;
-    curlHandle = curl_easy_init();
-    long responseCode = 0;
     CURLcode curlResultCode = CURL_LAST;
-    std::string result;
 
-    curlSetSSLOptions(curlHandle);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
+    // Preparing options for connecting to host
+    std::string result;
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
     string fullUrl = hostsPool.at(hostIndex) + "/latest/TPC/.*?Accept=application/json";
     curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
@@ -1749,6 +1755,7 @@ char* CcdbApi::latest()
       if (curlResultCode != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
+        // Parsing answer
         if (firstResponse == NULL) {
           firstResponse = new CCDBResponse(result);
         } else {
@@ -1757,15 +1764,19 @@ char* CcdbApi::latest()
           delete nextResponse;
         }
       }
-      curl_easy_cleanup(curlHandle);
     }
   }
 
+  if (curlHandle != NULL) {
+    curl_easy_cleanup(curlHandle);
+  }
+
+  char* parsedResponse = NULL;
   if (firstResponse != NULL) {
-    response = firstResponse->toString();
+    parsedResponse = firstResponse->toString();
     delete firstResponse;
   }
-  return response;
+  return parsedResponse;
 }
 
 } // namespace o2
