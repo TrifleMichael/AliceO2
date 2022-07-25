@@ -1,8 +1,5 @@
 #include <CCDB/CURLHandleManager.h>
 
-
-using namespace rapidjson;
-
 namespace o2
 {
 namespace ccdb

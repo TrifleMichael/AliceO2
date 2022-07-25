@@ -13,6 +13,7 @@ o2_add_library(CCDB
                SOURCES  src/CcdbApi.cxx
                         src/BasicCCDBManager.cxx
                         src/CCDBTimeStampUtils.cxx
+                        src/CURLHandleManager.cxx
         src/IdPath.cxx src/CCDBQuery.cxx
         PUBLIC_LINK_LIBRARIES CURL::libcurl
                                     FairRoot::ParMQ
@@ -30,7 +31,8 @@ o2_target_root_dictionary(CCDB
                                   include/CCDB/IdPath.h
                                   include/CCDB/BasicCCDBManager.h
                                   include/CCDB/CCDBTimeStampUtils.h
-                                  include/CCDB/CCDBQuery.h)
+                                  include/CCDB/CCDBQuery.h
+                                  include/CCDB/CURLHandleManager.h)
 
 o2_add_executable(inspectccdbfile
             COMPONENT_NAME ccdb

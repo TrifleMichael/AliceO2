@@ -28,6 +28,8 @@ class CURLHandleManager
 
  private:
 
+  CURL* curl;
+
   ClassDefNV(CURLHandleManager, 1);
 };
 
