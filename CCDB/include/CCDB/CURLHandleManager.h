@@ -13,6 +13,7 @@
 #define CURL_HANDLE_MANAGER_H_
 
 #include <Rtypes.h>
+#include <curl/curl.h>
 
 namespace o2
 {
@@ -25,10 +26,13 @@ class CURLHandleManager
   CURLHandleManager();
   ~CURLHandleManager() = default;
 
+  CURL* getHandle();
 
  private:
 
-  CURL* curl;
+  CURL* curlHandle;
+  //std::thread *deleterThread;
+  double resourceValidityTime; // TODO: Currently in seconds - switch to time of day format
 
   ClassDefNV(CURLHandleManager, 1);
 };
