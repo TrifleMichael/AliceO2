@@ -1714,10 +1714,12 @@ char* CcdbApi::browse()
     }
   }
 
+  // CURL Cleanup
   if (curlHandle != NULL) {
     curl_easy_cleanup(curlHandle);
   }
 
+  // Parsing answer
   char* parsedResponse = NULL;
   if (firstResponse != NULL) {
     parsedResponse = firstResponse->toString();
@@ -1767,10 +1769,12 @@ char* CcdbApi::latest()
     }
   }
 
+  // Curl cleanup
   if (curlHandle != NULL) {
     curl_easy_cleanup(curlHandle);
   }
 
+  // Parsing answer
   char* parsedResponse = NULL;
   if (firstResponse != NULL) {
     parsedResponse = firstResponse->toString();

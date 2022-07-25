@@ -44,7 +44,7 @@ void CCDBResponse::refreshObjectNum()
 
 void CCDBResponse::refreshPathHashmap()
 {
-  for (int i = 0; i < objectNum; i++) {
+  for (size_t i = 0; i < objectNum; i++) {
     std::string path = getStringAttribute(i, "path");
     pathHashmap[path] = path;
   }
@@ -52,7 +52,7 @@ void CCDBResponse::refreshPathHashmap()
 
 void CCDBResponse::refreshIdHashmap()
 {
-  for (int i = 0; i < objectNum; i++) {
+  for (size_t i = 0; i < objectNum; i++) {
     std::string id = getStringAttribute(i, "id");
     idHashmap[id] = id;
   }
@@ -110,7 +110,7 @@ void CCDBResponse::removeObjects(rapidjson::Document* document, std::vector<bool
 {
   rapidjson::Value& objects = (*document)["objects"];
   if (objects.Size() > 1) {
-    int i = 1;
+    size_t i = 1;
     rapidjson::Value::ConstValueIterator pastObject = objects.Begin();
     rapidjson::Value::ConstValueIterator nextObject = pastObject + 1;
     while (pastObject != objects.End() && nextObject != objects.End()) {
@@ -140,7 +140,7 @@ std::string CCDBResponse::getStringAttribute(int ind, std::string attributeName)
 void CCDBResponse::browse(CCDBResponse* other)
 {
   std::vector<bool> toBeRemoved(other->objectNum, false);
-  for (int i = 0; i < other->objectNum; i++) {
+  for (size_t i = 0; i < other->objectNum; i++) {
     std::string id = other->getStringAttribute(i, "id");
     if (idHashmap.find(id) != idHashmap.end() && idHashmap[id].compare(id) == 0) {
       toBeRemoved[i] = true;
@@ -165,7 +165,7 @@ void CCDBResponse::latestAndMerge(CCDBResponse* other)
   other->refreshPathHashmap();
 
   std::vector<bool> toBeRemoved(other->objectNum, false);
-  for (int i = 0; i < other->objectNum; i++) {
+  for (size_t i = 0; i < other->objectNum; i++) {
     std::string path = other->getStringAttribute(i, "path");
     if (pathHashmap.find(path) != pathHashmap.end() && pathHashmap[path].compare(other->pathHashmap[path]) == 0) {
       toBeRemoved[i] = true;

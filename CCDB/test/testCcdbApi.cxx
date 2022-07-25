@@ -104,7 +104,6 @@ struct test_fixture {
 
 BOOST_AUTO_TEST_CASE(CCDBResponseLatest)
 {
-  std::cout << "\n\nLatest test start\n\n";
   CcdbApi api;
   string url = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
   api.init(url);
@@ -114,7 +113,6 @@ BOOST_AUTO_TEST_CASE(CCDBResponseLatest)
 
 BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
 {
-  std::cout << "\n\nBrowse test start\n\n";
   CcdbApi api;
   string url = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
   api.init(url);
