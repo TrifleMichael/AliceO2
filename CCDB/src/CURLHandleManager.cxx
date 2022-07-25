@@ -15,5 +15,11 @@ namespace ccdb
     return curlHandle;
   }
 
+
+  void CURLHandleManager::sleepAndDelete()
+  {
+    
+  }
+
 } // namespace ccdb
 } // namespace o2

@@ -20,6 +20,9 @@ namespace o2
 namespace ccdb
 {
 
+// TODO: Does creating and destroying curl handle handle have to be in the same contex?
+//       What about curl_global_init() ?
+
 class CURLHandleManager
 {
  public:
@@ -32,7 +35,11 @@ class CURLHandleManager
 
   CURL* curlHandle;
   //std::thread *deleterThread;
-  double resourceValidityTime; // TODO: Currently in seconds - switch to time of day format
+  double resourceValidityTime = 5; // TODO: Currently in seconds - switch to time of day format
+  double validityExtension = 1;
+
+
+  void sleepAndDelete();
 
   ClassDefNV(CURLHandleManager, 1);
 };
