@@ -1680,21 +1680,22 @@ char* CcdbApi::browse()
   // Setting up CURL
   CURL* curlHandle;
   curlHandle = curl_easy_init();
-  curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
-  curlSetSSLOptions(curlHandle);
 
-  // Making /browse/ request for each host
-  for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
+  if (curlHandle != NULL) {
 
-    CURLcode curlResultCode = CURL_LAST;
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
+    curlSetSSLOptions(curlHandle);
 
-    // Preparing options for connecting to host
-    std::string result;
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
-    string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*?Accept=application/json";
-    curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
+    // Making /browse/ request for each host
+    for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
 
-    if (curlHandle != NULL) {
+      CURLcode curlResultCode = CURL_LAST;
+
+      // Preparing options for connecting to host
+      std::string result;
+      curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
+      string fullUrl = hostsPool.at(hostIndex) + "/browse/TPC/.*?Accept=application/json";
+      curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       // Connecting to host
       curlResultCode = curl_easy_perform(curlHandle);
@@ -1735,21 +1736,22 @@ char* CcdbApi::latest()
   // Setting up CURL
   CURL* curlHandle;
   curlHandle = curl_easy_init();
-  curlSetSSLOptions(curlHandle);
-  curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
 
-  // Making /latest/ request for each host
-  for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
+  if (curlHandle != NULL) {
 
-    CURLcode curlResultCode = CURL_LAST;
+    curlSetSSLOptions(curlHandle);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
 
-    // Preparing options for connecting to host
-    std::string result;
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
-    string fullUrl = hostsPool.at(hostIndex) + "/latest/TPC/.*?Accept=application/json";
-    curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
+    // Making /latest/ request for each host
+    for (size_t hostIndex = 0; hostIndex < hostsPool.size(); hostIndex++) {
 
-    if (curlHandle != NULL) {
+      CURLcode curlResultCode = CURL_LAST;
+
+      // Preparing options for connecting to host
+      std::string result;
+      curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &result);
+      string fullUrl = hostsPool.at(hostIndex) + "/latest/TPC/.*?Accept=application/json";
+      curl_easy_setopt(curlHandle, CURLOPT_URL, fullUrl.c_str());
 
       // Connecting to host
       curlResultCode = curl_easy_perform(curlHandle);
