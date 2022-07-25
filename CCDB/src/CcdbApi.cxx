@@ -1673,7 +1673,7 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
-char* CcdbApi::browse()
+std::string CcdbApi::browse()
 {
   CCDBResponse* firstResponse = NULL;
 
@@ -1713,23 +1713,21 @@ char* CcdbApi::browse()
         }
       }
     }
-  }
 
-  // CURL Cleanup
-  if (curlHandle != NULL) {
+    // Curl cleanup
     curl_easy_cleanup(curlHandle);
   }
 
   // Parsing answer
-  char* parsedResponse = NULL;
   if (firstResponse != NULL) {
-    parsedResponse = firstResponse->toString();
+    std::string parsedResponse = firstResponse->toString();
     delete firstResponse;
+    return parsedResponse;
   }
-  return parsedResponse;
+  return "";
 }
 
-char* CcdbApi::latest()
+std::string CcdbApi::latest()
 {
   CCDBResponse* firstResponse = NULL;
 
@@ -1769,20 +1767,18 @@ char* CcdbApi::latest()
         }
       }
     }
-  }
 
-  // Curl cleanup
-  if (curlHandle != NULL) {
+    // Curl cleanup
     curl_easy_cleanup(curlHandle);
   }
 
   // Parsing answer
-  char* parsedResponse = NULL;
   if (firstResponse != NULL) {
-    parsedResponse = firstResponse->toString();
+    std::string parsedResponse = firstResponse->toString();
     delete firstResponse;
+    return parsedResponse;
   }
-  return parsedResponse;
+  return "";
 }
 
 } // namespace o2

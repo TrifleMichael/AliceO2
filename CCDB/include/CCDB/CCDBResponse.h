@@ -30,7 +30,7 @@ class CCDBResponse
   CCDBResponse(const std::string& jsonString);
   ~CCDBResponse() = default;
 
-  char* toString();
+  std::string toString();
 
   /**
    * Debug method. Print all attributes of all objects inside the document.
@@ -68,7 +68,7 @@ class CCDBResponse
   rapidjson::Document document;
   rapidjson::Document* getDocument();
 
-  char* JsonToString(rapidjson::Document* document);
+  std::string JsonToString(rapidjson::Document* document);
 
   void browse(CCDBResponse* other);
   void refreshObjectNum();

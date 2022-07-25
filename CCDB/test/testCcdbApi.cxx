@@ -107,8 +107,8 @@ BOOST_AUTO_TEST_CASE(CCDBResponseLatest)
   CcdbApi api;
   string url = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
   api.init(url);
-  char* response = api.latest();
-  BOOST_CHECK(response != NULL);
+  std::string response = api.latest();
+  BOOST_CHECK(response != "");
 }
 
 BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
@@ -116,8 +116,8 @@ BOOST_AUTO_TEST_CASE(CCDBResponseBrowse)
   CcdbApi api;
   string url = "http://ccdb-test.cern.ch:8080,http://alice-ccdb.cern.ch";
   api.init(url);
-  char* response = api.browse();
-  BOOST_CHECK(response != NULL);
+  std::string response = api.browse();
+  BOOST_CHECK(response != "");
 }
 
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))

@@ -16,18 +16,18 @@ namespace o2
 namespace ccdb
 {
 
-char* CCDBResponse::toString()
+std::string CCDBResponse::toString()
 {
   return JsonToString(&document);
 }
 
-char* CCDBResponse::JsonToString(rapidjson::Document* document)
+std::string CCDBResponse::JsonToString(rapidjson::Document* document)
 {
   rapidjson::StringBuffer buffer;
   buffer.Clear();
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   (*document).Accept(writer);
-  return strdup(buffer.GetString());
+  return buffer.GetString();
 }
 
 CCDBResponse::CCDBResponse(const std::string& jsonString)
