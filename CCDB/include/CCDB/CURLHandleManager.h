@@ -40,16 +40,14 @@ class CURLHandleManager
 
   CURL* getHandle();
 
-  void testMultithread();
-  void testFunction(std::string word);
+  std::chrono::time_point<std::chrono::steady_clock> expectedEndTime;
+
+  size_t secondsOfBuffer = 10;
 
  private:
 
   CURL* curlHandle;
   std::thread *deleterThread;
-  double resourceValidityTime = 5; // TODO: Currently in seconds - switch to time of day format
-  double validityExtension = 1;
-
 
   void sleepAndDelete();
 
