@@ -9,27 +9,22 @@ namespace o2
 namespace ccdb
 {
 
-  CURLHandleManager::CURLHandleManager()
+  CURLHandleManager::CURLHandleManager(CURL* handle)
   {
-    // should take in handle as argument
-
-    // if (handle != NULL)
-    // {
-    //   curlHandle = handle;
-    //   curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1); // CURL signals are not thread safe
-    // }
-
-    // Testing on null handle
-    std::cout << "\nOpening handle\n";
-    extendValidity(secondsOfBuffer);
-    deleterThread = new std::thread(&CURLHandleManager::sleepAndDelete, this);
+    if (handle != NULL)
+    {
+      curlHandle = handle;
+      curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1); // CURL signals are not thread safe
+      extendValidity(secondsOfBuffer);
+      deleterThread = new std::thread(&CURLHandleManager::sleepAndDelete, this);
+    }
   }
 
   CURLHandleManager::~CURLHandleManager()
   {
     deleterThread->join();
     delete deleterThread;
-    // close CURLHandle if not closed
+    curl_easy_cleanup(curlHandle); // cleanup is null safe
   }
 
   CURL* CURLHandleManager::getHandle()
@@ -49,8 +44,8 @@ namespace ccdb
       secondsDiff = secondsUntilClosingHandle();
     } while (secondsDiff > 0);
 
+    curl_easy_cleanup(curlHandle);
     std::cout << "\nClosing handle!\n";
-    // close handle
   }
 
   double CURLHandleManager::secondsUntilClosingHandle()

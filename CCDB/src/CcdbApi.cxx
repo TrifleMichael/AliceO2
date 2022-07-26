@@ -43,6 +43,7 @@
 #include <boost/interprocess/sync/named_semaphore.hpp>
 #include <regex>
 #include <cstdio>
+#include "CCDB/CURLHandleManager.h"
 
 namespace o2::ccdb
 {
@@ -61,6 +62,12 @@ CcdbApi::CcdbApi()
 CcdbApi::~CcdbApi()
 {
   curl_global_cleanup();
+}
+
+void CcdbApi::addHandle(std::string handleName, CURL* handle)
+{
+  nameToHandleManagerMap[handleName] = new CURLHandleManager(handle);
+  delete nameToHandleManagerMap[handleName]; // mock to prevent memory leak
 }
 
 void CcdbApi::curlInit()

@@ -39,7 +39,7 @@ namespace ccdb
 class CURLHandleManager
 {
  public:
-  CURLHandleManager();
+  CURLHandleManager(CURL* handle);
   ~CURLHandleManager();
 
   // Returns the managed CURL handle and extends its validity

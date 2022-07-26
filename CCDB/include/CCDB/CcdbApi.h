@@ -27,6 +27,8 @@
 #include <CommonUtils/ConfigurableParam.h>
 #include <type_traits>
 #include <vector>
+#include <unordered_map>
+#include "CCDB/CURLHandleManager.h"
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
 #include "MemoryResources/MemoryResources.h"
@@ -60,6 +62,9 @@ class CcdbApi //: public DatabaseInterface
   CcdbApi();
   /// \brief Default destructor
   virtual ~CcdbApi();
+
+  std::unordered_map<std::string, CURLHandleManager*> nameToHandleManagerMap;
+  void addHandle(std::string handleName, CURL* handle);
 
   /**
    * Initialize connection to CCDB
