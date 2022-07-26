@@ -14,14 +14,23 @@
 
 #include <Rtypes.h>
 #include <curl/curl.h>
+#include <thread>
+#include <string>
+
+/*
+
+https://curl.se/libcurl/c/threadsafe.html
+
+Summary:
+  - global_anyfunction are not safe, each must be called max once per program
+  - CURLOPT_NOSIGNAL must be set to 1 [curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1)] because signals are also not safe
+
+*/
 
 namespace o2
 {
 namespace ccdb
 {
-
-// TODO: Does creating and destroying curl handle handle have to be in the same contex?
-//       What about curl_global_init() ?
 
 class CURLHandleManager
 {
@@ -31,10 +40,13 @@ class CURLHandleManager
 
   CURL* getHandle();
 
+  void testMultithread();
+  void testFunction(std::string word);
+
  private:
 
   CURL* curlHandle;
-  //std::thread *deleterThread;
+  std::thread *deleterThread;
   double resourceValidityTime = 5; // TODO: Currently in seconds - switch to time of day format
   double validityExtension = 1;
 

@@ -19,5 +19,7 @@ using namespace o2::ccdb;
 
 BOOST_AUTO_TEST_CASE(TestCURLHandleManager)
 {
-  BOOST_CHECK(1 == 1);
+  CURLHandleManager manager;
+  manager.testMultithread();
+  BOOST_CHECK(1 == 2);
 }
