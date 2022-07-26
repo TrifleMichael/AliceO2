@@ -21,5 +21,8 @@ BOOST_AUTO_TEST_CASE(TestCURLHandleManager)
 {
   CURL* handle;
   CURLHandleManager manager;
-  BOOST_CHECK(1 == 2);
+  handle = manager.getHandle();
+  sleep(7);
+  handle = manager.getHandle();
+  BOOST_CHECK(1 == 2); // Mock to see the result printed above
 }

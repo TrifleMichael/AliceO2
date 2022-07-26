@@ -22,9 +22,13 @@
 https://curl.se/libcurl/c/threadsafe.html
 
 Summary:
-  - global_anyfunction are not safe, each must be called max once per program
+  - global_anyfunction are not safe, each must be called max once per program outside of CURLHandleManager
   - CURLOPT_NOSIGNAL must be set to 1 [curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1)] because signals are also not safe
 
+TODO: 
+  - Extending connection should be done during curl_easy_perform, and not durning getHandle();
+  - Add a <std::string nameOfHandle, CURLHandleManager manager> map in CCDBApi in order to reuse handles
+  
 */
 
 namespace o2
@@ -36,13 +40,18 @@ class CURLHandleManager
 {
  public:
   CURLHandleManager();
-  ~CURLHandleManager() = default;
+  ~CURLHandleManager();
 
+  // Returns the managed CURL handle and extends its validity
   CURL* getHandle();
 
+  // Describes the point when handle will be closed. It is postponed each time getHandle is called.
   std::chrono::time_point<std::chrono::steady_clock> expectedEndTime;
 
-  size_t secondsOfBuffer = 10;
+  void extendValidity(size_t seconds);
+
+  size_t secondsOfBuffer = 3;
+  double secondsUntilClosingHandle();
 
  private:
 
