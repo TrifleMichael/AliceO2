@@ -106,17 +106,17 @@ struct test_fixture {
 
 BOOST_AUTO_TEST_CASE(HandleMapTest)
 {
-  CcdbApi api;
-  CURL* handle = NULL;
-  api.addHandle("someHandle", handle);
-  CURL* retrievedHandle = api.getHandle("someHandle");
-  sleep(1);
-  retrievedHandle = api.getHandle("someHandle");
-  sleep(4);
-  retrievedHandle = api.getHandle("someHandle");
-  // compare handles
-  api.clearManagerHandleMap();
-  BOOST_CHECK(1 == 2); // mock to see prints above
+  // CcdbApi api;
+  // CURL* handle = NULL;
+  // api.addHandle("someHandle", handle);
+  // CURL* retrievedHandle = api.getHandle("someHandle");
+  // sleep(1);
+  // retrievedHandle = api.getHandle("someHandle");
+  // sleep(4);
+  // retrievedHandle = api.getHandle("someHandle");
+  // // compare handles
+  // api.clearManagerHandleMap();
+  // BOOST_CHECK(1 == 2); // mock to see prints above
 }
 
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))

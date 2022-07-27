@@ -64,7 +64,7 @@ CcdbApi::~CcdbApi()
   curl_global_cleanup();
 }
 
-void CcdbApi::addHandle(std::string handleName, CURL* handle)
+void CcdbApi::addHandle(std::string handleName, CURL* handle) const
 {
   nameToHandleManagerMap[handleName] = new CURLHandleManager(handle);
 }
@@ -251,6 +251,7 @@ int CcdbApi::storeAsBinaryFile(const char* buffer, size_t size, const std::strin
   // Curl preparation
   CURL* curl = nullptr;
   curl = curl_easy_init();
+  addHandle("storeAsBinary", curl);
 
   // checking that all metadata keys do not contain invalid characters
   checkMetadataKeys(metadata);
