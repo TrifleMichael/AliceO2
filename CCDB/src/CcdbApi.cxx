@@ -1675,13 +1675,13 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
 
 std::string CcdbApi::browse()
 {
-  CCDBResponse* firstResponse = NULL;
+  CCDBResponse* firstResponse = nullptr;
 
   // Setting up CURL
   CURL* curlHandle;
   curlHandle = curl_easy_init();
 
-  if (curlHandle != NULL) {
+  if (curlHandle != nullptr) {
 
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
     curlSetSSLOptions(curlHandle);
@@ -1704,7 +1704,7 @@ std::string CcdbApi::browse()
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
         // Parsing answer
-        if (firstResponse == NULL) {
+        if (firstResponse == nullptr) {
           firstResponse = new CCDBResponse(result);
         } else {
           CCDBResponse* nextResponse = new CCDBResponse(result);
@@ -1719,7 +1719,7 @@ std::string CcdbApi::browse()
   }
 
   // Parsing answer
-  if (firstResponse != NULL) {
+  if (firstResponse != nullptr) {
     std::string parsedResponse = firstResponse->toString();
     delete firstResponse;
     return parsedResponse;
@@ -1729,13 +1729,13 @@ std::string CcdbApi::browse()
 
 std::string CcdbApi::latest()
 {
-  CCDBResponse* firstResponse = NULL;
+  CCDBResponse* firstResponse = nullptr;
 
   // Setting up CURL
   CURL* curlHandle;
   curlHandle = curl_easy_init();
 
-  if (curlHandle != NULL) {
+  if (curlHandle != nullptr) {
 
     curlSetSSLOptions(curlHandle);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
@@ -1758,7 +1758,7 @@ std::string CcdbApi::latest()
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
         // Parsing answer
-        if (firstResponse == NULL) {
+        if (firstResponse == nullptr) {
           firstResponse = new CCDBResponse(result);
         } else {
           CCDBResponse* nextResponse = new CCDBResponse(result);
@@ -1773,7 +1773,7 @@ std::string CcdbApi::latest()
   }
 
   // Parsing answer
-  if (firstResponse != NULL) {
+  if (firstResponse != nullptr) {
     std::string parsedResponse = firstResponse->toString();
     delete firstResponse;
     return parsedResponse;
