@@ -50,7 +50,7 @@ class CURLHandleManager
 
   void extendValidity(size_t seconds);
 
-  size_t secondsOfBuffer = 3;
+  size_t secondsOfBuffer = 1;
   double secondsUntilClosingHandle();
 
  private:

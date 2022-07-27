@@ -11,13 +11,14 @@ namespace ccdb
 
   CURLHandleManager::CURLHandleManager(CURL* handle)
   {
-    if (handle != NULL)
-    {
+    // if (handle != NULL)
+    // {
       curlHandle = handle;
-      curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1); // CURL signals are not thread safe
+      // curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1); // CURL signals are not thread safe
       extendValidity(secondsOfBuffer);
       deleterThread = new std::thread(&CURLHandleManager::sleepAndDelete, this);
-    }
+    // }
+    std::cout << "\nCreating manager\n";
   }
 
   CURLHandleManager::~CURLHandleManager()
@@ -25,14 +26,18 @@ namespace ccdb
     deleterThread->join();
     delete deleterThread;
     curl_easy_cleanup(curlHandle); // cleanup is null safe
+
+    std::cout << "\n Destroying manager\n";
   }
 
   CURL* CURLHandleManager::getHandle()
   {
-    if (curlHandle != NULL)
-    {
+    // if (curlHandle != NULL)
+    // {
       extendValidity(secondsOfBuffer);
-    }
+    // }
+
+    std::cout << "\nGetting handle \n";
     return curlHandle;
   }
 
@@ -56,6 +61,7 @@ namespace ccdb
 
   void CURLHandleManager::extendValidity(size_t seconds)
   {
+    std::cout << "\n Extending validity\n";
     expectedEndTime = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
   }
 
