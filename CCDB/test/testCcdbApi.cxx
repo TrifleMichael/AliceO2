@@ -40,7 +40,6 @@
 #include <boost/optional/optional.hpp>
 
 #include <unistd.h>     //for using the function sleep
-#include <stdlib.h>     //for using the function sleep
 
 using namespace std;
 using namespace o2::ccdb;
@@ -111,6 +110,7 @@ BOOST_AUTO_TEST_CASE(HandleMapTest)
   CURL* handle = NULL;
   api.addHandle("someHandle", handle);
   CURL* retrievedHandle = api.getHandle("someHandle");
+  sleep(1);
   retrievedHandle = api.getHandle("someHandle");
   sleep(4);
   retrievedHandle = api.getHandle("someHandle");

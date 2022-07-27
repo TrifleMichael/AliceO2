@@ -2,7 +2,6 @@
 #include <iostream>
 #include <chrono>
 #include <unistd.h>     //for using the function sleep
-// #include <stdlib.h>     //for using the function sleep
 
 namespace o2
 {
@@ -11,6 +10,7 @@ namespace ccdb
 
   CURLHandleManager::CURLHandleManager(CURL* handle)
   {
+    std::cout << "\nCreating manager\n";
     // if (handle != NULL)
     // {
       curlHandle = handle;
@@ -18,7 +18,6 @@ namespace ccdb
       extendValidity(secondsOfBuffer);
       deleterThread = new std::thread(&CURLHandleManager::sleepAndDelete, this);
     // }
-    std::cout << "\nCreating manager\n";
   }
 
   CURLHandleManager::~CURLHandleManager()
