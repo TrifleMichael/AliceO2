@@ -42,12 +42,10 @@ class CURLHandleManager
   CURLHandleManager(CURL* handle);
   ~CURLHandleManager();
 
-  // Returns the managed CURL handle and extends its validity
-  CURL* getHandle();
-
   // Describes the point when handle will be closed. It is postponed each time getHandle is called.
   std::chrono::time_point<std::chrono::steady_clock> expectedEndTime;
 
+  void extendValidityDefault();
   void extendValidity(size_t seconds);
 
   size_t secondsOfBuffer = 1;

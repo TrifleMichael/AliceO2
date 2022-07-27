@@ -65,7 +65,7 @@ class CcdbApi //: public DatabaseInterface
 
   std::unordered_map<std::string, CURLHandleManager*> nameToHandleManagerMap;
   void addHandle(std::string handleName, CURL* handle);
-  CURL* getHandle(std::string handleName);
+  void extendHandleValidity(std::string handleName);
   void clearManagerHandleMap();
 
   /**

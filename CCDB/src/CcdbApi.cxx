@@ -69,9 +69,9 @@ void CcdbApi::addHandle(std::string handleName, CURL* handle)
   nameToHandleManagerMap[handleName] = new CURLHandleManager(handle);
 }
 
-CURL* CcdbApi::getHandle(std::string handleName)
+void CcdbApi::extendHandleValidity(std::string handleName)
 {
-  return nameToHandleManagerMap[handleName]->getHandle();
+  nameToHandleManagerMap[handleName]->extendValidityDefault();
 }
 
 void CcdbApi::clearManagerHandleMap()
