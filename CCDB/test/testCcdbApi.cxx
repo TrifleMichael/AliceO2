@@ -39,6 +39,9 @@
 #include <boost/foreach.hpp>
 #include <boost/optional/optional.hpp>
 
+#include <unistd.h>     //for using the function sleep
+#include <stdlib.h>     //for using the function sleep
+
 using namespace std;
 using namespace o2::ccdb;
 namespace utf = boost::unit_test;
@@ -101,6 +104,20 @@ struct test_fixture {
   CcdbApi api;
   map<string, string> metadata;
 };
+
+BOOST_AUTO_TEST_CASE(HandleMapTest)
+{
+  CcdbApi api;
+  CURL* handle = NULL;
+  api.addHandle("someHandle", handle);
+  CURL* retrievedHandle = api.getHandle("someHandle");
+  retrievedHandle = api.getHandle("someHandle");
+  sleep(4);
+  retrievedHandle = api.getHandle("someHandle");
+  // compare handles
+  api.clearManagerHandleMap();
+  BOOST_CHECK(1 == 2); // mock to see prints above
+}
 
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))
 {

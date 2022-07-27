@@ -67,7 +67,20 @@ CcdbApi::~CcdbApi()
 void CcdbApi::addHandle(std::string handleName, CURL* handle)
 {
   nameToHandleManagerMap[handleName] = new CURLHandleManager(handle);
-  delete nameToHandleManagerMap[handleName]; // mock to prevent memory leak
+}
+
+CURL* CcdbApi::getHandle(std::string handleName)
+{
+  return nameToHandleManagerMap[handleName]->getHandle();
+}
+
+void CcdbApi::clearManagerHandleMap()
+{
+  for (std::pair<std::string, CURLHandleManager*> element : nameToHandleManagerMap)
+  {
+      delete element.second;
+  }
+
 }
 
 void CcdbApi::curlInit()
