@@ -110,7 +110,7 @@ class CCDBResponse
    * @param toBeRemoved - Vector of the length of number of objects in document. Objects at indexes containing true will be removed from the document.
    */
   void removeObjects(rapidjson::Document* document, std::vector<bool> toBeRemoved);
-  
+
   /**
    * Merges two rapidjson documents into one.
    * @param dstObject - destination object for the merge
