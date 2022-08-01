@@ -1,5 +1,15 @@
+ // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
+ // See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
+ // All rights not expressly granted are reserved.
+ //
+ // This software is distributed under the terms of the GNU General Public
+ // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
+ //
+ // In applying this license CERN does not waive the privileges and immunities
+ // granted to it by virtue of its status as an Intergovernmental Organization
+ // or submit itself to any jurisdiction.
+ 
 #include <CCDB/CCDBResponse.h>
-
 #include <string>
 #include <vector>
 #include <cstdio>
@@ -34,7 +44,7 @@ CCDBResponse::CCDBResponse(const std::string& jsonString)
 {
   document.Parse(jsonString.c_str());
   refreshObjectNum();
-  refreshIdHashmap();
+  refreshIdMap();
 }
 
 void CCDBResponse::refreshObjectNum()
@@ -42,7 +52,7 @@ void CCDBResponse::refreshObjectNum()
   objectNum = countObjects();
 }
 
-void CCDBResponse::refreshPathHashmap()
+void CCDBResponse::refreshPathMap()
 {
   for (size_t i = 0; i < objectNum; i++) {
     std::string path = getStringAttribute(i, "path");
@@ -50,7 +60,7 @@ void CCDBResponse::refreshPathHashmap()
   }
 }
 
-void CCDBResponse::refreshIdHashmap()
+void CCDBResponse::refreshIdMap()
 {
   for (size_t i = 0; i < objectNum; i++) {
     std::string id = getStringAttribute(i, "id");
@@ -58,7 +68,7 @@ void CCDBResponse::refreshIdHashmap()
   }
 }
 
-int CCDBResponse::countObjects()
+size_t CCDBResponse::countObjects()
 {
   auto objectsArray = document["objects"].GetArray();
   return objectsArray.Size();
@@ -161,8 +171,8 @@ void CCDBResponse::latestAndMerge(CCDBResponse* other)
 {
   browse(other);
   other->refreshObjectNum();
-  refreshPathHashmap();
-  other->refreshPathHashmap();
+  refreshPathMap();
+  other->refreshPathMap();
 
   std::vector<bool> toBeRemoved(other->objectNum, false);
   for (size_t i = 0; i < other->objectNum; i++) {
