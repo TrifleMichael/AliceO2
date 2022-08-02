@@ -76,8 +76,7 @@ size_t CCDBResponse::countObjects()
 
 bool CCDBResponse::mergeObjects(rapidjson::Value& dstObject, rapidjson::Value& srcObject, rapidjson::Document::AllocatorType& allocator)
 {
-  for (auto srcIt = srcObject.MemberBegin(); srcIt != srcObject.MemberEnd(); ++srcIt)
-  {
+  for (auto srcIt = srcObject.MemberBegin(); srcIt != srcObject.MemberEnd(); ++srcIt) {
     auto dstIt = dstObject.FindMember(srcIt->name);
     if (dstIt == dstObject.MemberEnd()) {
       rapidjson::Value dstName;
@@ -176,8 +175,7 @@ void CCDBResponse::latestAndMerge(CCDBResponse* other)
   other->refreshPathMap();
 
   std::vector<bool> toBeRemoved(other->objectNum, false);
-  for (size_t i = 0; i < other->objectNum; i++)
-  {
+  for (size_t i = 0; i < other->objectNum; i++) {
     std::string path = other->getStringAttribute(i, "path");
     if (pathHashmap.find(path) != pathHashmap.end() && pathHashmap[path].compare(other->pathHashmap[path]) == 0) {
       toBeRemoved[i] = true;
