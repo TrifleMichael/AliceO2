@@ -39,6 +39,8 @@
 #include <boost/foreach.hpp>
 #include <boost/optional/optional.hpp>
 
+#include "testCcdbApiResources.h"
+
 using namespace std;
 using namespace o2::ccdb;
 namespace utf = boost::unit_test;
@@ -101,6 +103,39 @@ struct test_fixture {
   CcdbApi api;
   map<string, string> metadata;
 };
+
+BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
+{
+  test_fixture f;
+
+  std::vector<std::string> paths;
+  std::vector<std::string> timestamps;
+  std::vector<std::string> types;
+  
+  std::string temp = "";
+  for(int i = 0; i < ObjectData.size(); i++)
+  {
+    if (ObjectData[i] == '`') {
+      paths.push_back(temp);
+      temp = "";
+    } else if (ObjectData[i] == '!') {
+      timestamps.push_back(temp);
+      temp = "";
+    } else if (ObjectData[i] == '@') {
+      types.push_back(temp);
+      temp = "";
+    } else {
+      (temp.push_back(ObjectData[i]));
+    }
+  }
+
+  for (int i = 0; i < 5; i++) {
+    std::map<std::string, std::string> metadata;
+    auto tObj = f.api.retrieveFromTFileAny<TObject>(paths[i], metadata);
+  }
+  // auto tObj = f.api.retrieveFromTFileAny<TObject>("TST/MO/XYZTask/example", metadata, 1629896877229);
+  BOOST_CHECK(1 == 2);
+}
 
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))
 {
