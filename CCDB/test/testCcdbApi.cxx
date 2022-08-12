@@ -165,7 +165,6 @@ BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
   }
 
   auto start = std::chrono::system_clock::now();
-  //navigateURLsAndRetrieveContent
   for (int i = 0; i < paths.size(); i++) {
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_URL, paths[i].c_str());
