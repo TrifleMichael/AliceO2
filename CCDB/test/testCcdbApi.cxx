@@ -164,8 +164,9 @@ BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
     }
   }
 
+  auto start = std::chrono::system_clock::now();
   //navigateURLsAndRetrieveContent
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < paths.size(); i++) {
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_URL, paths[i].c_str());
     MemoryStruct chunk{(char*)malloc(1), 0};
@@ -175,7 +176,11 @@ BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
     curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 0L);
     f.api.curlSetSSLOptions(curl_handle);
     auto res = curl_easy_perform(curl_handle);
+    BOOST_CHECK(res == CURLE_OK);
   }
+  auto end = std::chrono::system_clock::now();
+  auto difference = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "EXECUTION TIME: " << difference << "ms.\n";
   BOOST_CHECK(1 == 2);
 }
 //Michal test stop
