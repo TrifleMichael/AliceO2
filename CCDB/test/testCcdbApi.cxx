@@ -104,38 +104,81 @@ struct test_fixture {
   map<string, string> metadata;
 };
 
+//Michal test
+
+struct MemoryStruct {
+  char* memory;
+  unsigned int size;
+};
+
+static size_t WriteMemoryCallback(void* contents, size_t size, size_t nmemb, void* userp)
+{
+  size_t realsize = size * nmemb;
+  auto* mem = (struct MemoryStruct*)userp;
+
+  mem->memory = (char*)realloc(mem->memory, mem->size + realsize + 1);
+  if (mem->memory == nullptr) {
+    printf("not enough memory (realloc returned NULL)\n");
+    return 0;
+  }
+
+  memcpy(&(mem->memory[mem->size]), contents, realsize);
+  mem->size += realsize;
+  mem->memory[mem->size] = 0;
+
+  return realsize;
+}
 BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
 {
   test_fixture f;
 
-  std::vector<std::string> paths;
-  std::vector<std::string> timestamps;
-  std::vector<std::string> types;
-  
   std::string temp = "";
+  std::vector<std::string> paths;
+
+  // std::vector<std::string> timestamps;
+  // std::vector<std::string> types;
+  
+  // for(int i = 0; i < ObjectData.size(); i++)
+  // {
+  //   if (ObjectData[i] == '`') {
+  //     paths.push_back(temp);
+  //     temp = "";
+  //   } else if (ObjectData[i] == '!') {
+  //     timestamps.push_back(temp);
+  //     temp = "";
+  //   } else if (ObjectData[i] == '@') {
+  //     types.push_back(temp);
+  //     temp = "";
+  //   } else {
+  //     (temp.push_back(ObjectData[i]));
+  //   }
+  // }
+
   for(int i = 0; i < ObjectData.size(); i++)
   {
-    if (ObjectData[i] == '`') {
+    if (ObjectData[i] == ',') {
       paths.push_back(temp);
-      temp = "";
-    } else if (ObjectData[i] == '!') {
-      timestamps.push_back(temp);
-      temp = "";
-    } else if (ObjectData[i] == '@') {
-      types.push_back(temp);
       temp = "";
     } else {
       (temp.push_back(ObjectData[i]));
     }
   }
 
+  //navigateURLsAndRetrieveContent
   for (int i = 0; i < 5; i++) {
-    std::map<std::string, std::string> metadata;
-    auto tObj = f.api.retrieveFromTFileAny<TObject>(paths[i], metadata);
+    CURL* curl_handle = curl_easy_init();
+    curl_easy_setopt(curl_handle, CURLOPT_URL, paths[i].c_str());
+    MemoryStruct chunk{(char*)malloc(1), 0};
+    
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)&chunk);
+    curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 0L);
+    f.api.curlSetSSLOptions(curl_handle);
+    auto res = curl_easy_perform(curl_handle);
   }
-  // auto tObj = f.api.retrieveFromTFileAny<TObject>("TST/MO/XYZTask/example", metadata, 1629896877229);
   BOOST_CHECK(1 == 2);
 }
+//Michal test stop
 
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))
 {
