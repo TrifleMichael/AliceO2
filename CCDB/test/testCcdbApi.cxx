@@ -106,31 +106,20 @@ struct test_fixture {
 
 //Michal test
 
-struct MemoryStruct {
-  char* memory;
-  unsigned int size;
-};
-
-static size_t WriteMemoryCallback(void* contents, size_t size, size_t nmemb, void* userp)
+size_t writeToString(void *contents, size_t size, size_t nmemb, std::string *dst)
 {
-  size_t realsize = size * nmemb;
-  auto* mem = (struct MemoryStruct*)userp;
-
-  mem->memory = (char*)realloc(mem->memory, mem->size + realsize + 1);
-  if (mem->memory == nullptr) {
-    printf("not enough memory (realloc returned NULL)\n");
-    return 0;
+  // std::cout << "writeToString\n";
+  char *conts = (char *)contents;
+  for (int i = 0; i < nmemb; i++)
+  {
+    (*dst) += *(conts++);
   }
-
-  memcpy(&(mem->memory[mem->size]), contents, realsize);
-  mem->size += realsize;
-  mem->memory[mem->size] = 0;
-
-  return realsize;
+  return size * nmemb;
 }
+
 BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
 {
-  test_fixture f;
+  // test_fixture f;
 
   std::string temp = "";
   std::vector<std::string> paths;
@@ -154,6 +143,11 @@ BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
   //   }
   // }
 
+  if (curl_global_init(CURL_GLOBAL_ALL))
+  {
+    std::cout << "Could not init curl\n";
+  }
+
   for(int i = 0; i < ObjectData.size(); i++)
   {
     if (ObjectData[i] == ',') {
@@ -168,19 +162,25 @@ BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
   for (int i = 0; i < paths.size(); i++) {
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_URL, paths[i].c_str());
-    MemoryStruct chunk{(char*)malloc(1), 0};
     
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)&chunk);
-    curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 0L);
-    f.api.curlSetSSLOptions(curl_handle);
+    std::string *str = new std::string();
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, writeToString);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, str);
+    // f.api.curlSetSSLOptions(curl_handle);
     auto res = curl_easy_perform(curl_handle);
     BOOST_CHECK(res == CURLE_OK);
+
+
+    char *done_url;
+    curl_easy_getinfo(curl_handle, CURLINFO_EFFECTIVE_URL, &done_url);
+    std::cout << "Path: " << done_url << "\n";
+    std::cout << "RES: " << res << "\n";
   }
   auto end = std::chrono::system_clock::now();
   auto difference = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   std::cout << "EXECUTION TIME: " << difference << "ms.\n";
   BOOST_CHECK(1 == 2);
+  curl_global_cleanup();
 }
 //Michal test stop
 
