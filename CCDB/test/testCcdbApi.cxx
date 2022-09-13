@@ -18,6 +18,7 @@
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_DYN_LINK
 
+#include "CCDB/CCDBDownloader.h"
 #include "CCDB/CcdbApi.h"
 #include "CCDB/IdPath.h"    // just as test object
 #include "CommonUtils/RootChain.h" // just as test object
@@ -107,82 +108,10 @@ struct test_fixture {
 };
 
 //Michal test
-
-size_t writeToString(void *contents, size_t size, size_t nmemb, std::string *dst)
-{
-  // std::cout << "writeToString\n";
-  char *conts = (char *)contents;
-  for (int i = 0; i < nmemb; i++)
-  {
-    (*dst) += *(conts++);
-  }
-  return size * nmemb;
-}
-
 BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
 {
-  // test_fixture f;
-
-  std::string temp = "";
-  std::vector<std::string> paths;
-
-  // std::vector<std::string> timestamps;
-  // std::vector<std::string> types;
-  
-  // for(int i = 0; i < ObjectData.size(); i++)
-  // {
-  //   if (ObjectData[i] == '`') {
-  //     paths.push_back(temp);
-  //     temp = "";
-  //   } else if (ObjectData[i] == '!') {
-  //     timestamps.push_back(temp);
-  //     temp = "";
-  //   } else if (ObjectData[i] == '@') {
-  //     types.push_back(temp);
-  //     temp = "";
-  //   } else {
-  //     (temp.push_back(ObjectData[i]));
-  //   }
-  // }
-
-  if (curl_global_init(CURL_GLOBAL_ALL))
-  {
-    std::cout << "Could not init curl\n";
-  }
-
-  for(int i = 0; i < ObjectData.size(); i++)
-  {
-    if (ObjectData[i] == ',') {
-      paths.push_back(temp);
-      temp = "";
-    } else {
-      (temp.push_back(ObjectData[i]));
-    }
-  }
-
-  auto start = std::chrono::system_clock::now();
-  for (int i = 0; i < paths.size(); i++) {
-    CURL* curl_handle = curl_easy_init();
-    curl_easy_setopt(curl_handle, CURLOPT_URL, paths[i].c_str());
-    
-    std::string *str = new std::string();
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, writeToString);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, str);
-    // f.api.curlSetSSLOptions(curl_handle);
-    auto res = curl_easy_perform(curl_handle);
-    BOOST_CHECK(res == CURLE_OK);
-
-
-    char *done_url;
-    curl_easy_getinfo(curl_handle, CURLINFO_EFFECTIVE_URL, &done_url);
-    std::cout << "Path: " << done_url << "\n";
-    std::cout << "RES: " << res << "\n";
-  }
-  auto end = std::chrono::system_clock::now();
-  auto difference = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "EXECUTION TIME: " << difference << "ms.\n";
-  BOOST_CHECK(1 == 2);
-  curl_global_cleanup();
+  CCDBDownloader CCDBD;
+  // CCDBD.hello();
 }
 //Michal test stop
 
