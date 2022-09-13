@@ -26,8 +26,9 @@ if [[ -z $CTF_MAX_PER_FILE ]];         then CTF_MAX_PER_FILE="10000"; fi       #
 workflow_has_parameter CTF && export SAVECTF=1
 workflow_has_parameter GPU && { export GPUTYPE=HIP; export NGPUS=4; }
 
-NITSDECTHREADS=2
-NMFTDECTHREADS=2
+[[ -z $NITSDECTHREADS ]] && NITSDECTHREADS=2
+[[ -z $NMFTDECTHREADS ]] && NMFTDECTHREADS=2
+
 [[ -z $SVERTEX_THREADS ]] && SVERTEX_THREADS=$(( $SYNCMODE == 1 ? 1 : 2 ))
 # FIXME: multithreading in the itsmft reconstruction does not work on macOS.
 if [[ $(uname) == "Darwin" ]]; then
@@ -152,7 +153,9 @@ has_detector_flp_processing CPV && CPV_INPUT=digits
 if [[ $EPNSYNCMODE == 1 ]]; then
   EVE_CONFIG+=" --eve-dds-collection-index 0"
   MIDDEC_CONFIG+=" --feeId-config-file \"$MID_FEEID_MAP\""
-  GPU_CONFIG_KEY+="GPU_proc.tpcIncreasedMinClustersPerRow=500000;GPU_proc.ignoreNonFatalGPUErrors=1;GPU_proc.throttleAlarms=1;"
+  GPU_CONFIG_KEY+="GPU_proc.tpcIncreasedMinClustersPerRow=500000;GPU_proc.ignoreNonFatalGPUErrors=1;GPU_proc.throttleAlarms=1;GPU_proc.conservativeMemoryEstimate=1;"
+  # option for avoinding masking problematic channels from previous calibrations
+  TOF_CONFIG+=" --for-calib"
   # Options for decoding current TRD real raw data (not needed for data converted from MC)
   if [[ -z $TRD_DECODER_OPTIONS ]]; then TRD_DECODER_OPTIONS=" --tracklethcheader 2 "; fi
   if [[ $EXTINPUT == 1 ]] && [[ $GPUTYPE != "CPU" ]] && [[ -z "$GPU_NUM_MEM_REG_CALLBACKS" ]]; then GPU_NUM_MEM_REG_CALLBACKS=4; fi
@@ -370,6 +373,7 @@ if [[ $CTFINPUT == 0 && $DIGITINPUT == 0 ]]; then
     GPU_INPUT=zsonthefly
     add_W o2-tpc-raw-to-digits-workflow "--input-spec \"\" --remove-duplicates --pipeline $(get_N tpc-raw-to-digits-0 TPC RAW 1 TPCRAWDEC)"
     add_W o2-tpc-reco-workflow "--input-type digitizer --output-type zsraw,disable-writer --pipeline $(get_N tpc-zsEncoder TPC RAW 1 TPCRAWDEC)"
+    [ -z "$DISABLE_ROOT_OUTPUT" ] && add_W o2-tpc-reco-workflow "--input-type digitizer --output-type digits $DISABLE_MC"
   fi
   has_detector ITS && add_W o2-itsmft-stf-decoder-workflow "--nthreads ${NITSDECTHREADS} --raw-data-dumps $ALPIDE_ERR_DUMPS --pipeline $(get_N its-stf-decoder ITS RAW 1 ITSRAWDEC)" "$ITSMFT_STROBES;VerbosityConfig.rawParserSeverity=warn;"
   has_detector MFT && add_W o2-itsmft-stf-decoder-workflow "--nthreads ${NMFTDECTHREADS} --raw-data-dumps $ALPIDE_ERR_DUMPS --pipeline $(get_N mft-stf-decoder MFT RAW 1 MFTRAWDEC) --runmft true" "$ITSMFT_STROBES;VerbosityConfig.rawParserSeverity=warn;"
@@ -393,9 +397,9 @@ fi
 (has_detector_reco TPC || has_detector_ctf TPC) && add_W o2-gpu-reco-workflow "--gpu-reconstruction '--severity $SEVERITY_TPC' --input-type=$GPU_INPUT $DISABLE_MC --output-type $GPU_OUTPUT --pipeline gpu-reconstruction:${N_TPCTRK:-1} $GPU_CONFIG" "GPU_global.deviceType=$GPUTYPE;GPU_proc.debugLevel=0;$GPU_CONFIG_KEY"
 (has_detector_reco TOF || has_detector_ctf TOF) && add_W o2-tof-reco-workflow "$TOF_CONFIG --input-type $TOF_INPUT --output-type $TOF_OUTPUT $DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC --pipeline $(get_N tof-compressed-decoder TOF RAW 1),$(get_N TOFClusterer TOF REST 1)"
 has_detector_reco ITS && add_W o2-its-reco-workflow "--trackerCA $ITS_CONFIG $DISABLE_MC $DISABLE_DIGIT_CLUSTER_INPUT $DISABLE_ROOT_OUTPUT --pipeline $(get_N its-tracker ITS REST 1 ITSTRK)" "$ITS_CONFIG_KEY;$ITSMFT_STROBES"
-has_detectors_reco ITS TPC && has_detector_matching ITSTPC && add_W o2-tpcits-match-workflow "$DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC $SEND_ITSTPC_DTGL --pipeline $(get_N itstpc-track-matcher MATCH REST 1 TPCITS)" "$ITSMFT_STROBES"
 has_detector_reco FT0 && add_W o2-ft0-reco-workflow "$DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC --pipeline $(get_N ft0-reconstructor FT0 REST 1)"
 has_detector_reco TRD && add_W o2-trd-tracklet-transformer "$DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC $TRD_FILTER_CONFIG --pipeline $(get_N TRDTRACKLETTRANSFORMER TRD REST 1 TRDTRK)"
+has_detectors_reco ITS TPC && has_detector_matching ITSTPC && add_W o2-tpcits-match-workflow "$DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC $SEND_ITSTPC_DTGL --pipeline $(get_N itstpc-track-matcher MATCH REST 1 TPCITS)" "$ITSMFT_STROBES"
 has_detector_reco TRD && [[ ! -z "$TRD_SOURCES" ]] && add_W o2-trd-global-tracking "$DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC $TRD_CONFIG $TRD_FILTER_CONFIG --track-sources $TRD_SOURCES" "$TRD_CONFIG_KEY;$ITSMFT_STROBES"
 has_detector_reco TOF && [[ ! -z "$TOF_SOURCES" ]] && add_W o2-tof-matcher-workflow "$DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC --track-sources $TOF_SOURCES --pipeline $(get_N tof-matcher TOF REST 1 TOFMATCH)" "$ITSMFT_STROBES"
 has_detectors TPC && [ -z "$DISABLE_ROOT_OUTPUT" ] && add_W o2-tpc-reco-workflow "--input-type pass-through --output-type clusters,tracks,send-clusters-per-sector $DISABLE_MC"
@@ -418,8 +422,8 @@ has_detectors_reco MFT MCH && has_detector_matching MFTMCH && add_W o2-globalfwd
 ( has_detector_qc PHS || has_detector_calib PHS ) && ( workflow_has_parameter QC || workflow_has_parameter CALIB ) && add_W o2-phos-reco-workflow "--input-type cells --output-type clusters ${PHS_CONFIG} $DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $DISABLE_MC --pipeline $(get_N PHOSClusterizerSpec PHS REST 1)"
 
 # always run vertexing if requested and if there are some sources, but in cosmic mode we work in pass-trough mode (create record for non-associated tracks)
-[[ $BEAMTYPE == "cosmic" ]] && PVTXSKIP="--skip" || PVTXSKIP=
-has_detectors_reco ITS && has_detector_matching PRIMVTX && [[ ! -z "$VERTEXING_SOURCES" ]] && add_W o2-primary-vertexing-workflow "$PVTXSKIP $DISABLE_MC $DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $PVERTEX_CONFIG --pipeline $(get_N primary-vertexing MATCH REST 1)" "${PVERTEXING_CONFIG_KEY}"
+( [[ $BEAMTYPE == "cosmic" ]] || ! has_detector_reco ITS) && PVERTEX_CONFIG+=" --skip"
+has_detector_matching PRIMVTX && [[ ! -z "$VERTEXING_SOURCES" ]] && add_W o2-primary-vertexing-workflow "$PVTXSKIP $DISABLE_MC $DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT $PVERTEX_CONFIG --pipeline $(get_N primary-vertexing MATCH REST 1)" "${PVERTEXING_CONFIG_KEY}"
 
 if [[ $BEAMTYPE != "cosmic" ]]; then
   has_detectors_reco ITS && has_detector_matching SECVTX && [[ ! -z "$SVERTEXING_SOURCES" ]] && add_W o2-secondary-vertexing-workflow "$DISABLE_DIGIT_ROOT_INPUT $DISABLE_ROOT_OUTPUT --vertexing-sources $SVERTEXING_SOURCES --threads $SVERTEX_THREADS --pipeline $(get_N secondary-vertexing MATCH REST $SVERTEX_THREADS)"
@@ -480,7 +484,7 @@ workflow_has_parameter GPU_DISPLAY && [[ $NUMAID == 0 ]] && add_W o2-gpu-display
 # ---------------------------------------------------------------------------------------------------------------------
 # AOD
 [[ -z "$AOD_INPUT" ]] && AOD_INPUT=$TRACK_SOURCES
-( ! has_detector_matching SECVTX || [[ $BEAMTYPE == "cosmic" ]]) && AODPROD_OPT+="--disable-secondary-vertices"
+( ! has_detector_matching SECVTX || ! has_detectors_reco ITS || [[ $BEAMTYPE == "cosmic" ]]) && AODPROD_OPT+="--disable-secondary-vertices"
 workflow_has_parameter AOD && [[ ! -z "$AOD_INPUT" ]] && add_W o2-aod-producer-workflow "$AODPROD_OPT --info-sources $AOD_INPUT $DISABLE_DIGIT_ROOT_INPUT --aod-writer-keep dangling --aod-writer-resfile "AO2D" --aod-writer-resmode UPDATE $DISABLE_MC"
 
 # ---------------------------------------------------------------------------------------------------------------------

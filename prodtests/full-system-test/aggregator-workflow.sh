@@ -17,7 +17,11 @@ if [[ -z ${CCDB_POPULATOR_UPLOAD_PATH+x} ]]; then
   if [[ $RUNTYPE == "SYNTHETIC" ]]; then
     CCDB_POPULATOR_UPLOAD_PATH="http://ccdb-test.cern.ch:8080"
   elif [[ $RUNTYPE == "PHYSICS" ]]; then
-    CCDB_POPULATOR_UPLOAD_PATH="http://ccdb-test.cern.ch:8080"
+    if [[ $$EPNSYNCMODE == 1 ]]; then
+      CCDB_POPULATOR_UPLOAD_PATH="http://localhost:8084"
+    else
+      CCDB_POPULATOR_UPLOAD_PATH="http://ccdb-test.cern.ch:8080"
+    fi
   else
     CCDB_POPULATOR_UPLOAD_PATH="none"
   fi
@@ -34,7 +38,8 @@ if [[ "0$GEN_TOPO_VERBOSE" == "01" ]]; then
   echo "CALIB_TOF_LHCPHASE = $CALIB_TOF_LHCPHASE" 1>&2
   echo "CALIB_TOF_CHANNELOFFSETS = $CALIB_TOF_CHANNELOFFSETS" 1>&2
   echo "CALIB_TOF_DIAGNOSTICS = $CALIB_TOF_DIAGNOSTICS" 1>&2
-  echo "CALIB_EMC_CHANNELCALIB = $CALIB_EMC_CHANNELCALIB" 1>&2
+  echo "CALIB_EMC_BADCHANNELCALIB = $CALIB_EMC_BADCHANNELCALIB" 1>&2
+  echo "CALIB_EMC_TIMECALIB = $CALIB_EMC_TIMECALIB" 1>&2
   echo "CALIB_PHS_ENERGYCALIB = $CALIB_PHS_ENERGYCALIB" 1>&2
   echo "CALIB_PHS_BADMAPCALIB = $CALIB_PHS_BADMAPCALIB" 1>&2
   echo "CALIB_PHS_TURNONCALIB = $CALIB_PHS_TURNONCALIB" 1>&2
@@ -45,6 +50,7 @@ if [[ "0$GEN_TOPO_VERBOSE" == "01" ]]; then
   echo "CALIB_TPC_SCDCALIB = $CALIB_TPC_SCDCALIB" 1>&2
   echo "CALIB_TPC_VDRIFTTGL = $CALIB_TPC_VDRIFTTGL" 1>&2
   echo "CALIB_TPC_IDC = $CALIB_TPC_IDC" 1>&2
+  echo "CALIB_TPC_IDC_BOTH = $CALIB_TPC_IDC_BOTH" 1>&2
   echo "CALIB_CPV_GAIN = $CALIB_CPV_GAIN" 1>&2
 fi
 
@@ -91,6 +97,26 @@ if workflow_has_parameter CALIB_PROXIES; then
   elif [[ $AGGREGATOR_TASKS == BARREL_SPORADIC ]]; then
     if [[ ! -z $CALIBDATASPEC_BARREL_SPORADIC ]]; then
       add_W o2-dpl-raw-proxy "--dataspec \"$CALIBDATASPEC_BARREL_SPORADIC\" $(get_proxy_connection barrel_sp input)" "" 0
+    fi
+  elif [[ $AGGREGATOR_TASKS == TPCIDC_BOTH ]]; then
+    if [[ ! -z $CALIBDATASPEC_TPCIDC_A ]] || [[ ! -z $CALIBDATASPEC_TPCIDC_C ]]; then
+      if [[ $FLP_TPC_IDC == 1 ]]; then # IDCs are coming from FLPs
+  if [[ $EPNSYNCMODE != 1 ]]; then
+    echo "ERROR: You cannot run the TPC IDCs in FLP mode if you are not in EPNSYNCMODE" 1>&2
+    exit 2
+  fi
+  # define port for FLP; should be in 47900 - 47999; if nobody defined it, we use 47900
+  [[ -z $TPC_IDC_FLP_PORT ]] && TPC_IDC_FLP_PORT=47900
+  # expand FLPs; TPC uses from 001 to 145, but 145 is reserved for SAC
+  for flp in $(seq -f "%03g" 1 144)
+  do
+    FLP_ADDRESS="tcp://alicr1-flp-ib${flp}:${TPC_IDC_FLP_PORT}"
+    CHANNELS_LIST+=" --channel-config \"type=pull,name=tpcidc_flp${flp},transport=zmq,address=$FLP_ADDRESS,method=connect,rateLogging=10\""
+  done
+  add_W o2-dpl-raw-proxy "--dataspec \"$CALIBDATASPEC_TPCIDC_A;CALIBDATASPEC_TPCIDC_C\" $CHANNELS_LIST --timeframes-shm-limit $TIMEFRAME_SHM_LIMIT" "" 0
+      else
+  add_W o2-dpl-raw-proxy "--dataspec \"$CALIBDATASPEC_TPCIDC_A;$CALIBDATASPEC_TPCIDC_C\" $(get_proxy_connection tpcidc_both input)" "" 0
+      fi
     fi
   elif [[ $AGGREGATOR_TASKS == TPCIDC_A ]]; then
     if [[ ! -z $CALIBDATASPEC_TPCIDC_A ]]; then
@@ -166,24 +192,29 @@ if [[ $AGGREGATOR_TASKS == BARREL_SPORADIC ]] || [[ $AGGREGATOR_TASKS == ALL ]];
 fi
 
 # TPC IDCs
-firstCRU=0
-lastCRU=179
-crus="$firstCRU-$lastCRU"
-lanes=1
-lanesDistribute=1
+crus="0-359"  # to be used with $AGGREGATOR_TASKS == TPCIDC_BOTH or ALL
+if [[ $AGGREGATOR_TASKS == TPCIDC_A ]]; then
+  crus="0-179"
+elif [[ $AGGREGATOR_TASKS == TPCIDC_C ]]; then
+  crus="180-359"
+fi
 lanesFactorize=6
-nTFs=500
-if ! workflow_has_parameter CALIB_LOCAL_INTEGRATED_AGGREGATOR && [[ $AGGREGATOR_TASKS == TPCIDC_A || $AGGREGATOR_TASKS == TPCIDC_C || $AGGREGATOR_TASKS == ALL ]]; then
-  add_W o2-tpc-idc-distribute "--crus ${crus} --timeframes ${nTFs} --firstTF -100 --check-for-missing-data true --lanes ${lanesDistribute} --output-lanes ${lanesFactorize} --nFactorTFs 100"
-  add_W o2-tpc-idc-factorize "--lanesDistribute ${lanesDistribute} --input-lanes ${lanesFactorize} --crus ${crus} --timeframes ${nTFs} --configFile '' --compression 2 --groupIDCs true --nthreads-grouping 8 --nthreads-IDC-factorization 8 --groupPads \"5,6,7,8,4,5,6,8,10,13\" --groupRows \"2,2,2,3,3,3,2,2,2,2\" --sendOutputFFT true --nTFsMessage 500 --enable-CCDB-output true --enablePadStatusMap --check-for-missing-data" "TPCIDCGroupParam.groupPadsSectorEdges=32211"
-  add_W o2-tpc-idc-ft-aggregator "--rangeIDC 200 --inputLanes ${lanesFactorize} --nFourierCoeff 40 --timeframes ${nTFs} --nthreads 8"
+nTFs=1000
+
+if ! workflow_has_parameter CALIB_LOCAL_INTEGRATED_AGGREGATOR && [[ $CALIB_TPC_IDC == 1 ]] && [[ $AGGREGATOR_TASKS == TPCIDC_A || $AGGREGATOR_TASKS == TPCIDC_C || $AGGREGATOR_TASKS == TPCIDC_BOTH || $AGGREGATOR_TASKS == ALL ]]; then
+  add_W o2-tpc-idc-distribute "--crus ${crus} --timeframes ${nTFs} --firstTF -100 --output-lanes ${lanesFactorize} --send-precise-timestamp true --condition-tf-per-query ${nTFs}"
+  add_W o2-tpc-idc-factorize "--input-lanes ${lanesFactorize} --crus ${crus} --timeframes ${nTFs} --nthreads-grouping 8 --nthreads-IDC-factorization 8 --sendOutputFFT true --nTFsMessage 500 --enable-CCDB-output true --enablePadStatusMap true --use-precise-timestamp true" "TPCIDCGroupParam.groupPadsSectorEdges=32211"
+  add_W o2-tpc-idc-ft-aggregator "--rangeIDC 200 --inputLanes ${lanesFactorize} --nFourierCoeff 40 --nthreads 8"
 fi
 
 # Calo cal
 # calibrations for AGGREGATOR_TASKS == CALO_TF
 if [[ $AGGREGATOR_TASKS == CALO_TF || $AGGREGATOR_TASKS == ALL ]]; then
   # EMC
-  if [[ $CALIB_EMC_CHANNELCALIB == 1 ]]; then
+  if [[ $CALIB_EMC_BADCHANNELCALIB == 1 ]]; then
+    add_W o2-calibration-emcal-channel-calib-workflow "" "EMCALCalibParams.calibType=\"badchannels\""
+  fi
+  if [[ $CALIB_EMC_TIMECALIB == 1 ]]; then
     add_W o2-calibration-emcal-channel-calib-workflow "" "EMCALCalibParams.calibType=\"time\""
   fi
 

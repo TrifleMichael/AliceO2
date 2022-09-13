@@ -42,6 +42,7 @@
 #include "ArrowSupport.h"
 #include "DPLMonitoringBackend.h"
 #include "TDatabasePDG.h"
+#include "../../../DataFormats/simulation/include/SimulationDataFormat/O2DatabasePDG.h"
 #include "Headers/STFHeader.h"
 #include "Headers/DataHeader.h"
 
@@ -673,18 +674,21 @@ o2::framework::ServiceSpec CommonServices::threadPool(int numWorkers)
 {
   return ServiceSpec{
     .name = "threadpool",
-    .init = [numWorkers](ServiceRegistry& services, DeviceState&, fair::mq::ProgOptions& options) -> ServiceHandle {
+    .init = [](ServiceRegistry& services, DeviceState&, fair::mq::ProgOptions& options) -> ServiceHandle {
       ThreadPool* pool = new ThreadPool();
-      pool->poolSize = numWorkers;
+      // FIXME: this will require some extra argument for the configuration context of a service
+      pool->poolSize = 1;
       return ServiceHandle{TypeIdHelpers::uniqueId<ThreadPool>(), pool};
     },
-    .configure = [numWorkers](InitContext&, void* service) -> void* {
+    .configure = [](InitContext&, void* service) -> void* {
       ThreadPool* t = reinterpret_cast<ThreadPool*>(service);
-      t->poolSize = numWorkers;
+      // FIXME: this will require some extra argument for the configuration context of a service
+      t->poolSize = 1;
       return service;
     },
-    .postForkParent = [numWorkers](ServiceRegistry& service) -> void {
-      auto numWorkersS = std::to_string(numWorkers);
+    .postForkParent = [](ServiceRegistry& services) -> void {
+      // FIXME: this will require some extra argument for the configuration context of a service
+      auto numWorkersS = std::to_string(1);
       setenv("UV_THREADPOOL_SIZE", numWorkersS.c_str(), 0);
     },
     .kind = ServiceKind::Serial};
@@ -711,12 +715,12 @@ auto sendRelayerMetrics(ServiceRegistry& registry, DataProcessingStats& stats) -
     auto device = registry.get<RawDeviceService>().device();
     long freeMemory = -1;
     try {
-      freeMemory = Monitor::GetFreeMemory(ShmId{makeShmIdStr(device->fConfig->GetProperty<uint64_t>("shmid"))}, runningWorkflow.shmSegmentId);
+      freeMemory = fair::mq::shmem::Monitor::GetFreeMemory(ShmId{makeShmIdStr(device->fConfig->GetProperty<uint64_t>("shmid"))}, runningWorkflow.shmSegmentId);
     } catch (...) {
     }
     if (freeMemory == -1) {
       try {
-        freeMemory = Monitor::GetFreeMemory(SessionId{device->fConfig->GetProperty<std::string>("session")}, runningWorkflow.shmSegmentId);
+        freeMemory = fair::mq::shmem::Monitor::GetFreeMemory(SessionId{device->fConfig->GetProperty<std::string>("session")}, runningWorkflow.shmSegmentId);
       } catch (...) {
       }
     }
@@ -945,7 +949,7 @@ o2::framework::ServiceSpec CommonAnalysisServices::databasePDGSpec()
     .name = "database-pdg",
     .init = [](ServiceRegistry&, DeviceState&, fair::mq::ProgOptions&) -> ServiceHandle {
       auto* ptr = new TDatabasePDG();
-      ptr->ReadPDGTable();
+      o2::O2DatabasePDG::addALICEParticles(ptr);
       return ServiceHandle{TypeIdHelpers::uniqueId<TDatabasePDG>(), ptr, ServiceKind::Serial, "database-pdg"};
     },
     .configure = CommonServices::noConfiguration(),

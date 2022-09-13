@@ -44,11 +44,12 @@ class TPCFourierTransformAggregatorSpec : public o2::framework::Task
   // Fourier type
   using IDCFType = IDCFourierTransform<IDCFourierTransformBaseAggregator>;
 
-  TPCFourierTransformAggregatorSpec(const unsigned int nFourierCoefficientsStore, const unsigned int rangeIDC, const bool debug = false, const bool senddebug = false, const bool processSACs = false, const int inputLanes = 1)
-    : mIDCFourierTransform{IDCFType(rangeIDC, nFourierCoefficientsStore), IDCFType(rangeIDC, nFourierCoefficientsStore)}, mDebug{debug}, mSendOutDebug{senddebug}, mProcessSACs{processSACs}, mInputLanes{inputLanes} {};
+  TPCFourierTransformAggregatorSpec(const unsigned int nFourierCoefficientsStore, const unsigned int rangeIDC, const bool senddebug = false, const bool processSACs = false, const int inputLanes = 1)
+    : mIDCFourierTransform{IDCFType(rangeIDC, nFourierCoefficientsStore), IDCFType(rangeIDC, nFourierCoefficientsStore)}, mSendOutDebug{senddebug}, mProcessSACs{processSACs}, mInputLanes{inputLanes} {};
 
   void init(o2::framework::InitContext& ic) final
   {
+    mDumpFFT = ic.options().get<bool>("dump-coefficients-agg");
     mIntervalsSACs = ic.options().get<int>("intervalsSACs");
     resizeBuffer(mInputLanes);
   }
@@ -61,9 +62,9 @@ class TPCFourierTransformAggregatorSpec : public o2::framework::Task
       return;
     }
 
-    mCCDBBuffer[lane] = pc.inputs().get<std::vector<uint64_t>>("tsccdb");
+    mCCDBBuffer[lane] = pc.inputs().get<std::vector<long>>("tsccdb");
     if (mProcessedTimeStamp > mCCDBBuffer[lane].front()) {
-      LOGP(error, "Already processed a later time stamp {} then the received time stamp {}!", mProcessedTimeStamp, mCCDBBuffer[lane].front());
+      LOGP(warning, "Already received data from a later time stamp {} then the currently received time stamp {}! (This might not be an issue)", mProcessedTimeStamp, mCCDBBuffer[lane].front());
     } else {
       mProcessedTimeStamp = mCCDBBuffer[lane].front();
     }
@@ -122,7 +123,7 @@ class TPCFourierTransformAggregatorSpec : public o2::framework::Task
             coeffSAC.mCoeff[side] = mIDCFourierTransform[side].getFourierCoefficients();
           }
 
-          if (mDebug) {
+          if (mDumpFFT) {
             LOGP(info, "dumping FT to file");
             mIDCFourierTransform[side].dumpToFile(fmt::format("FourierAGG_{:02}_side{}.root", processing_helpers::getCurrentTF(pc), side).data());
           }
@@ -154,17 +155,17 @@ class TPCFourierTransformAggregatorSpec : public o2::framework::Task
 
  private:
   std::array<IDCFType, SIDES> mIDCFourierTransform{};              ///< object for performing the fourier transform of 1D-IDCs
-  const bool mDebug{false};                                        ///< dump IDCs to tree for debugging
   const bool mSendOutDebug{false};                                 ///< flag if the output will be send (for debugging)
   const bool mProcessSACs{false};                                  ///< flag for processing SACs instead of IDCs
   const int mInputLanes{1};                                        ///< number of lanes from which input is expected
+  bool mDumpFFT{false};                                            ///< dump fourier coefficients to file
   uint64_t mProcessedTimeStamp{0};                                 ///< to keep track of the processed timestamps
-  std::vector<std::vector<uint64_t>> mCCDBBuffer{};                ///< buffer for CCDB time stamp in case one facotorize lane is earlier sending data the n the other lane
+  std::vector<std::vector<long>> mCCDBBuffer{};                    ///< buffer for CCDB time stamp in case one facotorize lane is earlier sending data the n the other lane
   std::vector<std::vector<unsigned int>> mIntervalsBuffer{};       ///< buffer for the intervals in case one facotorize lane is earlier sending data the n the other lane
   std::vector<std::array<o2::tpc::IDCOne, SIDES>> mIDCOneBuffer{}; ///< buffer for the received IDCOne in case one facotorize lane is earlier sending data the n the other lane
   unsigned int mIntervalsSACs{12};                                 ///< number of intervals which are skipped for calculationg the fourier coefficients
   int mExpectedInputLane{0};                                       ///< expeceted data from this input lane
-  const std::array<std::vector<InputSpec>, 2> mFilter = {std::vector<InputSpec>{{"idcone", ConcreteDataTypeMatcher{o2::header::gDataOriginTPC, TPCFactorizeIDCSpec<>::getDataDescriptionIDC1()}, Lifetime::Sporadic}},
+  const std::array<std::vector<InputSpec>, 2> mFilter = {std::vector<InputSpec>{{"idcone", ConcreteDataTypeMatcher{o2::header::gDataOriginTPC, TPCFactorizeIDCSpec::getDataDescriptionIDC1()}, Lifetime::Sporadic}},
                                                          std::vector<InputSpec>{{"sacone", ConcreteDataTypeMatcher{o2::header::gDataOriginTPC, TPCFactorizeSACSpec::getDataDescriptionSAC1()}, Lifetime::Sporadic}}}; ///< filter for looping over input data
 
   void sendOutput(DataAllocator& output, const int side)
@@ -179,8 +180,7 @@ class TPCFourierTransformAggregatorSpec : public o2::framework::Task
     mIDCOneBuffer.resize(expectedLanes);
   }
 };
-
-DataProcessorSpec getTPCFourierTransformAggregatorSpec(const unsigned int rangeIDC, const unsigned int nFourierCoefficientsStore, const bool debug = false, const bool senddebug = false, const bool processSACs = false, const int inputLanes = 1)
+DataProcessorSpec getTPCFourierTransformAggregatorSpec(const unsigned int rangeIDC, const unsigned int nFourierCoefficientsStore, const bool senddebug, const bool processSACs, const int inputLanes)
 {
   std::vector<OutputSpec> outputSpecs;
   outputSpecs.emplace_back(ConcreteDataTypeMatcher{o2::calibration::Utils::gDataOriginCDBPayload, TPCFourierTransformAggregatorSpec::getDataDescriptionCCDBFourier()}, Lifetime::Sporadic);
@@ -192,10 +192,10 @@ DataProcessorSpec getTPCFourierTransformAggregatorSpec(const unsigned int rangeI
 
   std::vector<InputSpec> inputSpecs;
   if (!processSACs) {
-    inputSpecs.emplace_back(InputSpec{"idcone", ConcreteDataTypeMatcher{gDataOriginTPC, TPCFactorizeIDCSpec<>::getDataDescriptionIDC1()}, Lifetime::Sporadic});
-    inputSpecs.emplace_back(InputSpec{"tsccdb", gDataOriginTPC, TPCFactorizeIDCSpec<>::getDataDescriptionTimeStamp(), Lifetime::Sporadic});
-    inputSpecs.emplace_back(InputSpec{"intervals", gDataOriginTPC, TPCFactorizeIDCSpec<>::getDataDescriptionIntervals(), Lifetime::Sporadic});
-    inputSpecs.emplace_back(InputSpec{"lane", gDataOriginTPC, TPCFactorizeIDCSpec<>::getDataDescriptionLane(), Lifetime::Sporadic});
+    inputSpecs.emplace_back(InputSpec{"idcone", ConcreteDataTypeMatcher{gDataOriginTPC, TPCFactorizeIDCSpec::getDataDescriptionIDC1()}, Lifetime::Sporadic});
+    inputSpecs.emplace_back(InputSpec{"tsccdb", gDataOriginTPC, TPCFactorizeIDCSpec::getDataDescriptionTimeStamp(), Lifetime::Sporadic});
+    inputSpecs.emplace_back(InputSpec{"intervals", gDataOriginTPC, TPCFactorizeIDCSpec::getDataDescriptionIntervals(), Lifetime::Sporadic});
+    inputSpecs.emplace_back(InputSpec{"lane", gDataOriginTPC, TPCFactorizeIDCSpec::getDataDescriptionLane(), Lifetime::Sporadic});
   } else {
     inputSpecs.emplace_back(InputSpec{"sacone", ConcreteDataTypeMatcher{gDataOriginTPC, TPCFactorizeSACSpec::getDataDescriptionSAC1()}, Lifetime::Sporadic});
     inputSpecs.emplace_back(InputSpec{"tsccdb", gDataOriginTPC, TPCFactorizeSACSpec::getDataDescriptionTimeStamp(), Lifetime::Sporadic});
@@ -206,8 +206,9 @@ DataProcessorSpec getTPCFourierTransformAggregatorSpec(const unsigned int rangeI
     "tpc-aggregator-ft",
     inputSpecs,
     outputSpecs,
-    AlgorithmSpec{adaptFromTask<TPCFourierTransformAggregatorSpec>(nFourierCoefficientsStore, rangeIDC, debug, senddebug, processSACs, inputLanes)},
-    Options{{"intervalsSACs", VariantType::Int, 11, {"Number of integration intervals which will be sampled for the fourier coefficients"}}}};
+    AlgorithmSpec{adaptFromTask<TPCFourierTransformAggregatorSpec>(nFourierCoefficientsStore, rangeIDC, senddebug, processSACs, inputLanes)},
+    Options{{"intervalsSACs", VariantType::Int, 11, {"Number of integration intervals which will be sampled for the fourier coefficients"}},
+            {"dump-coefficients-agg", VariantType::Bool, false, {"Dump fourier coefficients to file"}}}};
 }
 
 } // namespace o2::tpc

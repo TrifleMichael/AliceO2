@@ -353,7 +353,10 @@ void EventManagerFrame::createOutreachScreenshot()
     fileName = imageFolder + "/" + fileName.substr(0, fileName.find_last_of('.')) + ".png";
     if (!std::filesystem::is_regular_file(fileName)) {
       std::vector<std::string> ext = {".png"};
-      DirectoryLoader::removeOldestFiles(imageFolder, ext, 10);
+      TEnv settings;
+      ConfigurationManager::getInstance().getConfig(settings);
+      UInt_t outreachFilesMax = settings.GetValue("outreach.files.max", 10);
+      DirectoryLoader::removeOldestFiles(imageFolder, ext, outreachFilesMax);
       LOG(info) << "Outreach screenshot: " << fileName;
       Screenshot::perform(fileName, this->mEventManager->getDataSource()->getDetectorsMask(),
                           this->mEventManager->getDataSource()->getRunNumber(),
@@ -461,58 +464,40 @@ void EventManagerFrame::DoSequentialMode()
   }
 }
 
-void EventManagerFrame::DoSyntheticData()
+void EventManagerFrame::changeRunMode(RunMode runMode)
 {
-  TEnv settings;
-  ConfigurationManager::getInstance().getConfig(settings);
+  if (this->mRunMode != runMode) {
+    if (not setInTick()) {
+      return;
+    }
 
-  if (this->mRunMode != EventManagerFrame::SyntheticRun) {
-    this->mRunMode = EventManagerFrame::SyntheticRun;
+    TEnv settings;
+    ConfigurationManager::getInstance().getConfig(settings);
+
+    this->mRunMode = runMode;
     this->mEventManager->getDataSource()->changeDataFolder(getSourceDirectory(this->mRunMode).Data());
 
-    if (mEventManager->getDataSource()->refresh()) {
-      mEventManager->displayCurrentEvent();
-    }
+    mEventManager->getDataSource()->refresh();
+    mEventManager->displayCurrentEvent();
     clearInTick();
     mEventManager->GotoEvent(-1);
     mEventId->SetIntNumber(mEventManager->getDataSource()->getCurrentEvent());
   }
+}
+
+void EventManagerFrame::DoSyntheticData()
+{
+  changeRunMode(EventManagerFrame::SyntheticRun);
 }
 
 void EventManagerFrame::DoCosmicsData()
 {
-  TEnv settings;
-  ConfigurationManager::getInstance().getConfig(settings);
-
-  if (this->mRunMode != EventManagerFrame::CosmicsRun) {
-    this->mRunMode = EventManagerFrame::CosmicsRun;
-    this->mEventManager->getDataSource()->changeDataFolder(getSourceDirectory(this->mRunMode).Data());
-
-    if (mEventManager->getDataSource()->refresh()) {
-      mEventManager->displayCurrentEvent();
-    }
-    clearInTick();
-    mEventManager->GotoEvent(-1);
-    mEventId->SetIntNumber(mEventManager->getDataSource()->getCurrentEvent());
-  }
+  changeRunMode(EventManagerFrame::CosmicsRun);
 }
 
 void EventManagerFrame::DoPhysicsData()
 {
-  TEnv settings;
-  ConfigurationManager::getInstance().getConfig(settings);
-
-  if (this->mRunMode != EventManagerFrame::PhysicsRun) {
-    this->mRunMode = EventManagerFrame::PhysicsRun;
-    this->mEventManager->getDataSource()->changeDataFolder(getSourceDirectory(this->mRunMode).Data());
-
-    if (mEventManager->getDataSource()->refresh()) {
-      mEventManager->displayCurrentEvent();
-    }
-    clearInTick();
-    mEventManager->GotoEvent(-1);
-    mEventId->SetIntNumber(mEventManager->getDataSource()->getCurrentEvent());
-  }
+  changeRunMode(EventManagerFrame::PhysicsRun);
 }
 
 bool EventManagerFrame::setInTick()
