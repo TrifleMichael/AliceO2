@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
 {
   CCDBDownloader CCDBD;
   // CCDBD.hello();
-  CCDBD.testFunction();
+  CCDBD.smallTest();
   std::cout << "I worked\n";
   BOOST_CHECK(1 == 2);
 }
