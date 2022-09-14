@@ -12,10 +12,10 @@ namespace ccdb
 //   std::cout << "Hemlo!\n";
 // }
 
-// void CCDBDownloader::hello()
-// {
-//   std::cout << "Hello!\n";
-// }
+void CCDBDownloader::hello()
+{
+  std::cout << "Hello!\n";
+}
 
 } // namespace ccdb
 } // namespace o2

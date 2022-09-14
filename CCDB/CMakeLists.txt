@@ -11,6 +11,7 @@
 
 o2_add_library(CCDB
                SOURCES  src/CcdbApi.cxx
+                        src/CCDBDownloader.cxx
                         src/BasicCCDBManager.cxx
                         src/CCDBTimeStampUtils.cxx
         src/IdPath.cxx src/CCDBQuery.cxx

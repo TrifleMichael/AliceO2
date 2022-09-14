@@ -9,8 +9,8 @@ namespace ccdb
 
 class CCDBDownloader
 {
-// public:
-//   void hello();
+public:
+  void hello();
 //   CCDBDownloader();
 //   ~CCDBDownloader() = default;
 
