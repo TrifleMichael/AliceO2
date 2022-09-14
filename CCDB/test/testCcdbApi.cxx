@@ -111,7 +111,8 @@ struct test_fixture {
 BOOST_AUTO_TEST_CASE(download_benchmark, *utf::precondition(if_reachable()))
 {
   CCDBDownloader CCDBD;
-  CCDBD.hello();
+  // CCDBD.hello();
+  CCDBD.testFunction();
   std::cout << "I worked\n";
   BOOST_CHECK(1 == 2);
 }
