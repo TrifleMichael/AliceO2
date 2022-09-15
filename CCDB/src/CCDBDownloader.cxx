@@ -474,6 +474,12 @@ std::vector<CURLcode>* CCDBDownloader::batchAsynchPerform(std::vector<CURL*> han
     data->type = ASYNCHRONOUS;
 
     curl_easy_setopt(handleVector[i], CURLOPT_PRIVATE, data);
+
+    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETFUNCTION, closesocket_callback);
+    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETDATA, this);
+    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETFUNCTION, opensocket_callback);
+    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETDATA, this);
+
     handlesToBeAdded.push_back(handleVector[i]);
   }
   handlesQueueLock.unlock();
@@ -507,6 +513,12 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> ha
     data->requestsLeft = &requestsLeft;
 
     curl_easy_setopt(handleVector[i], CURLOPT_PRIVATE, data);
+
+    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETFUNCTION, closesocket_callback);
+    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETDATA, this);
+    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETFUNCTION, opensocket_callback);
+    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETDATA, this);
+
     handlesToBeAdded.push_back(handleVector[i]);
   }
   handlesQueueLock.unlock();
@@ -529,6 +541,11 @@ CURLcode *CCDBDownloader::asynchPerformWithCallback(CURL* handle, bool *completi
   data->type = ASYNCHRONOUS_WITH_CALLBACK;
 
   curl_easy_setopt(handle, CURLOPT_PRIVATE, data);
+
+  curl_easy_setopt(handle, CURLOPT_CLOSESOCKETFUNCTION, closesocket_callback);
+  curl_easy_setopt(handle, CURLOPT_CLOSESOCKETDATA, this);
+  curl_easy_setopt(handle, CURLOPT_OPENSOCKETFUNCTION, opensocket_callback);
+  curl_easy_setopt(handle, CURLOPT_OPENSOCKETDATA, this);
 
   handlesQueueLock.lock();
   handlesToBeAdded.push_back(handle);

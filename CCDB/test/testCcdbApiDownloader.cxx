@@ -24,18 +24,11 @@ using namespace std;
 namespace o2{
 namespace ccdb{
 
-bool aliceServer = true;
+bool aliceServer = false;
 CcdbApi *api;
 
 void setHandleOptionsForValidity(CURL* handle, std::string* dst, std::string* url, std::string* etag, CCDBDownloader* AD)
 {
-
-  if (AD) {
-    curl_easy_setopt(handle, CURLOPT_CLOSESOCKETFUNCTION, closesocket_callback);
-    curl_easy_setopt(handle, CURLOPT_CLOSESOCKETDATA, AD);
-    curl_easy_setopt(handle, CURLOPT_OPENSOCKETFUNCTION, opensocket_callback);
-    curl_easy_setopt(handle, CURLOPT_OPENSOCKETDATA, AD);
-  }
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeToString);
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
   curl_easy_setopt(handle, CURLOPT_URL, url->c_str());
