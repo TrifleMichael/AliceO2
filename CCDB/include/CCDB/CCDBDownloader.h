@@ -99,6 +99,7 @@ public:
   } PerformData;
 
   void smallTest();
+  void hello();
 
   CCDBDownloader();
   ~CCDBDownloader();

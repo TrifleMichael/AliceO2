@@ -626,6 +626,10 @@ void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std:
   //   api->curlSetSSLOptions(handle);
 }
 
+void CCDBDownloader::hello()
+{
+  std::cout << "Hello\n";
+}
 
 // int main()
 // void GigaTest(CcdbApi* api)

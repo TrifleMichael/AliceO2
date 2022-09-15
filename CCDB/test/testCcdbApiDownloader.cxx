@@ -7,6 +7,7 @@
 #include <curl/curl.h>
 #include "testCcdbDownloaderResources.h"
 #include <chrono>   // time measurement
+#include <iostream>
 
 #include <boost/test/unit_test.hpp>
 
@@ -15,10 +16,13 @@
 #include <boost/foreach.hpp>
 #include <boost/optional/optional.hpp>
 
-bool aliceServer = true;
+
+using namespace std;
 
 namespace o2{
 namespace ccdb{
+
+bool aliceServer = false;
 
 void setHandleOptionsForValidity(CURL* handle, std::string* dst, std::string* url, std::string* etag, CCDBDownloader* AD)
 {
@@ -436,16 +440,65 @@ void smallTest()
 }
 
 //Michal test
-BOOST_AUTO_TEST_CASE(download_benchmark)
+BOOST_AUTO_TEST_CASE(small_test)
 {
   smallTest();
-  // CCDBDownloader CCDBD;
-  // // CCDBD.hello();
+  CCDBDownloader CCDBD;
+  CCDBD.hello();
   // CCDBD.smallTest();
   // std::cout << "I worked\n";
   BOOST_CHECK(1 == 2);
 }
 //Michal test stop
+
+
+
+BOOST_AUTO_TEST_CASE(download_benchmark)
+{
+  std::cout << "Test will be conducted on ";
+  if (aliceServer) {
+    std::cout << "https://alice-ccdb.cern.ch\n";
+    // api = api;
+    // api->init("https://alice-ccdb.cern.ch");
+  } else {
+    std::cout << "http://ccdb-test.cern.ch:8080\n";
+  }
+
+  if (curl_global_init(CURL_GLOBAL_ALL))
+  {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
+
+  int testSize = 100; // max 185
+
+  if (testSize != 0)
+    std::cout << "-------------- Testing for " << testSize << " objects with " << CCDBDownloader::maxHandlesInUse << " parallel connections. -----------\n";
+  else
+    std::cout << "-------------- Testing for all objects with " << CCDBDownloader::maxHandlesInUse << " parallel connections. -----------\n";
+
+  int repeats = 1;
+
+  // Just checking for 303
+  std::cout << "Benchmarking redirect time\n";
+  std::cout << "Blocking perform: " << countAverageTime(blockingBatchTest, testSize, repeats) << "ms.\n";
+  std::cout << "Async    perform: " << countAverageTime(asynchBatchTest, testSize, repeats) << "ms.\n";
+  std::cout << "Single   handle : " << countAverageTime(linearTest, testSize, repeats) << "ms.\n";
+  std::cout << "Single no reuse : " << countAverageTime(linearTestNoReuse, testSize, repeats) << "ms.\n";
+
+
+  // std::cout << "--------------------------------------------------------------------------------------------\n";
+
+  // std::cout << "Benchmarking test validity times\n";
+  std::cout << "Blocking perform validity: " << countAverageTime(blockingBatchTestValidity, testSize, repeats) << "ms.\n";
+  std::cout << "Async    perform validity: " << countAverageTime(asynchBatchTestValidity, testSize, repeats) << "ms.\n";
+  std::cout << "Single   handle  validity: " << countAverageTime(linearTestValidity, testSize, repeats) << "ms.\n";
+  std::cout << "Single no reuse  validity: " << countAverageTime(linearTestNoReuseValidity, testSize, repeats) << "ms.\n";
+
+  // int64_t r = blockingBatchTestSockets(testSize, false);
+
+  curl_global_cleanup();
+}
 
 }
 }
