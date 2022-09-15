@@ -27,7 +27,7 @@ namespace ccdb{
 bool aliceServer = false;
 CcdbApi *api;
 
-void setHandleOptionsForValidity(CURL* handle, std::string* dst, std::string* url, std::string* etag, CCDBDownloader* AD)
+void setHandleOptionsForValidity(CURL* handle, std::string* dst, std::string* url, std::string* etag)
 {
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeToString);
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
@@ -35,6 +35,9 @@ void setHandleOptionsForValidity(CURL* handle, std::string* dst, std::string* ur
 
   if (aliceServer)
     api->curlSetSSLOptions(handle);
+
+  // Use certificate path:password? Source: https://stackoverflow.com/questions/19014541/curl-to-pass-ssl-certifcate-and-password
+  // CURLcode curl_easy_setopt(CURL *handle, CURLOPT_SSLKEY, char *keyfile);
 
   std::string etagHeader = "If-None-Match: \"" + *etag + "\"";
   struct curl_slist *curlHeaders = nullptr;
@@ -106,7 +109,7 @@ int64_t blockingBatchTestSockets(int pathLimit = 0, bool printResult = false)
     handles.push_back(curl_easy_init());
     results.push_back(new std::string());
     headers.push_back(new std::string());
-    setHandleOptions(handles.back(), results.back(), headers.back(), &paths[i], &AD);
+    setHandleOptions(handles.back(), results.back(), headers.back(), &paths[i]);
   }
 
   // Downloading objects
@@ -124,7 +127,7 @@ int64_t blockingBatchTestSockets(int pathLimit = 0, bool printResult = false)
     handles2.push_back(curl_easy_init());
     results.push_back(new std::string());
     headers.push_back(new std::string());
-    setHandleOptions(handles2.back(), results.back(), headers.back(), &paths[i], &AD);
+    setHandleOptions(handles2.back(), results.back(), headers.back(), &paths[i]);
   }
 
   // Downloading again
@@ -152,7 +155,7 @@ int64_t blockingBatchTest(int pathLimit = 0, bool printResult = false)
     handles.push_back(curl_easy_init());
     results.push_back(new std::string());
     headers.push_back(new std::string());
-    setHandleOptions(handles.back(), results.back(), headers.back(), &paths[i], &AD);
+    setHandleOptions(handles.back(), results.back(), headers.back(), &paths[i]);
   }
 
   // Downloading objects
@@ -186,7 +189,7 @@ int64_t blockingBatchTestValidity(int pathLimit = 0, bool printResult = false)
     auto handle = curl_easy_init();
     results.push_back(new std::string());
     handles.push_back(handle);
-    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i], &AD);
+    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i]);
   }
 
   // Checking objects validity
@@ -230,7 +233,7 @@ int64_t asynchBatchTest(int pathLimit = 0, bool printResult = false)
     handles.push_back(curl_easy_init());
     results.push_back(new std::string());
     headers.push_back(new std::string());
-    setHandleOptions(handles.back(), results.back(), headers.back(), &paths[i], &AD);
+    setHandleOptions(handles.back(), results.back(), headers.back(), &paths[i]);
   }
 
   // Performing requests
@@ -266,7 +269,7 @@ int64_t asynchBatchTestValidity(int pathLimit = 0, bool printResult = false)
     auto handle = curl_easy_init();
     results.push_back(new std::string());
     handles.push_back(handle);
-    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i], &AD);
+    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i]);
   }
 
   // Checking objects validity
@@ -305,7 +308,7 @@ int64_t linearTest(int pathLimit = 0, bool printResult = false)
   for (int i = 0; i < (pathLimit == 0 ? paths.size() : pathLimit); i++) {
     results.push_back(new std::string());
     headers.push_back(new std::string());
-    setHandleOptions(handle, results.back(), headers.back(), &paths[i], nullptr);
+    setHandleOptions(handle, results.back(), headers.back(), &paths[i]);
     curl_easy_perform(handle);
 
     long code;
@@ -339,7 +342,7 @@ int64_t linearTestValidity(int pathLimit = 0, bool printResult = false)
   CURL* handle = curl_easy_init();
   for (int i = 0; i < (pathLimit == 0 ? paths.size() : pathLimit); i++) {
     results.push_back(new std::string());    
-    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i], nullptr);
+    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i]);
     
     curl_easy_perform(handle);
     long code;
@@ -370,7 +373,7 @@ int64_t linearTestNoReuse(int pathLimit = 0, bool printResult = false)
     CURL* handle = curl_easy_init();
     results.push_back(new std::string());
     headers.push_back(new std::string());
-    setHandleOptions(handle, results.back(), headers.back(), &paths[i], nullptr);
+    setHandleOptions(handle, results.back(), headers.back(), &paths[i]);
     curl_easy_perform(handle);
 
     long code;
@@ -403,7 +406,7 @@ int64_t linearTestNoReuseValidity(int pathLimit = 0, bool printResult = false)
   for (int i = 0; i < (pathLimit == 0 ? paths.size() : pathLimit); i++) {
     CURL* handle = curl_easy_init();
     results.push_back(new std::string());
-    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i], nullptr);
+    setHandleOptionsForValidity(handle, results.back(), &paths[i], &etags[i]);
     
     curl_easy_perform(handle);
     long code;

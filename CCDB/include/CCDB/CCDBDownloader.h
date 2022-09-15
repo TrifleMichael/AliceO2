@@ -121,7 +121,7 @@ public:
 
 };
 
-void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std::string* path, CCDBDownloader* AD);
+void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std::string* path);
 
 } // namespace ccdb
 } // namespace o2

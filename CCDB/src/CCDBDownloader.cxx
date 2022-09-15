@@ -623,15 +623,8 @@ curl_socket_t opensocket_callback(void *clientp, curlsocktype purpose, struct cu
   return sock;
 }
 
-void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std::string* path, CCDBDownloader* AD)
+void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std::string* path)
 {
-  if (AD) {
-    curl_easy_setopt(handle, CURLOPT_CLOSESOCKETFUNCTION, closesocket_callback);
-    curl_easy_setopt(handle, CURLOPT_CLOSESOCKETDATA, AD);
-    curl_easy_setopt(handle, CURLOPT_OPENSOCKETFUNCTION, opensocket_callback);
-    curl_easy_setopt(handle, CURLOPT_OPENSOCKETDATA, AD);
-  }
-
   curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, writeToString);
   curl_easy_setopt(handle, CURLOPT_HEADERDATA, headers);
 
