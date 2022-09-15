@@ -80,3 +80,9 @@ o2_add_test(CcdbApiMultipleUrls
             COMPONENT_NAME ccdb
             PUBLIC_LINK_LIBRARIES O2::CCDB
             LABELS ccdb)
+
+o2_add_test(CcdbDownloader
+            SOURCES test/testCcdbApiDownloader.cxx
+            COMPONENT_NAME ccdb
+            PUBLIC_LINK_LIBRARIES O2::CCDB
+            LABELS ccdb)

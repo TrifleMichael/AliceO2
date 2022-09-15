@@ -23,6 +23,10 @@ namespace o2
 namespace ccdb
 {
 
+curl_socket_t opensocket_callback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address);
+void closesocket_callback(void* clientp, curl_socket_t item);
+void cleanAllHandles(std::vector<CURL*> handles);
+
 void curl_perform(uv_poll_t *req, int status, int events);
 size_t writeToString(void *contents, size_t size, size_t nmemb, std::string *dst);
 std::string extractETAG(std::string headers);
@@ -113,8 +117,10 @@ public:
   CURLcode *asynchPerformWithCallback(CURL* handle, bool *completionFlag, void (*cbFun)(void*), void* cbData);
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> handleVector);
   std::vector<CURLcode>* batchAsynchPerform(std::vector<CURL*> handleVector, bool *completionFlag);
+
 };
 
+void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std::string* path, CCDBDownloader* AD);
 
 } // namespace ccdb
 } // namespace o2
