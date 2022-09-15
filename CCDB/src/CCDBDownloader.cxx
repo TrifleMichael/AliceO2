@@ -631,54 +631,6 @@ void CCDBDownloader::hello()
   std::cout << "Hello\n";
 }
 
-// int main()
-// void GigaTest(CcdbApi* api)
-// {
-//   std::cout << "Test will be conducted on ";
-//   if (aliceServer) {
-//     std::cout << "https://alice-ccdb.cern.ch\n";
-//     api = api;
-//     api->init("https://alice-ccdb.cern.ch");
-//   } else {
-//     std::cout << "http://ccdb-test.cern.ch:8080\n";
-//   }
-
-//   if (curl_global_init(CURL_GLOBAL_ALL))
-//   {
-//     fprintf(stderr, "Could not init curl\n");
-//     return;
-//   }
-
-//   int testSize = 100; // max 185
-
-//   if (testSize != 0)
-//     std::cout << "-------------- Testing for " << testSize << " objects with " << CCDBDownloader::maxHandlesInUse << " parallel connections. -----------\n";
-//   else
-//     std::cout << "-------------- Testing for all objects with " << CCDBDownloader::maxHandlesInUse << " parallel connections. -----------\n";
-
-//   int repeats = 10;
-
-//   // Just checking for 303
-//   // std::cout << "Benchmarking redirect time\n";
-//   // std::cout << "Blocking perform: " << countAverageTime(blockingBatchTest, testSize, repeats) << "ms.\n";
-//   // std::cout << "Async    perform: " << countAverageTime(asynchBatchTest, testSize, repeats) << "ms.\n";
-//   // std::cout << "Single   handle : " << countAverageTime(linearTest, testSize, repeats) << "ms.\n";
-//   // std::cout << "Single no reuse : " << countAverageTime(linearTestNoReuse, testSize, repeats) << "ms.\n";
-
-
-//   // std::cout << "--------------------------------------------------------------------------------------------\n";
-
-//   std::cout << "Benchmarking test validity times\n";
-//   std::cout << "Blocking perform validity: " << countAverageTime(blockingBatchTestValidity, testSize, repeats) << "ms.\n";
-//   // std::cout << "Async    perform validity: " << countAverageTime(asynchBatchTestValidity, testSize, repeats) << "ms.\n";
-//   // std::cout << "Single   handle  validity: " << countAverageTime(linearTestValidity, testSize, repeats) << "ms.\n";
-//   // std::cout << "Single no reuse  validity: " << countAverageTime(linearTestNoReuseValidity, testSize, repeats) << "ms.\n";
-
-//   // blockingBatchTestSockets(0, false);
-
-//   curl_global_cleanup();
-//   return;
-// }
 
 }
 }

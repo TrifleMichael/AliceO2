@@ -9,6 +9,8 @@
 #include <chrono>   // time measurement
 #include <iostream>
 
+#include <CCDB/CcdbApi.h>
+
 #include <boost/test/unit_test.hpp>
 
 #include <boost/property_tree/json_parser.hpp>
@@ -22,7 +24,8 @@ using namespace std;
 namespace o2{
 namespace ccdb{
 
-bool aliceServer = false;
+bool aliceServer = true;
+CcdbApi *api;
 
 void setHandleOptionsForValidity(CURL* handle, std::string* dst, std::string* url, std::string* etag, CCDBDownloader* AD)
 {
@@ -37,8 +40,8 @@ void setHandleOptionsForValidity(CURL* handle, std::string* dst, std::string* ur
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
   curl_easy_setopt(handle, CURLOPT_URL, url->c_str());
 
-  // if (aliceServer)
-  //   api->curlSetSSLOptions(handle);
+  if (aliceServer)
+    api->curlSetSSLOptions(handle);
 
   std::string etagHeader = "If-None-Match: \"" + *etag + "\"";
   struct curl_slist *curlHeaders = nullptr;
@@ -458,8 +461,8 @@ BOOST_AUTO_TEST_CASE(download_benchmark)
   std::cout << "Test will be conducted on ";
   if (aliceServer) {
     std::cout << "https://alice-ccdb.cern.ch\n";
-    // api = api;
-    // api->init("https://alice-ccdb.cern.ch");
+    api = new CcdbApi();
+    api->init("https://alice-ccdb.cern.ch");
   } else {
     std::cout << "http://ccdb-test.cern.ch:8080\n";
   }
@@ -497,6 +500,10 @@ BOOST_AUTO_TEST_CASE(download_benchmark)
 
   // int64_t r = blockingBatchTestSockets(testSize, false);
 
+
+  if(aliceServer) {
+    delete api;
+  }
   curl_global_cleanup();
 }
 
