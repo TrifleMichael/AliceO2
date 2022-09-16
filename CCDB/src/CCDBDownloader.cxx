@@ -52,6 +52,7 @@ namespace ccdb {
 
 CCDBDownloader::CCDBDownloader()
 {
+  std::cout << "Downloader created\n";
   // Preparing timer to be used by curl
   timeout = new uv_timer_t();
   timeout->data = this;

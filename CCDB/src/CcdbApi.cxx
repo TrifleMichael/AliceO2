@@ -16,6 +16,8 @@
 
 #include "CCDB/CcdbApi.h"
 #include "CCDB/CCDBQuery.h"
+#include "CCDB/CCDBDownloader.h"
+
 #include "CommonUtils/StringUtils.h"
 #include "CommonUtils/FileSystemUtils.h"
 #include "CommonUtils/MemFileHelper.h"
@@ -43,22 +45,17 @@
 #include <boost/interprocess/sync/named_semaphore.hpp>
 #include <regex>
 #include <cstdio>
-
 namespace o2::ccdb
 {
 
 using namespace std;
-
-void CcdbApi::test()
-{
-  std::cout << "Hello!\n";
-}
-
 std::mutex gIOMutex; // to protect TMemFile IO operations
 unique_ptr<TJAlienCredentials> CcdbApi::mJAlienCredentials = nullptr;
 
 CcdbApi::CcdbApi()
 {
+  std::cout << "Creating downloader?\n";
+  CCDBDownloader downloader;
   std::string host = boost::asio::ip::host_name();
   mUniqueAgentID = fmt::format("{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6));
 }
