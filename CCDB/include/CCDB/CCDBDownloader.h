@@ -98,9 +98,6 @@ public:
     RequestType type;
   } PerformData;
 
-  void smallTest();
-  void hello();
-
   CCDBDownloader();
   ~CCDBDownloader();
   void initializeMultiHandle();

@@ -353,6 +353,7 @@ string CcdbApi::getFullUrlForRetrieval(CURL* curl, const string& path, const map
     curl_free(mfirstEncoded);
     curl_free(msecondEncoded);
   }
+  std::cout << "Full url " << fullUrl << "\n";
   return fullUrl;
 }
 

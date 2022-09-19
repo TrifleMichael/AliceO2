@@ -438,20 +438,6 @@ void smallTest()
   std::cout << "I work!\n";
 }
 
-//Michal test
-BOOST_AUTO_TEST_CASE(small_test)
-{
-  smallTest();
-  CCDBDownloader CCDBD;
-  CCDBD.hello();
-  // CCDBD.smallTest();
-  // std::cout << "I worked\n";
-  BOOST_CHECK(1 == 2);
-}
-//Michal test stop
-
-
-
 BOOST_AUTO_TEST_CASE(download_benchmark)
 {
   std::cout << "Test will be conducted on ";

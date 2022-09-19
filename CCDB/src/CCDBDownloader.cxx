@@ -52,7 +52,6 @@ namespace ccdb {
 
 CCDBDownloader::CCDBDownloader()
 {
-  std::cout << "Downloader created\n";
   // Preparing timer to be used by curl
   timeout = new uv_timer_t();
   timeout->data = this;
@@ -151,15 +150,6 @@ void closePolls(uv_handle_t* handle, void* arg)
   }
 }
 
-void closeMultiHandle(uv_timer_t* handle) {
-  auto AD = (CCDBDownloader*)handle->data;
-  curl_multi_cleanup(AD->curlMultiHandle);
-  AD->multiHandleActive = false;
-
-  uv_walk(&AD->loop, closePolls, NULL);
-  uv_timer_stop(handle);
-}
-
 void onTimeout(uv_timer_t *req)
 {
   auto AD = (CCDBDownloader *)req->data;
@@ -227,7 +217,6 @@ void CCDBDownloader::finalizeDownload(CURL* easy_handle)
   handlesInUse--;
   char* done_url;
   curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &done_url);
-  // printf("%s DONE\n", done_url);
 
   PerformData *data;
   curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &data);
@@ -283,13 +272,6 @@ void CCDBDownloader::finalizeDownload(CURL* easy_handle)
   int running_handles;
   curl_multi_socket_action(curlMultiHandle, CURL_SOCKET_TIMEOUT, 0, &running_handles);
   checkMultiInfo();
-
-  // If no running handles left then schedule multihandle to close
-  if (running_handles == 0)
-  {
-    uv_timer_start(socketTimoutTimer, closeMultiHandle, socketTimoutMS, 0);
-    socketTimoutTimerRunning = true;
-  }
 }
 
 void CCDBDownloader::checkMultiInfo()
@@ -600,6 +582,7 @@ void cleanAllHandles(std::vector<CURL*> handles)
 
 void closesocket_callback(void *clientp, curl_socket_t item)
 {
+  std::cout << "Closing socket\n";
   auto AD = (CCDBDownloader*)clientp;
   if (AD->socketTimerMap.find(item) != AD->socketTimerMap.end()) {
     uv_timer_stop(AD->socketTimerMap[item]);
@@ -610,6 +593,7 @@ void closesocket_callback(void *clientp, curl_socket_t item)
 
 curl_socket_t opensocket_callback(void *clientp, curlsocktype purpose, struct curl_sockaddr *address)
 {
+  std::cout << "Opening socket\n";
   auto AD = (CCDBDownloader*)clientp;
   auto sock = socket(address->family, address->socktype, address->protocol);
 
@@ -635,11 +619,6 @@ void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std:
 
   // if (aliceServer)
   //   api->curlSetSSLOptions(handle);
-}
-
-void CCDBDownloader::hello()
-{
-  std::cout << "Hello\n";
 }
 
 
