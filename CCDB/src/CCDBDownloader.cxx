@@ -123,6 +123,7 @@ CCDBDownloader::~CCDBDownloader()
   curl_multi_cleanup(curlMultiHandle);
 }
 
+// TODO: delete or move to tests
 bool alienRedirect(CURL* handle)
 {
   char *url = NULL;
@@ -145,6 +146,7 @@ void closePolls(uv_handle_t* handle, void* arg)
   }
 }
 
+// TODO: Rename
 void onTimeout(uv_timer_t *req)
 {
   auto AD = (CCDBDownloader *)req->data;
@@ -154,9 +156,6 @@ void onTimeout(uv_timer_t *req)
   AD->checkMultiInfo();
 }
 
-// Is used to react to polling file descriptors in poll_handle
-// Calls handle_socket indirectly for further reading*
-// If call is finished closes handle indirectly by check multi info
 void curl_perform(uv_poll_t *req, int status, int events)
 {
   int running_handles;
@@ -188,14 +187,12 @@ CCDBDownloader::curl_context_t *CCDBDownloader::createCurlContext(curl_socket_t 
   return context;
 }
 
-// Frees data from curl handle inside uv_handle*
 void CCDBDownloader::curlCloseCB(uv_handle_t *handle)
 {
   curl_context_t *context = (curl_context_t *)handle->data;
   free(context);
 }
 
-// Makes an asynchronious call to free curl context*
 void CCDBDownloader::destroyCurlContext(curl_context_t *context)
 {
   uv_close((uv_handle_t *)&context->poll_handle, curlCloseCB);
@@ -231,6 +228,8 @@ void CCDBDownloader::finalizeDownload(CURL* easy_handle)
         std::cout << "Redirected to a different server than alien\n";
     }
   }
+  // TODO: Check if codes are returned corectly
+
   // curl_easy_getinfo(easy_handle,  CURLINFO_RESPONSE_CODE, data->codeDestination);
 
   if (data->callback)
@@ -297,7 +296,6 @@ void CCDBDownloader::checkMultiInfo()
   }
 }
 
-// Connects curl timer with uv timer
 int CCDBDownloader::startTimeout(CURLM *multi, long timeout_ms, void *userp)
 {
   auto timeout = (uv_timer_t *)userp;
@@ -315,6 +313,7 @@ int CCDBDownloader::startTimeout(CURLM *multi, long timeout_ms, void *userp)
   return 0;
 }
 
+// TODO: Change name
 void closeHandleTimerCallback(uv_timer_t* handle)
 {
   auto data = (CCDBDownloader::DataForClosingSocket*)handle->data;
@@ -331,8 +330,6 @@ void closeHandleTimerCallback(uv_timer_t* handle)
   std::cout << "Socket not found " << sock << " (timer)\n";
 }
 
-// Is used to react to curl_multi_socket_action
-// If INOUT then assigns socket to multi handle and starts polling file descriptors in poll_handle by callback
 int handleSocket(CURL *easy, curl_socket_t s, int action, void *userp,
                                          void *socketp)
 {
@@ -402,6 +399,7 @@ void CCDBDownloader::checkHandleQueue()
   handlesQueueLock.unlock();
 }
 
+// TODO: Rename
 void checkGlobals(uv_timer_t *handle)
 {
   // Check for closing signal

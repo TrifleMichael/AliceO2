@@ -23,15 +23,32 @@ namespace o2
 namespace ccdb
 {
 
+// Called by CURL in order to open a new socket. Newly opened sockets are assigned a timeout timer and added to socketTimerMap.
 curl_socket_t opensocket_callback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address);
+
+
+// Called by CURL in order to close a socket. It will be called by CURL even if a timout timer closed the socket beforehand.
 void closesocket_callback(void* clientp, curl_socket_t item);
+
+// TODO: Remove or move to tests
 void cleanAllHandles(std::vector<CURL*> handles);
 
+
+// Is used to react to polling file descriptors in poll_handle
+// Calls handle_socket indirectly for further reading*
+// If call is finished closes handle indirectly by check multi info
 void curl_perform(uv_poll_t *req, int status, int events);
+
+// TODO: Remove or move to tests
 size_t writeToString(void *contents, size_t size, size_t nmemb, std::string *dst);
+
+// TODO: Remove or move to tests
 std::string extractETAG(std::string headers);
+
+// TODO: Rename
 void checkGlobals(uv_timer_t *handle);
 
+// Used by CURL to react to action happening on a socket.
 int handleSocket(CURL *easy, curl_socket_t s, int action, void *userp, void *socketp);
 
 class CCDBDownloader
