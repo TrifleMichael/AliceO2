@@ -58,11 +58,6 @@ CCDBDownloader::CCDBDownloader()
   uv_loop_init(&loop);
   uv_timer_init(&loop, timeout);
 
-  // Preparing timer that will close multi handle and it's sockets some time after transfer completes
-  socketTimoutTimer = new uv_timer_t();
-  uv_timer_init(&loop, socketTimoutTimer);
-  socketTimoutTimer->data = this;
-
   // Preparing curl handle
   initializeMultiHandle();  
 
@@ -397,12 +392,6 @@ void CCDBDownloader::checkHandleQueue()
   handlesQueueLock.lock();
   if (handlesToBeAdded.size() > 0)
   {
-    // Postpone closing sockets
-    if (socketTimoutTimerRunning) {
-      uv_timer_stop(socketTimoutTimer);
-      socketTimoutTimerRunning = false;
-    }
-
     // Add handles without going over the limit
     while(handlesToBeAdded.size() > 0 && handlesInUse < maxHandlesInUse) {
       curl_multi_add_handle(curlMultiHandle, handlesToBeAdded.front());

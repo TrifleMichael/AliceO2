@@ -70,8 +70,6 @@ public:
   static int const maxHandlesInUse = 5; // static and constant just for testing
   bool multiHandleActive = false;
 
-  uv_timer_t* socketTimoutTimer;
-  bool socketTimoutTimerRunning = false;
   std::unordered_map<curl_socket_t, uv_timer_t*> socketTimerMap;
 
   bool closeLoop = false;
@@ -100,20 +98,47 @@ public:
 
   CCDBDownloader();
   ~CCDBDownloader();
+
+  // Creates a new multi-handle
   void initializeMultiHandle();
+
+  // Removes easy_handle from multi_handle, makes callbacks, releases locks for blocking dowloands etc.
   void finalizeDownload(CURL* handle);
+
+  // Creates structure holding information about a socket including a poll handle assigned to it
   curl_context_t *createCurlContext(curl_socket_t sockfd, CCDBDownloader *objPtr);
+
+  // Is called when handle is closed. Frees data stored within it.
   static void curlCloseCB(uv_handle_t *handle);
+
+  // Destroyes data about a socket
   static void destroyCurlContext(curl_context_t *context);
+
+  // Checks messages inside curl multi handle
   void checkMultiInfo(void);
+
+  // Connects curl timer with uv timer
   static int startTimeout(CURLM *multi, long timeout_ms, void *userp);
+
+  // Asynchroniously signalls the event loop to check for new easy_handles to add to multi_handle
   void makeLoopCheckQueueAsync();
+
+  // If multi_handles uses less then maximum number of handles then add handles from the queue.
   void checkHandleQueue();
+
+  // Start the event loop.
   void asynchLoop();
-  bool init();
+
+  // Perform on a single handle in a blocking manner.
   CURLcode perform(CURL* handle);
+
+  // Perform on a batch of handles. Callback will be exectuted in it's own thread after all handles finish their transfers.
   CURLcode *asynchPerformWithCallback(CURL* handle, bool *completionFlag, void (*cbFun)(void*), void* cbData);
+
+  // Perform on a batch of handles in a blocking manner.
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> handleVector);
+
+  // Perform on a batch of handles. Completion flag will be set to true when all handles finish their transfers.
   std::vector<CURLcode>* batchAsynchPerform(std::vector<CURL*> handleVector, bool *completionFlag);
 
 };
