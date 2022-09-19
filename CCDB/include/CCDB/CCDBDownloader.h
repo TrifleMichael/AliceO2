@@ -114,7 +114,7 @@ public:
   void checkHandleQueue();
   void asynchLoop();
   bool init();
-  CURLcode blockingPerform(CURL* handle);
+  CURLcode perform(CURL* handle);
   CURLcode *asynchPerformWithCallback(CURL* handle, bool *completionFlag, void (*cbFun)(void*), void* cbData);
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> handleVector);
   std::vector<CURLcode>* batchAsynchPerform(std::vector<CURL*> handleVector, bool *completionFlag);

@@ -62,6 +62,8 @@ class CcdbApi //: public DatabaseInterface
   /// \brief Default destructor
   virtual ~CcdbApi();
 
+  std::unique_ptr<CCDBDownloader> downloader;
+
   const std::string getUniqueAgentID() const { return mUniqueAgentID; }
 
   /**

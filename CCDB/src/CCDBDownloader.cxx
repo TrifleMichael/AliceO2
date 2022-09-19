@@ -488,7 +488,7 @@ std::vector<CURLcode>* CCDBDownloader::batchAsynchPerform(std::vector<CURL*> han
   return codeVector;
 }
 
-CURLcode CCDBDownloader::blockingPerform(CURL* handle)
+CURLcode CCDBDownloader::perform(CURL* handle)
 {
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
