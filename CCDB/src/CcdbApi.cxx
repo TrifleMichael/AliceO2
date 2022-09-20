@@ -265,6 +265,11 @@ int CcdbApi::storeAsBinaryFile(const char* buffer, size_t size, const std::strin
       /* what URL that receives this POST */
       curl_easy_setopt(curl, CURLOPT_URL, fullUrl.c_str());
 
+
+      char* url;
+      curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &url);
+      std::cout << "URL: " << url << "\n";
+
       /* Perform the request, res will get the return code */
       res = curl_easy_perform(curl);
       /* Check for errors */
@@ -1107,6 +1112,7 @@ bool CcdbApi::isHostReachable() const
   curl = curl_easy_init();
   if (curl) {
     for (size_t hostIndex = 0; hostIndex < hostsPool.size() && res != CURLE_OK; hostIndex++) {
+      std::cout << "mUrl: " << mUrl.data() << "\n";
       curl_easy_setopt(curl, CURLOPT_URL, mUrl.data());
       curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
       curlSetSSLOptions(curl);

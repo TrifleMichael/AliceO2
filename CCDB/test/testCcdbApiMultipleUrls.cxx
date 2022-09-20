@@ -82,6 +82,11 @@ struct test_fixture {
   map<string, string> metadata;
 };
 
+BOOST_AUTO_TEST_CASE(test)
+{
+  BOOST_CHECK(1 == 2);
+}
+
 BOOST_AUTO_TEST_CASE(storeAndRetrieve, *utf::precondition(if_reachable()))
 {
   test_fixture f;
@@ -95,4 +100,6 @@ BOOST_AUTO_TEST_CASE(storeAndRetrieve, *utf::precondition(if_reachable()))
 
   TObject* returnResult = f.api.retrieve("ccdb/TObject/TEST/" + to_string(timestamp), f.metadata, timestamp);
   BOOST_CHECK(returnResult != nullptr);
+  BOOST_CHECK(1 == 0);
+  BOOST_CHECK(2 == 1);
 }
