@@ -204,7 +204,7 @@ void callbackWrappingFunction(void (*cbFun)(void*), void* data, bool* completion
   *completionFlag = true;
 }
 
-void CCDBDownloader::finalizeDownload(CURL* easy_handle)
+void CCDBDownloader::finalizeDownload(CURL* easy_handle, CURLcode curlCode)
 {
   handlesInUse--;
   char* done_url;
@@ -214,13 +214,15 @@ void CCDBDownloader::finalizeDownload(CURL* easy_handle)
   curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &data);
   curl_multi_remove_handle(curlMultiHandle, easy_handle);
 
+  *data->codeDestination = curlCode;
+
   long code;
   curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &code);
 
   if (code != 200) {
     if (code != 303 && code != 304)
     {
-      std::cout << "Weird code returned: " << code << "for URL: " << done_url << "\n";
+      std::cout << "Weird code returned: " << code << ", for URL: " << done_url << "\n";
     }
     else
     {
@@ -284,7 +286,8 @@ void CCDBDownloader::checkMultiInfo()
         "WARNING: The data the returned pointer points to will not survive
         calling curl_multi_cleanup, curl_multi_remove_handle or
         curl_easy_cleanup." */
-      finalizeDownload(message->easy_handle);
+      CURLcode code = message->data.result;
+      finalizeDownload(message->easy_handle, code);
       
     }
     break;
@@ -439,6 +442,7 @@ std::vector<CURLcode>* CCDBDownloader::batchAsynchPerform(std::vector<CURL*> han
     auto *data = new CCDBDownloader::PerformData();
 
     data->codeDestination = &(*codeVector)[i];
+    (*codeVector)[i] = CURLE_FAILED_INIT;
     data->requestsLeft = requestsLeft;
     data->completionFlag = completionFlag;
     data->type = ASYNCHRONOUS;
@@ -459,6 +463,10 @@ std::vector<CURLcode>* CCDBDownloader::batchAsynchPerform(std::vector<CURL*> han
 
 CURLcode CCDBDownloader::perform(CURL* handle)
 {
+  char* url;;
+  curl_easy_getinfo(handle, CURLINFO_EFFECTIVE_URL, &url);
+  std::cout << "Starting perform for url: " << url << "\n";
+
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
   return batchBlockingPerform(handleVector).back();
@@ -478,6 +486,7 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> ha
   {
     auto *data = new CCDBDownloader::PerformData();
     data->codeDestination = &codeVector[i];
+    codeVector[i] = CURLE_FAILED_INIT;
     data->cv = &cv;
     data->type = BLOCKING;
     data->requestsLeft = &requestsLeft;
@@ -502,6 +511,7 @@ CURLcode *CCDBDownloader::asynchPerformWithCallback(CURL* handle, bool *completi
 {
   auto data = new CCDBDownloader::PerformData();
   auto code = new CURLcode();
+  (*code) = CURLE_FAILED_INIT;
   data->completionFlag = completionFlag;
   data->codeDestination = code;
 

@@ -120,7 +120,7 @@ public:
   void initializeMultiHandle();
 
   // Removes easy_handle from multi_handle, makes callbacks, releases locks for blocking dowloands etc.
-  void finalizeDownload(CURL* handle);
+  void finalizeDownload(CURL* handle, CURLcode curlCode);
 
   // Creates structure holding information about a socket including a poll handle assigned to it
   curl_context_t *createCurlContext(curl_socket_t sockfd, CCDBDownloader *objPtr);

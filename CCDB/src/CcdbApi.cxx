@@ -268,7 +268,8 @@ int CcdbApi::storeAsBinaryFile(const char* buffer, size_t size, const std::strin
       curl_easy_setopt(curl, CURLOPT_URL, fullUrl.c_str());
 
       /* Perform the request, res will get the return code */
-      res = downloader->perform(curl);
+      // res = downloader->perform(curl);
+      res = curl_easy_perform(curl);
       /* Check for errors */
       if (res != CURLE_OK) {
         LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(res));
@@ -353,7 +354,6 @@ string CcdbApi::getFullUrlForRetrieval(CURL* curl, const string& path, const map
     curl_free(mfirstEncoded);
     curl_free(msecondEncoded);
   }
-  std::cout << "Full url " << fullUrl << "\n";
   return fullUrl;
 }
 
@@ -1113,7 +1113,9 @@ bool CcdbApi::isHostReachable() const
       curl_easy_setopt(curl, CURLOPT_URL, mUrl.data());
       curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
       curlSetSSLOptions(curl);
+      std::cout << "mUrl " << mUrl.data() << "\n";
       res = downloader->perform(curl);
+      std::cout << "Downloader perform result " << res << ". Is it CURLE_OK? " << (CURLE_OK == res) << "\n";
       result = (res == CURLE_OK);
     }
 
