@@ -16,7 +16,6 @@ o2_add_library(CCDB
                         src/CCDBTimeStampUtils.cxx
         src/IdPath.cxx src/CCDBQuery.cxx
         PUBLIC_LINK_LIBRARIES CURL::libcurl
-                                    FairRoot::ParMQ
                                     ROOT::Hist
                                     O2::CommonUtils
                                     FairMQ::FairMQ

@@ -35,15 +35,15 @@ void CellRecalibratorSpec::init(framework::InitContext& ctx)
   LOG(info) << "Bad channel calibration: " << (isRunBadChannlCalibration() ? "enabled" : "disabled");
   LOG(info) << "Time calibration:        " << (isRunTimeCalibration() ? "enabled" : "disabled");
   LOG(info) << "Gain calibration:        " << (isRunGainCalibration() ? "enabled" : "disabled");
-
-  mCalibrationHandler->static_load();
 }
 
 void CellRecalibratorSpec::run(framework::ProcessingContext& ctx)
 {
   auto inputcells = ctx.inputs().get<gsl::span<o2::emcal::Cell>>("cells");
   auto intputtriggers = ctx.inputs().get<gsl::span<o2::emcal::TriggerRecord>>("triggerrecords");
+  LOG(info) << "Received " << inputcells.size() << " cells from " << intputtriggers.size() << " triggers";
 
+  mCalibrationHandler->checkUpdates(ctx);
   updateCalibObjects();
 
   std::vector<o2::emcal::Cell> outputcells;
@@ -71,6 +71,8 @@ void CellRecalibratorSpec::run(framework::ProcessingContext& ctx)
     currentfirst = outputcells.size();
   }
 
+  LOG(info) << "Timeframe: " << inputcells.size() << " cells read, " << outputcells.size() << " cells kept";
+
   // send recalibrated objects
   ctx.outputs().snapshot(o2::framework::Output{o2::header::gDataOriginEMC, "CELLS", mOutputSubspec, o2::framework::Lifetime::Timeframe}, outputcells);
   ctx.outputs().snapshot(o2::framework::Output{o2::header::gDataOriginEMC, "CELLSTRGR", mOutputSubspec, o2::framework::Lifetime::Timeframe}, outputtriggers);
@@ -78,6 +80,7 @@ void CellRecalibratorSpec::run(framework::ProcessingContext& ctx)
 
 void CellRecalibratorSpec::finaliseCCDB(o2::framework::ConcreteDataMatcher& matcher, void* obj)
 {
+  LOG(info) << "Handling new Calibration objects";
   if (mCalibrationHandler->finalizeCCDB(matcher, obj)) {
     return;
   }
@@ -106,32 +109,31 @@ std::optional<o2::emcal::Cell> CellRecalibratorSpec::getCalibratedCell(const o2:
 
 void CellRecalibratorSpec::updateCalibObjects()
 {
+  auto badmapOld = mBadChannelMap;
+  auto timeCalibOld = mTimeCalibration;
   if (isRunBadChannlCalibration()) {
     mBadChannelMap = mCalibrationHandler->getBadChannelMap();
+    if (badmapOld != mBadChannelMap) {
+      LOG(info) << "updateCalibObjects: Bad channel map changed";
+    }
   }
   if (isRunTimeCalibration()) {
     mTimeCalibration = mCalibrationHandler->getTimeCalibration();
+    if (timeCalibOld != mTimeCalibration) {
+      LOG(info) << "updateCalibObjects: Time calib params changed";
+    }
   }
   if (isRunGainCalibration()) {
     mGainCalibration = mCalibrationHandler->getGainCalibration();
   }
 }
 
-o2::framework::DataProcessorSpec o2::emcal::getCellRecalibratorSpec(uint32_t inputSubspec, uint32_t outputSubspec, bool badChannelCalib, bool timeCalib, bool gainCalib, const std::string_view pathBadChannelMap, const std::string_view pathTimeCalib, const std::string_view pathGainCalib)
+o2::framework::DataProcessorSpec o2::emcal::getCellRecalibratorSpec(uint32_t inputSubspec, uint32_t outputSubspec, bool badChannelCalib, bool timeCalib, bool gainCalib)
 {
   auto calibhandler = std::make_shared<o2::emcal::CalibLoader>();
   calibhandler->enableBadChannelMap(badChannelCalib);
   calibhandler->enableTimeCalib(timeCalib);
   calibhandler->enableGainCalib(gainCalib);
-  if (pathBadChannelMap.length()) {
-    calibhandler->setLoadBadChannelMapFromFile(pathBadChannelMap);
-  }
-  if (pathTimeCalib.length()) {
-    calibhandler->setLoadTimeCalibFromFile(pathTimeCalib);
-  }
-  if (pathGainCalib.length()) {
-    calibhandler->setLoadGainCalibFromFile(pathGainCalib);
-  }
   std::vector<o2::framework::InputSpec>
     inputs = {{"cells", o2::header::gDataOriginEMC, "CELLS", inputSubspec, o2::framework::Lifetime::Timeframe},
               {"triggerrecords", o2::header::gDataOriginEMC, "CELLSTRGR", inputSubspec, o2::framework::Lifetime::Timeframe}};
