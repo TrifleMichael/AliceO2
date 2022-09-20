@@ -220,7 +220,7 @@ void CCDBDownloader::finalizeDownload(CURL* easy_handle)
   if (code != 200) {
     if (code != 303 && code != 304)
     {
-      std::cout << "Weird code returned: " << code << "\n";
+      std::cout << "Weird code returned: " << code << "for URL: " << done_url << "\n";
     }
     else
     {
@@ -321,13 +321,13 @@ void closeHandleTimerCallback(uv_timer_t* handle)
   auto sock = data->socket;
 
   if (AD->socketTimerMap.find(sock) != AD->socketTimerMap.end()) {
-    std::cout << "Closing socket (timer)" << sock << "\n";
+    // std::cout << "Closing socket (timer)" << sock << "\n";
     uv_timer_stop(AD->socketTimerMap[sock]);
     AD->socketTimerMap.erase(sock);
     close(sock);
     return;
   }
-  std::cout << "Socket not found " << sock << " (timer)\n";
+  // std::cout << "Socket not found " << sock << " (timer)\n";
 }
 
 int handleSocket(CURL *easy, curl_socket_t s, int action, void *userp,
@@ -551,16 +551,6 @@ std::string extractETAG(std::string headers)
   return headers.substr(etagStart, etagEnd - etagStart);
 }
 
-size_t writeToString(void *contents, size_t size, size_t nmemb, std::string *dst)
-{
-  char *conts = (char *)contents;
-  for (int i = 0; i < nmemb; i++)
-  {
-    (*dst) += *(conts++);
-  }
-  return size * nmemb;
-}
-
 void cleanAllHandles(std::vector<CURL*> handles)
 {
   for(auto handle : handles)
@@ -569,7 +559,7 @@ void cleanAllHandles(std::vector<CURL*> handles)
 
 void closesocket_callback(void *clientp, curl_socket_t item)
 {
-  std::cout << "Closing socket\n";
+  // std::cout << "Closing socket\n";
   auto AD = (CCDBDownloader*)clientp;
   if (AD->socketTimerMap.find(item) != AD->socketTimerMap.end()) {
     uv_timer_stop(AD->socketTimerMap[item]);
@@ -580,7 +570,7 @@ void closesocket_callback(void *clientp, curl_socket_t item)
 
 curl_socket_t opensocket_callback(void *clientp, curlsocktype purpose, struct curl_sockaddr *address)
 {
-  std::cout << "Opening socket\n";
+  // std::cout << "Opening socket\n";
   auto AD = (CCDBDownloader*)clientp;
   auto sock = socket(address->family, address->socktype, address->protocol);
 
@@ -593,19 +583,6 @@ curl_socket_t opensocket_callback(void *clientp, curlsocktype purpose, struct cu
   AD->socketTimerMap[sock]->data = data;
 
   return sock;
-}
-
-void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std::string* path)
-{
-  curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, writeToString);
-  curl_easy_setopt(handle, CURLOPT_HEADERDATA, headers);
-
-  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeToString);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
-  curl_easy_setopt(handle, CURLOPT_URL, path->c_str());
-
-  // if (aliceServer)
-  //   api->curlSetSSLOptions(handle);
 }
 
 

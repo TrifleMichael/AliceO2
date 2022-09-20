@@ -55,7 +55,7 @@ class CCDBDownloader
 {
 public:
 
-  int socketTimoutMS = 20000; // Time for which sockets will stay open after last download finishes
+  int socketTimoutMS = 5000; // Time for which sockets will stay open after last download finishes
 
   enum RequestType
   {
