@@ -51,6 +51,18 @@ void checkGlobals(uv_timer_t *handle);
 // Used by CURL to react to action happening on a socket.
 int handleSocket(CURL *easy, curl_socket_t s, int action, void *userp, void *socketp);
 
+void onUVClose(uv_handle_t* handle);
+
+void closeHandles(uv_handle_t* handle, void* arg);
+
+void closePolls(uv_handle_t* handle, void* arg);
+
+void asyncUVHandleCallback(uv_async_t *handle);
+
+void closeHandleTimerCallback(uv_timer_t* handle);
+
+void onTimeout(uv_timer_t *req);
+
 class CCDBDownloader
 {
 public:
@@ -132,7 +144,7 @@ public:
    * 
    * @param socketfd File descriptor of socket for which the structure will be created
    */
-  curl_context_t *createCurlContext(curl_socket_t sockfd, CCDBDownloader *CD);
+  curl_context_t *createCurlContext(curl_socket_t sockfd);
 
   // Is called when handle is closed. Frees data stored within it.
   static void curlCloseCB(uv_handle_t *handle);
