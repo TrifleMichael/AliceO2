@@ -37,7 +37,7 @@ void cleanAllHandles(std::vector<CURL*> handles);
 // Is used to react to polling file descriptors in poll_handle
 // Calls handle_socket indirectly for further reading*
 // If call is finished closes handle indirectly by check multi info
-void curl_perform(uv_poll_t *req, int status, int events);
+void curlPerform(uv_poll_t *req, int status, int events);
 
 // TODO: Remove or move to tests
 size_t writeToString(void *contents, size_t size, size_t nmemb, std::string *dst);
@@ -120,7 +120,7 @@ public:
   void initializeMultiHandle();
 
   // Removes easy_handle from multi_handle, makes callbacks, releases locks for blocking dowloands etc.
-  void finalizeDownload(CURL* handle, CURLcode curlCode);
+  void transferFinished(CURL* handle, CURLcode curlCode);
 
   // Creates structure holding information about a socket including a poll handle assigned to it
   curl_context_t *createCurlContext(curl_socket_t sockfd, CCDBDownloader *objPtr);

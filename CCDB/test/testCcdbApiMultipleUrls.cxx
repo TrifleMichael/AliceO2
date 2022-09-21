@@ -92,10 +92,8 @@ BOOST_AUTO_TEST_CASE(storeAndRetrieve, *utf::precondition(if_reachable()))
   cout << "ccdb/TObject/TEST" << endl;
   long timestamp = getCurrentTimestamp();
 
-  std::cout << "----------STORE----------\n";
   f.api.storeAsTFile(&h1, "ccdb/TObject/TEST", f.metadata, timestamp);
 
-  std::cout << "----------RETRIEVE----------\n";
   TObject* returnResult = f.api.retrieve("ccdb/TObject/TEST/" + to_string(timestamp), f.metadata, timestamp);
   BOOST_CHECK(returnResult != nullptr);
 }
