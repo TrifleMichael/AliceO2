@@ -107,8 +107,6 @@ public:
     void (*cbFun)(void*);
     std::thread *cbThread;
     void *cbData;
-    bool callback = false;
-    bool batchRequest = false;
     size_t *requestsLeft;
     RequestType type;
   } PerformData;
@@ -150,7 +148,7 @@ public:
   CURLcode perform(CURL* handle);
 
   // Perform on a batch of handles. Callback will be exectuted in it's own thread after all handles finish their transfers.
-  CURLcode *asynchPerformWithCallback(CURL* handle, bool *completionFlag, void (*cbFun)(void*), void* cbData);
+  std::vector<CURLcode> *asynchBatchPerformWithCallback(std::vector<CURL*> handle, bool *completionFlag, void (*cbFun)(void*), void* cbData);
 
   // Perform on a batch of handles in a blocking manner.
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> handleVector);
