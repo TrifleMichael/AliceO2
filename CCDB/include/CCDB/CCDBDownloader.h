@@ -68,18 +68,18 @@ public:
   {
     uv_poll_t poll_handle;
     curl_socket_t sockfd = -1;
-    CCDBDownloader *objPtr = nullptr;
+    CCDBDownloader *CD = nullptr;
   } curl_context_t;
 
   typedef struct DataForSocket
   {
-    CCDBDownloader *objPtr;
+    CCDBDownloader *CD;
     CURLM *curlm;
   } DataForSocket;
 
   typedef struct DataForClosingSocket
   {
-    CCDBDownloader* AD;
+    CCDBDownloader* CD;
     curl_socket_t socket;
   } DataForClosingSocket;
 
@@ -114,14 +114,25 @@ public:
   CCDBDownloader();
   ~CCDBDownloader();
 
-  // Creates a new multi-handle
+  /**
+   * Creates a new multi_handle for the downloader
+   */
   void initializeMultiHandle();
 
-  // Removes easy_handle from multi_handle, makes callbacks, releases locks for blocking dowloands etc.
+  /**
+   * Releases resources reserver for the transfer, marks transfer as complete, passes the CURLcode to the destination and launches callbacks if requested
+   * 
+   * @param handle The easy_handle for which the transfer completed
+   * @param curlCode The code produced for the handle by the transfer
+   */
   void transferFinished(CURL* handle, CURLcode curlCode);
 
-  // Creates structure holding information about a socket including a poll handle assigned to it
-  curl_context_t *createCurlContext(curl_socket_t sockfd, CCDBDownloader *objPtr);
+  /**
+   * Creates structure holding information about a socket including a poll handle assigned to it
+   * 
+   * @param socketfd File descriptor of socket for which the structure will be created
+   */
+  curl_context_t *createCurlContext(curl_socket_t sockfd, CCDBDownloader *CD);
 
   // Is called when handle is closed. Frees data stored within it.
   static void curlCloseCB(uv_handle_t *handle);
