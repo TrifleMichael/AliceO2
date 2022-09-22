@@ -269,10 +269,10 @@ int CcdbApi::storeAsBinaryFile(const char* buffer, size_t size, const std::strin
 
       /* Perform the request, res will get the return code */
       // res = downloader->perform(curl);
-      res = curl_easy_perform(curl);
+      res = downloader->perform(curl);
       /* Check for errors */
       if (res != CURLE_OK) {
-        LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(res));
+        LOGP(alarm, "downloader->perform() failed: {}", curl_easy_strerror(res));
         returnValue = res;
       }
     }
@@ -552,7 +552,7 @@ bool CcdbApi::receiveObject(void* dataHolder, std::string const& path, std::map<
       curlResultCode = downloader->perform(curlHandle);
 
       if (curlResultCode != CURLE_OK) {
-        LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(curlResultCode));
+        LOGP(alarm, "downloader->perform() failed: {}", curl_easy_strerror(curlResultCode));
       } else {
         curlResultCode = curl_easy_getinfo(curlHandle, CURLINFO_RESPONSE_CODE, &responseCode);
         if ((curlResultCode == CURLE_OK) && (responseCode < 300)) {
@@ -1028,7 +1028,7 @@ std::string CcdbApi::list(std::string const& path, bool latestOnly, std::string 
 
       res = downloader->perform(curl);
       if (res != CURLE_OK) {
-        LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(res));
+        LOGP(alarm, "downloader->perform() failed: {}", curl_easy_strerror(res));
       }
     }
     curl_slist_free_all(headers);
@@ -1064,7 +1064,7 @@ void CcdbApi::deleteObject(std::string const& path, long timestamp) const
       // Perform the request, res will get the return code
       res = downloader->perform(curl);
       if (res != CURLE_OK) {
-        LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(res));
+        LOGP(alarm, "downloader->perform() failed: {}", curl_easy_strerror(res));
       }
       curl_easy_cleanup(curl);
     }
@@ -1089,7 +1089,7 @@ void CcdbApi::truncate(std::string const& path) const
       // Perform the request, res will get the return code
       res = downloader->perform(curl);
       if (res != CURLE_OK) {
-        LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(res));
+        LOGP(alarm, "downloader->perform() failed: {}", curl_easy_strerror(res));
       }
       curl_easy_cleanup(curl);
     }
@@ -1194,7 +1194,7 @@ std::map<std::string, std::string> CcdbApi::retrieveHeaders(std::string const& p
         // We take out the unsupported protocol error because we are only querying
         // header info which is returned in any case. Unsupported protocol error
         // occurs sometimes because of redirection to alien for blobs.
-        LOG(error) << "curl_easy_perform() failed: " << curl_easy_strerror(res);
+        LOG(error) << "downloader->perform() failed: " << curl_easy_strerror(res);
       }
 
       getCodeRes = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
@@ -1351,7 +1351,7 @@ void CcdbApi::updateMetadata(std::string const& path, std::map<std::string, std:
         // Perform the request, res will get the return code
         res = downloader->perform(curl);
         if (res != CURLE_OK) {
-          LOGP(alarm, "curl_easy_perform() failed: {}", curl_easy_strerror(res));
+          LOGP(alarm, "downloader->perform() failed: {}", curl_easy_strerror(res));
         }
         curl_easy_cleanup(curl);
       }
