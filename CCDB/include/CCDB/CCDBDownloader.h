@@ -87,39 +87,86 @@ public:
   ~CCDBDownloader();
 
 
-// Called by CURL in order to open a new socket. Newly opened sockets are assigned a timeout timer and added to socketTimerMap.
-static curl_socket_t opensocket_callback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address);
+/**
+ * Called by CURL in order to open a new socket. Newly opened sockets are assigned a timeout timer and added to socketTimerMap.
+ * 
+ * @param clientp Pointer to the CCDBDownloader instance which controls the socket.
+ * @param purpose Purpose of opened socket. This parameter is unused but required by the callback template.
+ * @param address Structure containing information about family, type and protocol for the socket.
+ */
+static curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address);
 
 
-// Called by CURL in order to close a socket. It will be called by CURL even if a timout timer closed the socket beforehand.
-static void closesocket_callback(void* clientp, curl_socket_t item);
+/**
+ * Called by CURL in order to close a socket. It will be called by CURL even if a timout timer closed the socket beforehand.
+ * 
+ * @param clientp Pointer to the CCDBDownloader instance which controls the socket.
+ * @param item File descriptor of the socket.
+ */
+static void closesocketCallback(void* clientp, curl_socket_t item);
 
-// TODO: Remove or move to tests
-static void cleanAllHandles(std::vector<CURL*> handles);
 
+/**
+ *  Is used to react to polling file descriptors in poll_handle. 
+ * 
+ * @param handle Handle assigned to this callback.
+ * @param status Used to signal errors.
+ * @param events Bitmask used to describe events on the socket.
+ */
+static void curlPerform(uv_poll_t *handle, int status, int events);
 
-// Is used to react to polling file descriptors in poll_handle
-// Calls handle_socket indirectly for further reading*
-// If call is finished closes handle indirectly by check multi info
-static void curlPerform(uv_poll_t *req, int status, int events);
+/**
+ * Checks if loop was signalled to close. The handle connected with this callbacks is always active as to prevent the uv_loop from stopping.
+ *  
+ * @param handle uv_handle to which this callbacks is assigned
+ */
+static void checkStopSignal(uv_timer_t *handle);
 
-// TODO: Rename
-static void checkGlobals(uv_timer_t *handle);
+/**
+ * Checks if any of the callback threads have finished running and approprietly joins them.
+ */
+void checkForThreadsToJoin(); // TODO: MOVE DOWN
 
-// Used by CURL to react to action happening on a socket.
+/**
+ * Used by CURL to react to action happening on a socket.
+ */
 static int handleSocket(CURL *easy, curl_socket_t s, int action, void *userp, void *socketp);
 
+/**
+ * Deletes the handle.
+ * 
+ * @param handle Handle assigned to this callback.
+ */
 static void onUVClose(uv_handle_t* handle);
 
+/**
+ * uv_walk callback which is used to close passed handle.
+ * 
+ * @param handle Handle to be closed.
+ * @param arg Argument required by callback template. Is not used in this implementation.
+ */
 static void closeHandles(uv_handle_t* handle, void* arg);
 
-static void closePolls(uv_handle_t* handle, void* arg);
+/**
+ * Asynchroniously notifies the loop to check its CURL handle queue.
+ * 
+ * @param handle Handle which is assigned to this callback.
+ */
+static void asyncUVHandleCheckQueue(uv_async_t *handle);
 
-static void asyncUVHandleCallback(uv_async_t *handle);
+/**
+ * Closes socket assigned to the timer handle.
+ * 
+ * @param handle Handle which is assigned to this callback. 
+ */
+static void closeSocketByTimer(uv_timer_t* handle);
 
-static void closeHandleTimerCallback(uv_timer_t* handle);
-
-static void onTimeout(uv_timer_t *req);
+/**
+ * Starts new transfers.
+ * 
+ * @param req Handle which is assigned to this callback.
+ */
+static void curlTimeout(uv_timer_t *req);
 
 
 
@@ -153,42 +200,77 @@ static void onTimeout(uv_timer_t *req);
    */
   curl_context_t *createCurlContext(curl_socket_t sockfd);
 
-  // Is called when handle is closed. Frees data stored within it.
+  /**
+   * Is called when a poll handle conencted to as socket is closed. Frees data stored within the handle.
+   * 
+   * @param handle Handle assigned to this callback.
+   */
   static void curlCloseCB(uv_handle_t *handle);
 
-  // Destroyes data about a socket
+  /**
+   * Closes poll handle assigned to the socket contained in the context and frees data within the handle.
+   * 
+   * @param context Structure containing information about socket and handle to be closed.
+   */
   static void destroyCurlContext(curl_context_t *context);
 
-  // Checks messages inside curl multi handle
-  void checkMultiInfo(void);
+  /**
+   * Checks message queue inside curl multi handle.
+   */
+  void checkMultiInfo();
 
-  // Connects curl timer with uv timer
+  /**
+   * Connects curl timer with uv timer.
+   * 
+   * @param multi Multi handle for which the timout will be set
+   * @param timeout_ms Time until timeout
+   * @param userp Pointer to the uv_timer_t handle that is used for timeout.
+   */
   static int startTimeout(CURLM *multi, long timeout_ms, void *userp);
 
-  // Asynchroniously signalls the event loop to check for new easy_handles to add to multi_handle
+  /**
+   * Asynchroniously signals the event loop to check for new easy_handles to add to multi handle.
+   */
   void makeLoopCheckQueueAsync();
 
-  // If multi_handles uses less then maximum number of handles then add handles from the queue.
+  /**
+   * If multi_handles uses less then maximum number of handles then add handles from the queue.
+   */
   void checkHandleQueue();
 
-  // Start the event loop.
-  void asynchLoop();
+  /**
+   * Start the event loop. This function should be ran in the `loopThread`.
+   */
+  void runLoop();
 
-  // Perform on a single handle in a blocking manner.
+  /**
+   * Perform on a single handle in a blocking manner. Has the same effect as curl_easy_perform().
+   * 
+   * @param handle Handle to be performed on. It can be reused or cleaned after perform finishes.
+   */
   CURLcode perform(CURL* handle);
 
-  // Perform on a batch of handles. Callback will be exectuted in it's own thread after all handles finish their transfers.
-  std::vector<CURLcode> *asynchBatchPerformWithCallback(std::vector<CURL*> handle, bool *completionFlag, void (*cbFun)(void*), void* cbData);
+  /**
+   * Perform on a batch of handles. Callback will be exectuted in it's own thread after all handles finish their transfers.
+   * 
+   * @param handles Handles to be performed on.
+   */
+  std::vector<CURLcode> *asynchBatchPerformWithCallback(std::vector<CURL*> handles, bool *completionFlag, void (*cbFun)(void*), void* cbData);
 
-  // Perform on a batch of handles in a blocking manner.
+  /**
+   * Perform on a batch of handles in a blocking manner. Has the same effect as calling curl_easy_perform() on all handles in the vector.
+   * @param handleVector Handles to be performed on.
+   */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> handleVector);
 
-  // Perform on a batch of handles. Completion flag will be set to true when all handles finish their transfers.
+  /**
+   * Perform on a batch of handles. Completion flag will be set to true when all handles finish their transfers.
+   * @param handleVector Handles to be performed on.
+   * @param completionFlag Should be set to false before passing it to this function. Will be set to true after all transfers finish.
+   */
   std::vector<CURLcode>* batchAsynchPerform(std::vector<CURL*> handleVector, bool *completionFlag);
 
 };
-
-void setHandleOptions(CURL* handle, std::string* dst, std::string* headers, std::string* path);
 
 } // namespace ccdb
 } // namespace o2
