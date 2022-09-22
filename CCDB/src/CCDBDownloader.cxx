@@ -72,7 +72,6 @@ CCDBDownloader::CCDBDownloader()
 
 void CCDBDownloader::initializeMultiHandle()
 {
-  multiHandleActive = true;
   curlMultiHandle = curl_multi_init();
   curl_multi_setopt(curlMultiHandle, CURLMOPT_SOCKETFUNCTION, handleSocket);
   auto socketData = new DataForSocket();
@@ -269,7 +268,16 @@ int CCDBDownloader::handleSocket(CURL *easy, curl_socket_t s, int action, void *
   return 0;
 }
 
-// Initializes a handle using a socket and passes it to context
+void CCDBDownloader::setMaxParallelConnections(int limit)
+{
+  maxHandlesInUse = limit;
+}
+
+void CCDBDownloader::setSocketTimoutTime(int timoutMS)
+{
+  socketTimoutMS = timoutMS;
+}
+
 CCDBDownloader::curl_context_t *CCDBDownloader::createCurlContext(curl_socket_t sockfd)
 {
   curl_context_t *context;
