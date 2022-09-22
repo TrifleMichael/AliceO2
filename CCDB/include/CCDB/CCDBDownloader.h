@@ -59,6 +59,16 @@ class CCDBDownloader
    */
   std::vector<CURLcode>* batchAsynchPerform(std::vector<CURL*> handleVector, bool* completionFlag);
 
+  /**
+   * Limits the number of parallel connections. Should be used only if no transfers are happening.
+   */
+  void setMaxParallelConnections(int limit);
+
+  /**
+   * Limits the time a socket and its connection will be opened after transfer finishes.
+   */
+  void setSocketTimoutTime(int timoutMS);
+
  private:
 
   int handlesInUse = 0;
@@ -107,16 +117,6 @@ class CCDBDownloader
   } PerformData;
 
   /**
-   * Limits the number of parallel connections. Should be used only if no transfers are happening.
-   */
-  void setMaxParallelConnections(int limit);
-
-  /**
-   * Limits the time a socket and its connection will be opened after transfer finishes.
-   */
-  void setSocketTimoutTime(int timoutMS);
-  
-  /**
    * Called by CURL in order to open a new socket. Newly opened sockets are assigned a timeout timer and added to socketTimerMap.
    *
    * @param clientp Pointer to the CCDBDownloader instance which controls the socket.
@@ -148,11 +148,6 @@ class CCDBDownloader
    * @param handle uv_handle to which this callbacks is assigned
    */
   static void checkStopSignal(uv_timer_t* handle);
-
-  /**
-   * Checks if any of the callback threads have finished running and approprietly joins them.
-   */
-  void checkForThreadsToJoin(); // TODO: MOVE DOWN
 
   /**
    * Used by CURL to react to action happening on a socket.
@@ -196,26 +191,6 @@ class CCDBDownloader
   static void curlTimeout(uv_timer_t* req);
 
   /**
-   * Creates a new multi_handle for the downloader
-   */
-  void initializeMultiHandle();
-
-  /**
-   * Releases resources reserver for the transfer, marks transfer as complete, passes the CURLcode to the destination and launches callbacks if requested
-   *
-   * @param handle The easy_handle for which the transfer completed
-   * @param curlCode The code produced for the handle by the transfer
-   */
-  void transferFinished(CURL* handle, CURLcode curlCode);
-
-  /**
-   * Creates structure holding information about a socket including a poll handle assigned to it
-   *
-   * @param socketfd File descriptor of socket for which the structure will be created
-   */
-  curl_context_t* createCurlContext(curl_socket_t sockfd);
-
-  /**
    * Is called when a poll handle conencted to as socket is closed. Frees data stored within the handle.
    *
    * @param handle Handle assigned to this callback.
@@ -230,11 +205,6 @@ class CCDBDownloader
   static void destroyCurlContext(curl_context_t* context);
 
   /**
-   * Checks message queue inside curl multi handle.
-   */
-  void checkMultiInfo();
-
-  /**
    * Connects curl timer with uv timer.
    *
    * @param multi Multi handle for which the timout will be set
@@ -242,6 +212,36 @@ class CCDBDownloader
    * @param userp Pointer to the uv_timer_t handle that is used for timeout.
    */
   static int startTimeout(CURLM* multi, long timeout_ms, void* userp);
+
+  /**
+   * Checks if any of the callback threads have finished running and approprietly joins them.
+   */
+  void checkForThreadsToJoin(); // TODO: MOVE DOWN
+
+  /**
+   * Creates a new multi_handle for the downloader
+   */
+  void initializeMultiHandle();
+
+  /**
+   * Releases resources reserver for the transfer, marks transfer as complete, passes the CURLcode to the destination and launches callbacks if requested
+   *
+   * @param handle The easy_handle for which the transfer completed
+   * @param curlCode The code produced for the handle by the transfer
+   */
+  void transferFinished(CURL* handle, CURLcode curlCode);
+
+  /**
+   * Checks message queue inside curl multi handle.
+   */
+  void checkMultiInfo();
+
+  /**
+   * Creates structure holding information about a socket including a poll handle assigned to it
+   *
+   * @param socketfd File descriptor of socket for which the structure will be created
+   */
+  curl_context_t* createCurlContext(curl_socket_t sockfd);
 
   /**
    * Asynchroniously signals the event loop to check for new easy_handles to add to multi handle.

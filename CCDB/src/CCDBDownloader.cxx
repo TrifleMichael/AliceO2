@@ -16,34 +16,12 @@
 #include <chrono>   // time measurement
 #include <unistd.h> // time measurement
 
-#include <sys/types.h> /* See NOTES */
+#include <sys/types.h>
 #include <sys/socket.h>
 
-// THIS IS THE SSL TEST ! THIS IS THE SSL TEST ! THIS IS THE SSL TEST ! THIS IS THE SSL TEST !
-
 /*
-g++ -std=c++11 GigaTest.cpp -lpthread -lcurl -luv -o GigaTest && ./GigaTest
-*/
-
-// Ideas: call handleSocket for each socket to close them (mark with flag passed outside)
-
-/*
-TODO:
-
-- add asynchronous closeLoop call
-
-- check what can be free'd in destructor
-- free things in finalize Download
-
-- pooling threads only when they exist
-
-- multiple uv loop threads
-
-Information:
-
 - Curl multi handle automatically reuses connections. Source: https://everything.curl.dev/libcurl/connectionreuse
 - Keepalive for http is set to 118 seconds by default by CURL Source: https://stackoverflow.com/questions/60141625/libcurl-how-does-connection-keep-alive-work
-
 */
 
 namespace o2 {
@@ -333,7 +311,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       *data->completionFlag = true;
       break;
     case ASYNCHRONOUS_WITH_CALLBACK:
-    // TODO : TEST IF CALLBACKS WORK AND ARE CLOSED CORRECTLY!
       *data->completionFlag = true;
       bool* cbFlag = (bool*)malloc(sizeof(bool));
       *cbFlag = false;
