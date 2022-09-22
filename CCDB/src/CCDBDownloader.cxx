@@ -109,13 +109,13 @@ CCDBDownloader::~CCDBDownloader()
   curl_multi_cleanup(curlMultiHandle);
 }
 
-void closeHandles(uv_handle_t* handle, void* arg)
+void CCDBDownloader::closeHandles(uv_handle_t* handle, void* arg)
 {
   if (!uv_is_closing(handle))
     uv_close(handle, onUVClose);
 }
 
-void closePolls(uv_handle_t* handle, void* arg)
+void CCDBDownloader::closePolls(uv_handle_t* handle, void* arg)
 {
   if (handle->type == UV_POLL) {
     if (!uv_is_closing(handle)) {
@@ -124,7 +124,7 @@ void closePolls(uv_handle_t* handle, void* arg)
   }
 }
 
-void onUVClose(uv_handle_t* handle)
+void CCDBDownloader::onUVClose(uv_handle_t* handle)
 {
   if (handle != NULL)
   {
@@ -132,7 +132,30 @@ void onUVClose(uv_handle_t* handle)
   }
 }
 
-void closesocket_callback(void *clientp, curl_socket_t item)
+// TODO: Rename
+void CCDBDownloader::checkGlobals(uv_timer_t *handle)
+{
+  // Check for closing signal
+  auto CD = (CCDBDownloader*)handle->data;
+  if(CD->closeLoop) {
+    uv_timer_stop(handle);
+    uv_stop(&CD->loop);
+  }
+
+  // Join and erase threads that finished running callback functions
+  for (int i = 0; i < CD->threadFlagPairVector.size(); i++)
+  {
+    if (*(CD->threadFlagPairVector[i].second))
+    {
+      CD->threadFlagPairVector[i].first->join();
+      delete (CD->threadFlagPairVector[i].first);
+      delete (CD->threadFlagPairVector[i].second);
+      CD->threadFlagPairVector.erase(CD->threadFlagPairVector.begin() + i);
+    }
+  }
+}
+
+void CCDBDownloader::closesocket_callback(void *clientp, curl_socket_t item)
 {
   auto CD = (CCDBDownloader*)clientp;
   if (CD->socketTimerMap.find(item) != CD->socketTimerMap.end()) {
@@ -142,7 +165,7 @@ void closesocket_callback(void *clientp, curl_socket_t item)
   }
 }
 
-curl_socket_t opensocket_callback(void *clientp, curlsocktype purpose, struct curl_sockaddr *address)
+curl_socket_t CCDBDownloader::opensocket_callback(void *clientp, curlsocktype purpose, struct curl_sockaddr *address)
 {
   auto CD = (CCDBDownloader*)clientp;
   auto sock = socket(address->family, address->socktype, address->protocol);
@@ -158,7 +181,7 @@ curl_socket_t opensocket_callback(void *clientp, curlsocktype purpose, struct cu
   return sock;
 }
 
-void asyncUVHandleCallback(uv_async_t *handle)
+void CCDBDownloader::asyncUVHandleCallback(uv_async_t *handle)
 {
   auto CD = (CCDBDownloader*)handle->data;
   uv_close((uv_handle_t*)handle, onUVClose);
@@ -166,7 +189,7 @@ void asyncUVHandleCallback(uv_async_t *handle)
 }
 
 // TODO: Change name
-void closeHandleTimerCallback(uv_timer_t* handle)
+void CCDBDownloader::closeHandleTimerCallback(uv_timer_t* handle)
 {
   auto data = (CCDBDownloader::DataForClosingSocket*)handle->data;
   auto CD = data->CD;
@@ -181,7 +204,7 @@ void closeHandleTimerCallback(uv_timer_t* handle)
 }
 
 // TODO: Rename
-void onTimeout(uv_timer_t *req)
+void CCDBDownloader::onTimeout(uv_timer_t *req)
 {
   auto CD = (CCDBDownloader *)req->data;
   int running_handles;
@@ -189,7 +212,7 @@ void onTimeout(uv_timer_t *req)
   CD->checkMultiInfo();
 }
 
-void curlPerform(uv_poll_t *req, int status, int events)
+void CCDBDownloader::curlPerform(uv_poll_t *req, int status, int events)
 {
   int running_handles;
   int flags = 0;
@@ -204,7 +227,7 @@ void curlPerform(uv_poll_t *req, int status, int events)
   context->CD->checkMultiInfo();
 }
 
-int handleSocket(CURL *easy, curl_socket_t s, int action, void *userp, void *socketp)
+int CCDBDownloader::handleSocket(CURL *easy, curl_socket_t s, int action, void *userp, void *socketp)
 {
   auto socketData = (CCDBDownloader::DataForSocket *)userp;
   auto CD = (CCDBDownloader*)socketData->CD;
@@ -388,29 +411,6 @@ void CCDBDownloader::checkHandleQueue()
     }
   }
   handlesQueueLock.unlock();
-}
-
-// TODO: Rename
-void checkGlobals(uv_timer_t *handle)
-{
-  // Check for closing signal
-  auto CD = (CCDBDownloader*)handle->data;
-  if(CD->closeLoop) {
-    uv_timer_stop(handle);
-    uv_stop(&CD->loop);
-  }
-
-  // Join and erase threads that finished running callback functions
-  for (int i = 0; i < CD->threadFlagPairVector.size(); i++)
-  {
-    if (*(CD->threadFlagPairVector[i].second))
-    {
-      CD->threadFlagPairVector[i].first->join();
-      delete (CD->threadFlagPairVector[i].first);
-      delete (CD->threadFlagPairVector[i].second);
-      CD->threadFlagPairVector.erase(CD->threadFlagPairVector.begin() + i);
-    }
-  }
 }
 
 void CCDBDownloader::asynchLoop()
