@@ -202,5 +202,55 @@ BOOST_AUTO_TEST_CASE(test_with_break)
   curl_global_cleanup();
 }
 
+void testCallback(void* ptr)
+{
+  int* intPtr = (int*)ptr;
+  *intPtr = 46;
+}
+
+BOOST_AUTO_TEST_CASE(asynch_batch_callback)
+{
+  if (curl_global_init(CURL_GLOBAL_ALL))
+  {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
+
+  CCDBDownloader downloader;
+  std::vector<CURL*> handleVector;
+  std::vector<std::string*> destinations;
+  for(int i = 0; i < 10; i++) {
+    destinations.push_back(new std::string());
+    handleVector.push_back(testHandle(destinations.back()));
+  }
+
+  int testValue = 0;
+
+  bool flag = false;
+  auto curlCodes = downloader.asynchBatchPerformWithCallback(handleVector, &flag, testCallback, &testValue);
+  while (!flag) sleep(1);
+
+  BOOST_CHECK(testValue == 46);
+
+  for(CURLcode code : (*curlCodes)) {
+    BOOST_CHECK(code == CURLE_OK);
+    if (code != CURLE_OK) std::cout << "CURL Code: " << code << "\n";
+  }
+
+  for(CURL* handle : handleVector) {
+    long httpCode;
+    curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+    BOOST_CHECK(httpCode == 200);
+    if (httpCode != 200) std::cout << "HTTP Code: " << httpCode << "\n";
+    curl_easy_cleanup(handle);
+  }
+
+  for(std::string* dst : destinations) {
+    delete dst;
+  }
+
+  curl_global_cleanup();
+}
+
 }
 }
