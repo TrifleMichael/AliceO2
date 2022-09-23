@@ -10,9 +10,6 @@
 #include <condition_variable>
 #include <unordered_map>
 
-#include <chrono>   // time measurement
-#include <unistd.h> // time measurement
-
 #ifndef ALICEO2_CCDBDOWNLOADER_H
 #define ALICEO2_CCDBDOWNLOADER_H
 

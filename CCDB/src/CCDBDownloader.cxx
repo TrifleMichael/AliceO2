@@ -5,24 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <uv.h>
-#include <curl/curl.h>
 #include <string>
-#include <iostream>
-#include <thread>     // get_id
+#include <thread>
 #include <vector>
 #include <condition_variable>
 #include <mutex>
-
-#include <chrono>   // time measurement
-#include <unistd.h> // time measurement
-
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-
-/*
-- Curl multi handle automatically reuses connections. Source: https://everything.curl.dev/libcurl/connectionreuse
-- Keepalive for http is set to 118 seconds by default by CURL Source: https://stackoverflow.com/questions/60141625/libcurl-how-does-connection-keep-alive-work
-*/
 
 namespace o2 {
 namespace ccdb {
@@ -64,15 +54,15 @@ void CCDBDownloader::initializeMultiHandle()
 
 CCDBDownloader::~CCDBDownloader()
 {
+  // Close all socket timers (curl_multi_cleanup will take care of the sockets)
   for(auto socketTimerPair : socketTimerMap) {
     uv_timer_stop(socketTimerPair.second);
     uv_close((uv_handle_t*)socketTimerPair.second, onUVClose);
   }
 
-  // Close async thread
+  // Close loop thread
   closeLoop = true;
   loopThread->join();
-
   delete loopThread;
 
   // Close and if any handles are running then signal to close, and run loop once to close them
