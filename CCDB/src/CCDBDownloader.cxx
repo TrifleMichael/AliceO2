@@ -357,6 +357,16 @@ int CCDBDownloader::startTimeout(CURLM *multi, long timeout_ms, void *userp)
   return 0;
 }
 
+void CCDBDownloader::setHandleOptions(CURL* handle, PerformData* data)
+{
+  curl_easy_setopt(handle, CURLOPT_PRIVATE, data);
+
+  curl_easy_setopt(handle, CURLOPT_CLOSESOCKETFUNCTION, closesocketCallback);
+  curl_easy_setopt(handle, CURLOPT_CLOSESOCKETDATA, this);
+  curl_easy_setopt(handle, CURLOPT_OPENSOCKETFUNCTION, opensocketCallback);
+  curl_easy_setopt(handle, CURLOPT_OPENSOCKETDATA, this);
+}
+
 void CCDBDownloader::checkHandleQueue()
 {
   // Lock access to handle queue
@@ -395,13 +405,7 @@ std::vector<CURLcode>* CCDBDownloader::batchAsynchPerform(std::vector<CURL*> han
     data->completionFlag = completionFlag;
     data->type = ASYNCHRONOUS;
 
-    curl_easy_setopt(handleVector[i], CURLOPT_PRIVATE, data);
-
-    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETFUNCTION, closesocketCallback);
-    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETDATA, this);
-    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETFUNCTION, opensocketCallback);
-    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETDATA, this);
-
+    setHandleOptions(handleVector[i], data);
     handlesToBeAdded.push_back(handleVector[i]);
   }
   handlesQueueLock.unlock();
@@ -438,13 +442,7 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> ha
     data->type = BLOCKING;
     data->requestsLeft = &requestsLeft;
 
-    curl_easy_setopt(handleVector[i], CURLOPT_PRIVATE, data);
-
-    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETFUNCTION, closesocketCallback);
-    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETDATA, this);
-    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETFUNCTION, opensocketCallback);
-    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETDATA, this);
-
+    setHandleOptions(handleVector[i], data);
     handlesToBeAdded.push_back(handleVector[i]);
   }
   handlesQueueLock.unlock();
@@ -473,13 +471,7 @@ std::vector<CURLcode> *CCDBDownloader::asynchBatchPerformWithCallback(std::vecto
     data->cbFun = cbFun;
     data->cbData = cbData;
 
-    curl_easy_setopt(handleVector[i], CURLOPT_PRIVATE, data);
-
-    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETFUNCTION, closesocketCallback);
-    curl_easy_setopt(handleVector[i], CURLOPT_CLOSESOCKETDATA, this);
-    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETFUNCTION, opensocketCallback);
-    curl_easy_setopt(handleVector[i], CURLOPT_OPENSOCKETDATA, this);
-
+    setHandleOptions(handleVector[i], data);
     handlesToBeAdded.push_back(handleVector[i]);
   }
   handlesQueueLock.unlock();

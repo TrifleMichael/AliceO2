@@ -234,6 +234,11 @@ class CCDBDownloader
   void checkMultiInfo();
 
   /**
+   * Sets openSocketCallback and closeSocketCallback with appropriate arguments. Stores data inside the CURL handle.
+   */
+  void setHandleOptions(CURL* handle, PerformData* data);
+
+  /**
    * Creates structure holding information about a socket including a poll handle assigned to it
    *
    * @param socketfd File descriptor of socket for which the structure will be created
