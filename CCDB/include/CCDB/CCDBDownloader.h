@@ -23,8 +23,16 @@ namespace ccdb
 class CCDBDownloader
 {
  public:
-  int socketTimoutMS = 4000; // Time for which sockets will stay open after last download finishes
-  int maxHandlesInUse = 3;   // Max number of handles that can be used at the same time
+
+  /**
+    * Time for which sockets will stay open after last download finishes
+    */
+  int socketTimoutMS = 4000;
+
+  /**
+   * Max number of handles that can be used at the same time
+   */
+  int maxHandlesInUse = 3;
 
   CCDBDownloader();
   ~CCDBDownloader();
@@ -68,41 +76,96 @@ class CCDBDownloader
 
  private:
 
+  /**
+   * Current amount of handles which are performed on.
+   */
   int handlesInUse = 0;
+
+  /**
+   * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
+   * When the timer runs out it closes the socket. The period for which socket stays open is defined by socketTimoutMS.
+   */
   std::unordered_map<curl_socket_t, uv_timer_t*> socketTimerMap;
+
+  /**
+   * The UV loop which handles transfers.
+   */
   uv_loop_t loop;
+
+  /**
+   * Multi handle which controlls all network flow.
+   */
   CURLM* curlMultiHandle = nullptr;
+
+  /**
+   * The timeout clock that is be used by CURL.
+   */
   uv_timer_t* timeout;
+
+  /**
+   * Queue of handles awaiting their transfers to start.
+   */
   std::vector<CURL*> handlesToBeAdded;
+
+  /**
+   * Lock protecting the handleToBeAdded queue.
+   */
   std::mutex handlesQueueLock;
+
+  /**
+   * Thread on which the thread with uv_loop runs.
+   */
   std::thread* loopThread;
+
+  /**
+   * Vector with reference to callback threads with a flag marking whether they finished running.
+   */
   std::vector<std::pair<std::thread*, bool*>> threadFlagPairVector;
+
+  /**
+   * Flag used to signall the loop to close.
+   */
   bool closeLoop = false;
 
+  /**
+   * Types of requests.
+   */
   enum RequestType {
     BLOCKING,
     ASYNCHRONOUS,
     ASYNCHRONOUS_WITH_CALLBACK
   };
 
+  /**
+   * Information about a socket.
+   */
   typedef struct curl_context_s {
     uv_poll_t poll_handle;
     curl_socket_t sockfd = -1;
     CCDBDownloader* CD = nullptr;
   } curl_context_t;
 
+  /**
+   * Structure used for CURLMOPT_SOCKETDATA, which gives context for handleSocket
+   */
   typedef struct DataForSocket {
     CCDBDownloader* CD;
     CURLM* curlm;
   } DataForSocket;
 
+  /**
+   * Structure assigned  to a uv_timer_t before adding it to socketTimerMap. It stores the information about the socket connected to the timer.
+   */
   typedef struct DataForClosingSocket {
     CCDBDownloader* CD;
     curl_socket_t socket;
   } DataForClosingSocket;
 
+  /**
+   * Structure which is stored in a easy_handle. It carries information about the request which the easy_handle is part of.
+   * All easy handles coming from one request have an identical PerformData structure.
+   */
   typedef struct PerformData {
-    bool asynchronous;
     std::condition_variable* cv;
     bool* completionFlag;
     CURLcode* codeDestination;
@@ -140,7 +203,7 @@ class CCDBDownloader
   static void curlPerform(uv_poll_t* handle, int status, int events);
 
   /**
-   * Checks if loop was signalled to close. The handle connected with this callbacks is always active as to prevent the uv_loop from stopping.
+   * Check if loop was signalled to close. The handle connected with this callbacks is always active as to prevent the uv_loop from stopping.
    *
    * @param handle uv_handle to which this callbacks is assigned
    */
@@ -152,7 +215,7 @@ class CCDBDownloader
   static int handleSocket(CURL* easy, curl_socket_t s, int action, void* userp, void* socketp);
 
   /**
-   * Deletes the handle.
+   * Delete the handle.
    *
    * @param handle Handle assigned to this callback.
    */
@@ -167,42 +230,42 @@ class CCDBDownloader
   static void closeHandles(uv_handle_t* handle, void* arg);
 
   /**
-   * Asynchroniously notifies the loop to check its CURL handle queue.
+   * Asynchronously notify the loop to check its CURL handle queue.
    *
    * @param handle Handle which is assigned to this callback.
    */
   static void asyncUVHandleCheckQueue(uv_async_t* handle);
 
   /**
-   * Closes socket assigned to the timer handle.
+   * Close socket assigned to the timer handle.
    *
    * @param handle Handle which is assigned to this callback.
    */
   static void closeSocketByTimer(uv_timer_t* handle);
 
   /**
-   * Starts new transfers.
+   * Start new transfers, terminate expired transfers.
    *
    * @param req Handle which is assigned to this callback.
    */
   static void curlTimeout(uv_timer_t* req);
 
   /**
-   * Is called when a poll handle conencted to as socket is closed. Frees data stored within the handle.
+   * Free curl context assigned to the handle.
    *
    * @param handle Handle assigned to this callback.
    */
   static void curlCloseCB(uv_handle_t* handle);
 
   /**
-   * Closes poll handle assigned to the socket contained in the context and frees data within the handle.
+   * Close poll handle assigned to the socket contained in the context and free data within the handle.
    *
    * @param context Structure containing information about socket and handle to be closed.
    */
   static void destroyCurlContext(curl_context_t* context);
 
   /**
-   * Connects curl timer with uv timer.
+   * Connect curl timer with uv timer.
    *
    * @param multi Multi handle for which the timout will be set
    * @param timeout_ms Time until timeout
@@ -211,17 +274,17 @@ class CCDBDownloader
   static int startTimeout(CURLM* multi, long timeout_ms, void* userp);
 
   /**
-   * Checks if any of the callback threads have finished running and approprietly joins them.
+   * Check if any of the callback threads have finished running and approprietly join them.
    */
   void checkForThreadsToJoin();
 
   /**
-   * Creates a new multi_handle for the downloader
+   * Create a new multi_handle for the downloader
    */
   void initializeMultiHandle();
 
   /**
-   * Releases resources reserver for the transfer, marks transfer as complete, passes the CURLcode to the destination and launches callbacks if requested
+   * Release resources reserver for the transfer, mark transfer as complete, passe the CURLcode to the destination and launche callbacks if it is specified in PerformData.
    *
    * @param handle The easy_handle for which the transfer completed
    * @param curlCode The code produced for the handle by the transfer
@@ -229,24 +292,24 @@ class CCDBDownloader
   void transferFinished(CURL* handle, CURLcode curlCode);
 
   /**
-   * Checks message queue inside curl multi handle.
+   * Check message queue inside curl multi handle.
    */
   void checkMultiInfo();
 
   /**
-   * Sets openSocketCallback and closeSocketCallback with appropriate arguments. Stores data inside the CURL handle.
+   * Set openSocketCallback and closeSocketCallback with appropriate arguments. Stores data inside the CURL handle.
    */
   void setHandleOptions(CURL* handle, PerformData* data);
 
   /**
-   * Creates structure holding information about a socket including a poll handle assigned to it
+   * Create structure holding information about a socket including a poll handle assigned to it
    *
    * @param socketfd File descriptor of socket for which the structure will be created
    */
   curl_context_t* createCurlContext(curl_socket_t sockfd);
 
   /**
-   * Asynchroniously signals the event loop to check for new easy_handles to add to multi handle.
+   * Asynchroniously signal the event loop to check for new easy_handles to add to multi handle.
    */
   void makeLoopCheckQueueAsync();
 
