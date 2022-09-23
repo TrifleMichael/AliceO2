@@ -89,7 +89,6 @@ void CCDBDownloader::onUVClose(uv_handle_t* handle)
   }
 }
 
-// TODO: Rename
 void CCDBDownloader::checkStopSignal(uv_timer_t *handle)
 {
   // Check for closing signal
@@ -99,21 +98,6 @@ void CCDBDownloader::checkStopSignal(uv_timer_t *handle)
     uv_stop(&CD->loop);
   }
   CD->checkForThreadsToJoin();
-}
-
-void CCDBDownloader::checkForThreadsToJoin() // TODO: MOVE DOWN
-{
-  // Join and erase threads that finished running callback functions
-  for (int i = 0; i < threadFlagPairVector.size(); i++)
-  {
-    if (*(threadFlagPairVector[i].second))
-    {
-      threadFlagPairVector[i].first->join();
-      delete (threadFlagPairVector[i].first);
-      delete (threadFlagPairVector[i].second);
-      threadFlagPairVector.erase(threadFlagPairVector.begin() + i);
-    }
-  }
 }
 
 void CCDBDownloader::closesocketCallback(void *clientp, curl_socket_t item)
@@ -149,7 +133,6 @@ void CCDBDownloader::asyncUVHandleCheckQueue(uv_async_t *handle)
   CD->checkHandleQueue();
 }
 
-// TODO: Change name
 void CCDBDownloader::closeSocketByTimer(uv_timer_t* handle)
 {
   auto data = (CCDBDownloader::DataForClosingSocket*)handle->data;
@@ -164,7 +147,6 @@ void CCDBDownloader::closeSocketByTimer(uv_timer_t* handle)
   }
 }
 
-// TODO: Rename
 void CCDBDownloader::curlTimeout(uv_timer_t *handle)
 {
   auto CD = (CCDBDownloader *)handle->data;
@@ -244,6 +226,21 @@ void CCDBDownloader::setMaxParallelConnections(int limit)
 void CCDBDownloader::setSocketTimoutTime(int timoutMS)
 {
   socketTimoutMS = timoutMS;
+}
+
+void CCDBDownloader::checkForThreadsToJoin()
+{
+  // Join and erase threads that finished running callback functions
+  for (int i = 0; i < threadFlagPairVector.size(); i++)
+  {
+    if (*(threadFlagPairVector[i].second))
+    {
+      threadFlagPairVector[i].first->join();
+      delete (threadFlagPairVector[i].first);
+      delete (threadFlagPairVector[i].second);
+      threadFlagPairVector.erase(threadFlagPairVector.begin() + i);
+    }
+  }
 }
 
 CCDBDownloader::curl_context_t *CCDBDownloader::createCurlContext(curl_socket_t sockfd)

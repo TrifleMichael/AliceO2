@@ -213,7 +213,7 @@ class CCDBDownloader
   /**
    * Checks if any of the callback threads have finished running and approprietly joins them.
    */
-  void checkForThreadsToJoin(); // TODO: MOVE DOWN
+  void checkForThreadsToJoin();
 
   /**
    * Creates a new multi_handle for the downloader
