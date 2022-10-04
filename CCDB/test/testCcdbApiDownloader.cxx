@@ -5,19 +5,12 @@
 
 #include <CCDB/CCDBDownloader.h>
 #include <curl/curl.h>
-#include "testCcdbDownloaderResources.h"
-#include <chrono>   // time measurement
+#include <chrono>
 #include <iostream>
-
 #include <CCDB/CcdbApi.h>
-
 #include <unistd.h> // Sleep function to wait for asynch results
 
 #include <boost/test/unit_test.hpp>
-
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/foreach.hpp>
 #include <boost/optional/optional.hpp>
 
 

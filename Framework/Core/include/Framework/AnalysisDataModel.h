@@ -804,6 +804,20 @@ DECLARE_SOA_TABLE_VERSIONED(Cascades_001, "AOD", "CASCADE", 1, //! Run 3 cascade
 using Cascades = Cascades_001; //! this defines the current default version
 using Cascade = Cascades::iterator;
 
+namespace decay3body
+{
+DECLARE_SOA_INDEX_COLUMN_FULL(Track0, track0, int, Tracks, "_0"); //! Track 0 index
+DECLARE_SOA_INDEX_COLUMN_FULL(Track1, track1, int, Tracks, "_1"); //! Track 1 index
+DECLARE_SOA_INDEX_COLUMN_FULL(Track2, track2, int, Tracks, "_2"); //! Track 2 index
+DECLARE_SOA_INDEX_COLUMN(Collision, collision);                   //! Collision index
+} // namespace decay3body
+
+DECLARE_SOA_TABLE(Decays3Body, "AOD", "DECAY3BODY", //! Run 2 cascade table
+                  o2::soa::Index<>, decay3body::CollisionId, decay3body::Track0Id, decay3body::Track1Id, decay3body::Track2Id);
+
+using Decays3Body = Decays3Body; //! this defines the current default version
+using Decay3Body = Decays3Body::iterator;
+
 namespace origin
 {
 DECLARE_SOA_COLUMN(DataframeID, dataframeID, uint64_t); //! Data frame ID (what is usually found in directory name in the AO2D.root, i.e. DF_XXX)
@@ -1072,7 +1086,7 @@ DECLARE_SOA_COLUMN(NpartProj, npartProj, int);                                  
 DECLARE_SOA_COLUMN(NpartTarg, npartTarg, int);                                   //! Number of target participants
 DECLARE_SOA_COLUMN(Ncoll, ncoll, int);                                           //! Number of NN (nucleon-nucleon) collisions
 DECLARE_SOA_COLUMN(NNwoundedCollisions, nNwoundedCollisions, int);               //! Number of N-Nwounded collisions
-DECLARE_SOA_COLUMN(NwoundedNCollisions, nwoundedNCollisions, int);               //! Number of Nwounded-N collisons
+DECLARE_SOA_COLUMN(NwoundedNCollisions, nwoundedNCollisions, int);               //! Number of Nwounded-N collisions
 DECLARE_SOA_COLUMN(NwoundedNwoundedCollisions, nwoundedNwoundedCollisions, int); //! Number of Nwounded-Nwounded collisions
 DECLARE_SOA_COLUMN(SpectatorNeutrons, spectatorNeutrons, int);                   //! Number of spectator neutrons
 DECLARE_SOA_COLUMN(SpectatorProtons, spectatorProtons, int);                     //! Number of spectator protons

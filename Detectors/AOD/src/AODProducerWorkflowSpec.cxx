@@ -704,6 +704,8 @@ void AODProducerWorkflowDPL::fillMCParticlesTable(o2::steer::MCKinematicsReader&
                                                   const o2::globaltracking::RecoContainer& data,
                                                   const std::map<std::pair<int, int>, int>& mcColToEvSrc)
 {
+  using o2::aodhelpers::Triplet_t;
+
   auto markMCTrackForSrc = [&](std::array<GID, GID::NSources>& contributorsGID, uint8_t src) {
     auto mcLabel = data.getTrackMCLabel(contributorsGID[src]);
     if (!mcLabel.isValid()) {
@@ -898,6 +900,8 @@ void AODProducerWorkflowDPL::fillMCTrackLabelsTable(const MCTrackLabelCursorType
                                                     const gsl::span<const GIndex>& primVerGIs,
                                                     const o2::globaltracking::RecoContainer& data)
 {
+  using o2::aodhelpers::Triplet_t;
+
   // labelMask (temporary) usage:
   //   bit 13 -- ITS/TPC or TPC/TOF labels are not equal
   //   bit 14 -- isNoise() == true
@@ -1002,12 +1006,13 @@ void AODProducerWorkflowDPL::fillMCTrackLabelsTable(const MCTrackLabelCursorType
   }
 }
 
-template <typename V0CursorType, typename CascadeCursorType>
-void AODProducerWorkflowDPL::fillSecondaryVertices(const o2::globaltracking::RecoContainer& recoData, V0CursorType& v0Cursor, CascadeCursorType& cascadeCursor)
+template <typename V0CursorType, typename CascadeCursorType, typename Decay3BodyCursorType>
+void AODProducerWorkflowDPL::fillSecondaryVertices(const o2::globaltracking::RecoContainer& recoData, V0CursorType& v0Cursor, CascadeCursorType& cascadeCursor, Decay3BodyCursorType& decay3BodyCursor)
 {
 
   auto v0s = recoData.getV0s();
   auto cascades = recoData.getCascades();
+  auto decays3Body = recoData.getDecays3Body();
 
   // filling v0s table
   for (size_t iv0 = 0; iv0 < v0s.size(); iv0++) {
@@ -1062,6 +1067,37 @@ void AODProducerWorkflowDPL::fillSecondaryVertices(const o2::globaltracking::Rec
       continue;
     }
     cascadeCursor(0, collID, v0tableID, bachTableIdx);
+  }
+
+  // filling 3 body decays table
+  for (size_t i3Body = 0; i3Body < decays3Body.size(); i3Body++) {
+    const auto& decay3Body = decays3Body[i3Body];
+    GIndex trIDs[3]{
+      decay3Body.getProngID(0),
+      decay3Body.getProngID(1),
+      decay3Body.getProngID(2)};
+    int tableIdx[3]{-1, -1, -1}, collID = -1;
+    bool missing{false};
+    for (int i{0}; i < 3; ++i) {
+      auto item = mGIDToTableID.find(trIDs[i]);
+      if (item != mGIDToTableID.end()) {
+        tableIdx[i] = item->second;
+      } else {
+        LOG(warn) << fmt::format("Could not find a track index for prong ID {}", trIDs[i]);
+        missing = true;
+      }
+    }
+    auto itemV = mVtxToTableCollID.find(decay3Body.getVertexID());
+    if (itemV == mVtxToTableCollID.end()) {
+      LOG(warn) << "Could not find 3 body collisionID for the vertex ID " << decay3Body.getVertexID();
+      missing = true;
+    } else {
+      collID = itemV->second;
+    }
+    if (missing) {
+      continue;
+    }
+    decay3BodyCursor(0, collID, tableIdx[0], tableIdx[1], tableIdx[2]);
   }
 }
 
@@ -1126,7 +1162,7 @@ uint8_t AODProducerWorkflowDPL::getTRDPattern(const o2::trd::TrackTRD& track)
 template <typename TEventHandler, typename TCaloCells, typename TCaloTriggerRecord, typename TCaloCursor, typename TCaloTRGTableCursor>
 void AODProducerWorkflowDPL::fillCaloTable(TEventHandler* caloEventHandler, const TCaloCells& calocells, const TCaloTriggerRecord& caloCellTRGR,
                                            const TCaloCursor& caloCellCursor, const TCaloTRGTableCursor& caloCellTRGTableCursor,
-                                           std::map<uint64_t, int>& bcsMap, int8_t caloType)
+                                           const std::map<uint64_t, int>& bcsMap, int8_t caloType)
 {
   uint64_t globalBC = 0;    // global BC ID
   uint64_t globalBCRel = 0; // BC id reltive to minGlBC (from FIT)
@@ -1317,9 +1353,11 @@ void AODProducerWorkflowDPL::run(ProcessingContext& pc)
   LOG(debug) << "FOUND " << caloEMCCells.size() << " EMC cells";
   LOG(debug) << "FOUND " << caloEMCCellsTRGR.size() << " EMC Trigger Records";
 
+  LOG(info) << "FOUND " << primVertices.size() << " primary vertices";
   auto& bcBuilder = pc.outputs().make<TableBuilder>(Output{"AOD", "BC"});
   auto& cascadesBuilder = pc.outputs().make<TableBuilder>(Output{"AOD", "CASCADE_001"});
   auto& collisionsBuilder = pc.outputs().make<TableBuilder>(Output{"AOD", "COLLISION"});
+  auto& decay3BodyBuilder = pc.outputs().make<TableBuilder>(Output{"AOD", "DECAY3BODY"});
   auto& fddBuilder = pc.outputs().make<TableBuilder>(Output{"AOD", "FDD_001"});
   auto& ft0Builder = pc.outputs().make<TableBuilder>(Output{"AOD", "FT0"});
   auto& fv0aBuilder = pc.outputs().make<TableBuilder>(Output{"AOD", "FV0A"});
@@ -1347,6 +1385,7 @@ void AODProducerWorkflowDPL::run(ProcessingContext& pc)
   auto bcCursor = bcBuilder.cursor<o2::aod::BCs>();
   auto cascadesCursor = cascadesBuilder.cursor<o2::aod::Cascades>();
   auto collisionsCursor = collisionsBuilder.cursor<o2::aod::Collisions>();
+  auto decay3BodyCursor = decay3BodyBuilder.cursor<o2::aod::Decays3Body>();
   auto fddCursor = fddBuilder.cursor<o2::aod::FDDs>();
   auto ft0Cursor = ft0Builder.cursor<o2::aod::FT0s>();
   auto fv0aCursor = fv0aBuilder.cursor<o2::aod::FV0As>();
@@ -1380,6 +1419,8 @@ void AODProducerWorkflowDPL::run(ProcessingContext& pc)
   if (!primVer2TRefs.empty()) { // if the vertexing was done, the last slot refers to orphan tracks
     addRefGlobalBCsForTOF(primVer2TRefs.back(), primVerGIs, recoData, bcsMap);
   }
+  // initialize the bunch crossing container for further use below
+  mBCLookup.init(bcsMap);
 
   uint64_t tfNumber;
   const int runNumber = (mRunNumber == -1) ? int(tinfo.runNumber) : mRunNumber;
@@ -1695,7 +1736,7 @@ void AODProducerWorkflowDPL::run(ProcessingContext& pc)
     collisionID++;
   }
 
-  fillSecondaryVertices(recoData, v0sCursor, cascadesCursor);
+  fillSecondaryVertices(recoData, v0sCursor, cascadesCursor, decay3BodyCursor);
 
   // helper map for fast search of a corresponding class mask for a bc
   std::unordered_map<uint64_t, uint64_t> bcToClassMask;
@@ -2097,20 +2138,45 @@ std::uint64_t AODProducerWorkflowDPL::fillBCSlice(int (&slice)[2], double tmin, 
   // The track time in the TrackExtraInfo is stored in ns wrt the collision BC for unambigous tracks and wrt bcSlice[0] for ambiguous ones,
   // with convention for errors: trackSigma in case (1) and half of the time interval for case (2) above.
 
-  // find indices of widest slice of global BCs in the map compatible with provided BC range. bcsMap is guaranteed to be non-empty
+  // find indices of widest slice of global BCs in the map compatible with provided BC range. bcsMap is guaranteed to be non-empty.
+  // We also assume that tmax >= tmin.
+
   uint64_t bcMin = relativeTime_to_GlobalBC(tmin), bcMax = relativeTime_to_GlobalBC(tmax);
-  auto lower = bcsMap.lower_bound(bcMin), upper = bcsMap.upper_bound(bcMax);
-  if (lower == bcsMap.end()) {
-    --lower;
+
+  /*
+    // brute force way of searching bcs via direct binary search in the map
+    auto lower = bcsMap.lower_bound(bcMin), upper = bcsMap.upper_bound(bcMax);
+
+    if (lower == bcsMap.end()) {
+      --lower;
+    }
+    if (upper != lower) {
+      --upper;
+    }
+    slice[0] = std::distance(bcsMap.begin(), lower);
+    slice[1] = std::distance(bcsMap.begin(), upper);
+  */
+
+  // faster way to search in bunch crossing via the accelerated bunch crossing lookup structure
+  auto p = mBCLookup.lower_bound(bcMin);
+  // assuming that bcMax will be >= bcMin and close to bcMin; we can find
+  // the upper bound quickly by lineary iterating from p.first to the point where
+  // the time becomes larger than bcMax.
+  // (if this is not the case we could determine it with a similar call to mBCLookup)
+  auto& bcvector = mBCLookup.getBCTimeVector();
+  auto upperindex = p.first;
+  while (upperindex < bcvector.size() && bcvector[upperindex] <= bcMax) {
+    upperindex++;
   }
-  if (upper != lower) {
-    --upper;
+  if (upperindex != p.first) {
+    upperindex--;
   }
-  slice[0] = std::distance(bcsMap.begin(), lower);
-  slice[1] = std::distance(bcsMap.begin(), upper);
-  auto bcOfTimeRef = lower->first - this->mStartIR.toLong();
-  LOG(debug) << "BC slice t:" << tmin << " " << slice[0] << "(" << lower->first << "/" << lower->second << ")"
-             << " t: " << tmax << " " << slice[1] << "(" << upper->first << "/" << upper->second << ")"
+  slice[0] = p.first;
+  slice[1] = upperindex;
+
+  auto bcOfTimeRef = p.first - this->mStartIR.toLong();
+  LOG(debug) << "BC slice t:" << tmin << " " << slice[0]
+             << " t: " << tmax << " " << slice[1]
              << " bcref: " << bcOfTimeRef;
   return bcOfTimeRef;
 }
@@ -2135,6 +2201,7 @@ DataProcessorSpec getAODProducerWorkflowSpec(GID::mask_t src, bool enableSV, boo
   }
   if (enableSV) {
     dataRequest->requestSecondaryVertertices(useMC);
+    LOGF(info, "requestSecondaryVertertices Finish");
   }
   if (src[GID::TPC]) {
     dataRequest->requestClusters(GIndex::getSourcesMask("TPC"), false); // no need to ask for TOF clusters as they are requested with TOF tracks
@@ -2163,6 +2230,7 @@ DataProcessorSpec getAODProducerWorkflowSpec(GID::mask_t src, bool enableSV, boo
   outputs.emplace_back(OutputLabel{"O2bc"}, "AOD", "BC", 0, Lifetime::Timeframe);
   outputs.emplace_back(OutputLabel{"O2cascade_001"}, "AOD", "CASCADE_001", 0, Lifetime::Timeframe);
   outputs.emplace_back(OutputLabel{"O2collision"}, "AOD", "COLLISION", 0, Lifetime::Timeframe);
+  outputs.emplace_back(OutputLabel{"O2decay3body"}, "AOD", "DECAY3BODY", 0, Lifetime::Timeframe);
   outputs.emplace_back(OutputLabel{"O2fdd_001"}, "AOD", "FDD_001", 0, Lifetime::Timeframe);
   outputs.emplace_back(OutputLabel{"O2ft0"}, "AOD", "FT0", 0, Lifetime::Timeframe);
   outputs.emplace_back(OutputLabel{"O2fv0a"}, "AOD", "FV0A", 0, Lifetime::Timeframe);
@@ -2189,6 +2257,7 @@ DataProcessorSpec getAODProducerWorkflowSpec(GID::mask_t src, bool enableSV, boo
   outputs.emplace_back(OutputSpec{"TFN", "TFNumber"});
   outputs.emplace_back(OutputSpec{"TFF", "TFFilename"});
 
+  LOGF(info, "Call for DataProcessorSPec aod-produce-workflow");
   return DataProcessorSpec{
     "aod-producer-workflow",
     dataRequest->inputs,
