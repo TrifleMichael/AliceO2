@@ -40,8 +40,6 @@
 #include <boost/foreach.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "testCcdbApiResources.h"
-
 using namespace std;
 using namespace o2::ccdb;
 namespace utf = boost::unit_test;

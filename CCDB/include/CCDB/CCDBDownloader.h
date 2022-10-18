@@ -34,7 +34,8 @@ class CCDBDownloader
    */
   int maxHandlesInUse = 3;
 
-  CCDBDownloader();
+  // CCDBDownloader(uv_loop_t uv_loop);
+  CCDBDownloader(uv_loop_t* uv_loop = nullptr);
   ~CCDBDownloader();
 
   /**
@@ -90,7 +91,7 @@ class CCDBDownloader
   /**
    * The UV loop which handles transfers.
    */
-  uv_loop_t loop;
+  uv_loop_t* loop;
 
   /**
    * Multi handle which controlls all network flow.
