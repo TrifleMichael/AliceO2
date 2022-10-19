@@ -20,9 +20,29 @@ namespace o2
 namespace ccdb
 {
 
+/**
+ * uv_walk callback which is used to close passed handle.
+ *
+ * @param handle Handle to be closed.
+ * @param arg Argument required by callback template. Is not used in this implementation.
+ */
+void closeHandles(uv_handle_t* handle, void* arg);
+
+/**
+ * Called by CURL in order to open a new socket. Newly opened sockets are assigned a timeout timer and added to socketTimerMap.
+ *
+ * @param clientp Pointer to the CCDBDownloader instance which controls the socket.
+ * @param purpose Purpose of opened socket. This parameter is unused but required by the callback template.
+ * @param address Structure containing information about family, type and protocol for the socket.
+ */
+curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address);
+
 class CCDBDownloader
 {
  public:
+
+  std::unordered_map<uv_handle_t*, bool> handleMap;
+  // ADD COMMENT
 
   /**
     * Time for which sockets will stay open after last download finishes
@@ -178,15 +198,6 @@ class CCDBDownloader
   } PerformData;
 
   /**
-   * Called by CURL in order to open a new socket. Newly opened sockets are assigned a timeout timer and added to socketTimerMap.
-   *
-   * @param clientp Pointer to the CCDBDownloader instance which controls the socket.
-   * @param purpose Purpose of opened socket. This parameter is unused but required by the callback template.
-   * @param address Structure containing information about family, type and protocol for the socket.
-   */
-  static curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address);
-
-  /**
    * Called by CURL in order to close a socket. It will be called by CURL even if a timout timer closed the socket beforehand.
    *
    * @param clientp Pointer to the CCDBDownloader instance which controls the socket.
@@ -221,14 +232,6 @@ class CCDBDownloader
    * @param handle Handle assigned to this callback.
    */
   static void onUVClose(uv_handle_t* handle);
-
-  /**
-   * uv_walk callback which is used to close passed handle.
-   *
-   * @param handle Handle to be closed.
-   * @param arg Argument required by callback template. Is not used in this implementation.
-   */
-  static void closeHandles(uv_handle_t* handle, void* arg);
 
   /**
    * Asynchronously notify the loop to check its CURL handle queue.
