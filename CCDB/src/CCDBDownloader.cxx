@@ -84,11 +84,11 @@ void closeHandles(uv_handle_t* handle, void* arg)
   if (!uv_is_closing(handle) && CD->handleMap.find(handle) != CD->handleMap.end()) {
   // if (!uv_is_closing(handle)) {
     CD->handleMap.erase(handle);
-    uv_close(handle, CCDBDownloader::onUVClose);
+    uv_close(handle, onUVClose);
   }
 }
 
-void CCDBDownloader::onUVClose(uv_handle_t* handle)
+void onUVClose(uv_handle_t* handle)
 {
   if (handle != NULL)
   {
@@ -124,9 +124,9 @@ curl_socket_t opensocketCallback(void *clientp, curlsocktype purpose, struct cur
 
   CD->socketTimerMap[sock] = new uv_timer_t();
   uv_timer_init(CD->loop, CD->socketTimerMap[sock]);
-  handleMap[(uv_handle_t*)CD->socketTimerMap[sock]] = true;
+  CD->handleMap[(uv_handle_t*)CD->socketTimerMap[sock]] = true;
 
-  auto data = new CCDBDownloader::DataForClosingSocket();
+  auto data = new DataForClosingSocket();
   data->CD = CD;
   data->socket = sock;
   CD->socketTimerMap[sock]->data = data;
@@ -143,7 +143,7 @@ void CCDBDownloader::asyncUVHandleCheckQueue(uv_async_t *handle)
 
 void CCDBDownloader::closeSocketByTimer(uv_timer_t* handle)
 {
-  auto data = (CCDBDownloader::DataForClosingSocket*)handle->data;
+  auto data = (DataForClosingSocket*)handle->data;
   auto CD = data->CD;
   auto sock = data->socket;
 

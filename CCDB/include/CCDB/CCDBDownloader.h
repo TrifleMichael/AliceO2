@@ -37,9 +37,28 @@ void closeHandles(uv_handle_t* handle, void* arg);
  */
 curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address);
 
+/**
+ * Delete the handle.
+ *
+ * @param handle Handle assigned to this callback.
+ */
+void onUVClose(uv_handle_t* handle);
+
 class CCDBDownloader
 {
  public:
+
+
+  /**
+   * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
+   * When the timer runs out it closes the socket. The period for which socket stays open is defined by socketTimoutMS.
+   */
+  std::unordered_map<curl_socket_t, uv_timer_t*> socketTimerMap;
+
+  /**
+   * The UV loop which handles transfers.
+   */
+  uv_loop_t* loop;
 
   std::unordered_map<uv_handle_t*, bool> handleMap;
   // ADD COMMENT
@@ -103,17 +122,6 @@ class CCDBDownloader
   int handlesInUse = 0;
 
   /**
-   * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
-   * When the timer runs out it closes the socket. The period for which socket stays open is defined by socketTimoutMS.
-   */
-  std::unordered_map<curl_socket_t, uv_timer_t*> socketTimerMap;
-
-  /**
-   * The UV loop which handles transfers.
-   */
-  uv_loop_t* loop;
-
-  /**
    * Multi handle which controlls all network flow.
    */
   CURLM* curlMultiHandle = nullptr;
@@ -175,14 +183,6 @@ class CCDBDownloader
   } DataForSocket;
 
   /**
-   * Structure assigned  to a uv_timer_t before adding it to socketTimerMap. It stores the information about the socket connected to the timer.
-   */
-  typedef struct DataForClosingSocket {
-    CCDBDownloader* CD;
-    curl_socket_t socket;
-  } DataForClosingSocket;
-
-  /**
    * Structure which is stored in a easy_handle. It carries information about the request which the easy_handle is part of.
    * All easy handles coming from one request have an identical PerformData structure.
    */
@@ -225,13 +225,6 @@ class CCDBDownloader
    * Used by CURL to react to action happening on a socket.
    */
   static int handleSocket(CURL* easy, curl_socket_t s, int action, void* userp, void* socketp);
-
-  /**
-   * Delete the handle.
-   *
-   * @param handle Handle assigned to this callback.
-   */
-  static void onUVClose(uv_handle_t* handle);
 
   /**
    * Asynchronously notify the loop to check its CURL handle queue.
@@ -328,6 +321,14 @@ class CCDBDownloader
   void runLoop();
 
 };
+
+/**
+ * Structure assigned  to a uv_timer_t before adding it to socketTimerMap. It stores the information about the socket connected to the timer.
+ */
+typedef struct DataForClosingSocket {
+  CCDBDownloader* CD;
+  curl_socket_t socket;
+} DataForClosingSocket;
 
 } // namespace ccdb
 } // namespace o2
