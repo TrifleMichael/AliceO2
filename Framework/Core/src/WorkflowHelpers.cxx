@@ -25,7 +25,6 @@
 #include "Framework/ExternalFairMQDeviceProxy.h"
 #include "Framework/Plugins.h"
 #include "ArrowSupport.h"
-#include "CCDBHelpers.h"
 
 #include "Headers/DataHeader.h"
 #include <algorithm>
@@ -241,7 +240,6 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
   DataProcessorSpec ccdbBackend{
     .name = "internal-dpl-ccdb-backend",
     .outputs = {},
-    .algorithm = CCDBHelpers::fetchFromCCDB(),
     .options = {{"condition-backend", VariantType::String, defaultConditionBackend(), {"URL for CCDB"}},
                 {"condition-not-before", VariantType::Int64, 0ll, {"do not fetch from CCDB objects created before provide timestamp"}},
                 {"condition-not-after", VariantType::Int64, 3385078236000ll, {"do not fetch from CCDB objects created after the timestamp"}},
@@ -480,31 +478,7 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
 
   // add the reader
   if (aodReader.outputs.empty() == false) {
-    uv_lib_t supportLib;
-    int result = 0;
-#ifdef __APPLE__
-    result = uv_dlopen("libO2FrameworkAnalysisSupport.dylib", &supportLib);
-#else
-    result = uv_dlopen("libO2FrameworkAnalysisSupport.so", &supportLib);
-#endif
-    if (result == -1) {
-      LOG(fatal) << uv_dlerror(&supportLib);
-      return;
-    }
-    DPLPluginHandle* (*dpl_plugin_callback)(DPLPluginHandle*);
-
-    result = uv_dlsym(&supportLib, "dpl_plugin_callback", (void**)&dpl_plugin_callback);
-    if (result == -1) {
-      LOG(fatal) << uv_dlerror(&supportLib);
-      return;
-    }
-    if (dpl_plugin_callback == nullptr) {
-      LOG(fatal) << "Could not find the AnalysisSupport plugin.";
-      return;
-    }
-    DPLPluginHandle* pluginInstance = dpl_plugin_callback(nullptr);
-    auto* creator = PluginManager::getByName<AlgorithmPlugin>(pluginInstance, "ROOTFileReader");
-    aodReader.algorithm = creator->create();
+    aodReader.algorithm = PluginManager::loadAlgorithmFromPlugin("O2FrameworkAnalysisSupport", "ROOTFileReader");
     aodReader.outputs.emplace_back(OutputSpec{"TFN", "TFNumber"});
     aodReader.outputs.emplace_back(OutputSpec{"TFF", "TFFilename"});
     extraSpecs.push_back(timePipeline(aodReader, ctx.options().get<int64_t>("readers")));
@@ -556,6 +530,9 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
         }
       }
     }
+
+    // Load the CCDB backend from the plugin
+    ccdbBackend.algorithm = PluginManager::loadAlgorithmFromPlugin("O2FrameworkCCDBSupport", "CCDBFetcherPlugin");
     extraSpecs.push_back(ccdbBackend);
   } else {
     // If there is no CCDB requested, but we still ask for a FLP/DISTSUBTIMEFRAME/0xccdb
@@ -996,7 +973,9 @@ std::shared_ptr<DataOutputDirector> WorkflowHelpers::getDataOutputDirector(Confi
 
   // analyze options and take actions accordingly
   // default values
+  std::string rdn, resdir("./");
   std::string fnb, fnbase("AnalysisResults_trees");
+  float mfs, maxfilesize(-1.);
   std::string fmo, filemode("RECREATE");
   int ntfm, ntfmerge = 1;
 
@@ -1004,12 +983,18 @@ std::shared_ptr<DataOutputDirector> WorkflowHelpers::getDataOutputDirector(Confi
   if (options.isSet("aod-writer-json")) {
     auto fnjson = options.get<std::string>("aod-writer-json");
     if (!fnjson.empty()) {
-      std::tie(fnb, fmo, ntfm) = dod->readJson(fnjson);
+      std::tie(rdn, fnb, fmo, mfs, ntfm) = dod->readJson(fnjson);
+      if (!rdn.empty()) {
+        resdir = rdn;
+      }
       if (!fnb.empty()) {
         fnbase = fnb;
       }
       if (!fmo.empty()) {
         filemode = fmo;
+      }
+      if (mfs > 0.) {
+        maxfilesize = mfs;
       }
       if (ntfm > 0) {
         ntfmerge = ntfm;
@@ -1018,6 +1003,12 @@ std::shared_ptr<DataOutputDirector> WorkflowHelpers::getDataOutputDirector(Confi
   }
 
   // values from command line options, information from json is overwritten
+  if (options.isSet("aod-writer-resdir")) {
+    rdn = options.get<std::string>("aod-writer-resdir");
+    if (!rdn.empty()) {
+      resdir = rdn;
+    }
+  }
   if (options.isSet("aod-writer-resfile")) {
     fnb = options.get<std::string>("aod-writer-resfile");
     if (!fnb.empty()) {
@@ -1028,6 +1019,12 @@ std::shared_ptr<DataOutputDirector> WorkflowHelpers::getDataOutputDirector(Confi
     fmo = options.get<std::string>("aod-writer-resmode");
     if (!fmo.empty()) {
       filemode = fmo;
+    }
+  }
+  if (options.isSet("aod-writer-maxfilesize")) {
+    mfs = options.get<float>("aod-writer-maxfilesize");
+    if (mfs > 0) {
+      maxfilesize = mfs;
     }
   }
   if (options.isSet("aod-writer-ntfmerge")) {
@@ -1062,8 +1059,10 @@ std::shared_ptr<DataOutputDirector> WorkflowHelpers::getDataOutputDirector(Confi
       }
     }
   }
+  dod->setResultDir(resdir);
   dod->setFilenameBase(fnbase);
   dod->setFileMode(filemode);
+  dod->setMaximumFileSize(maxfilesize);
   dod->setNumberTimeFramesToMerge(ntfmerge);
 
   return dod;

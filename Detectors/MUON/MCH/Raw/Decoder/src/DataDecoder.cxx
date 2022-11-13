@@ -18,16 +18,17 @@
 
 #include "MCHRawDecoder/DataDecoder.h"
 
-#include <fstream>
-#include <fairlogger/Logger.h>
-#include "Headers/RAWDataHeader.h"
 #include "CommonConstants/LHCConstants.h"
-#include "DetectorsRaw/RDHUtils.h"
 #include "DetectorsRaw/HBFUtils.h"
-#include "MCHBase/DecoderError.h"
-#include "MCHMappingInterface/Segmentation.h"
+#include "DetectorsRaw/RDHUtils.h"
 #include "Framework/Logger.h"
+#include "Headers/RAWDataHeader.h"
+#include "MCHBase/DecoderError.h"
+#include "MCHConstants/DetectionElements.h"
+#include "MCHMappingInterface/Segmentation.h"
 #include "MCHRawDecoder/ErrorCodes.h"
+#include <fairlogger/Logger.h>
+#include <fstream>
 
 #define MCH_DECODER_MAX_ERROR_COUNT 100
 
@@ -126,7 +127,7 @@ std::ostream& operator<<(std::ostream& os, const DataDecoder::RawDigit& d)
 
 static bool isValidDeID(int deId)
 {
-  for (auto id : deIdsForAllMCH) {
+  for (auto id : o2::mch::constants::deIdsForAllMCH) {
     if (id == deId) {
       return true;
     }
@@ -564,8 +565,9 @@ void DataDecoder::decodePage(gsl::span<const std::byte> page)
 
     mHBPackets.emplace_back(solar, ds, chip, bunchCrossing);
 
-    if (!mTimeFrameStartRecords[chipId].update(mFirstOrbitInTF, bunchCrossing)) {
-      if (mErrorCount < MCH_DECODER_MAX_ERROR_COUNT) {
+    if (mTimeRecoMode == TimeRecoMode::HBPackets) {
+      bool isOk = mTimeFrameStartRecords[chipId].update(mFirstOrbitInTF, bunchCrossing);
+      if (!isOk && mErrorCount < MCH_DECODER_MAX_ERROR_COUNT) {
         auto s = asString(dsElecId);
         LOGP(warning, "Bad HeartBeat packet received: {}-CHIP{} {}/{} (last {}/{})",
              s, chip, mFirstOrbitInTF, bunchCrossing, mTimeFrameStartRecords[chipId].mOrbitPrev, mTimeFrameStartRecords[chipId].mBunchCrossingPrev);
@@ -809,21 +811,6 @@ void DataDecoder::computeDigitsTimeBCRst()
 
     setDigitTime(d, tfTime);
     info.tfTime = tfTime;
-  }
-}
-
-//_________________________________________________________________________________________________
-
-void DataDecoder::checkDigitsTime()
-{
-  for (auto& digit : mDigits) {
-    auto& d = digit.digit;
-    auto& info = digit.info;
-    auto tfTime = d.getTime();
-    if (tfTime == DataDecoder::tfTimeInvalid) {
-      // add invalid digit time error
-      mErrors.emplace_back(o2::mch::DecoderError(info.solar, info.ds, info.chip, ErrorInvalidDigitTime));
-    }
   }
 }
 

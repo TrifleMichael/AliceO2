@@ -14,7 +14,6 @@
 #ifndef O2_AODPRODUCER_WORKFLOW_SPEC
 #define O2_AODPRODUCER_WORKFLOW_SPEC
 
-#include "AODProducerHelpers.h"
 #include "CCDB/BasicCCDBManager.h"
 #include "DataFormatsFT0/RecPoints.h"
 #include "DataFormatsFDD/RecPoint.h"
@@ -42,9 +41,6 @@
 #include "TMap.h"
 #include "TStopwatch.h"
 
-#include <boost/functional/hash.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <boost/unordered_map.hpp>
 #include <string>
 #include <vector>
 
@@ -207,7 +203,7 @@ class BunchCrossings
 class AODProducerWorkflowDPL : public Task
 {
  public:
-  AODProducerWorkflowDPL(GID::mask_t src, std::shared_ptr<DataRequest> dataRequest, std::shared_ptr<o2::base::GRPGeomRequest> gr, bool enableSV, std::string resFile, bool useMC = true) : mInputSources(src), mDataRequest(dataRequest), mGGCCDBRequest(gr), mEnableSV(enableSV), mResFile{resFile}, mUseMC(useMC) {}
+  AODProducerWorkflowDPL(GID::mask_t src, std::shared_ptr<DataRequest> dataRequest, std::shared_ptr<o2::base::GRPGeomRequest> gr, bool enableSV, bool useMC = true) : mInputSources(src), mDataRequest(dataRequest), mGGCCDBRequest(gr), mEnableSV(enableSV), mUseMC(useMC) {}
   ~AODProducerWorkflowDPL() override = default;
   void init(InitContext& ic) final;
   void run(ProcessingContext& pc) final;
@@ -226,6 +222,7 @@ class AODProducerWorkflowDPL : public Task
     return std::uint64_t(mStartIR.toLong()) + relativeTime_to_LocalBC(relativeTimeStampInNS);
   }
 
+  int mNThreads = 1;
   bool mUseMC = true;
   bool mEnableSV = true;             // enable secondary vertices
   const float cSpeed = 0.029979246f; // speed of light in TOF units
@@ -236,7 +233,6 @@ class AODProducerWorkflowDPL : public Task
   int mTruncate{1};
   int mRecoOnly{0};
   o2::InteractionRecord mStartIR{}; // TF 1st IR
-  TString mResFile{"AO2D"};
   TString mLPMProdTag{""};
   TString mAnchorPass{""};
   TString mAnchorProd{""};
@@ -284,10 +280,16 @@ class AODProducerWorkflowDPL : public Task
   double mTimeMarginTrackTime = -1;         // safety margin in NS used for track-vertex matching (additive to track uncertainty)
   double mTPCBinNS = -1;                    // inverse TPC time-bin in ns
 
-  o2::aodhelpers::TripletsMap_t mToStore;
+  // Container used to mark MC particles to store/transfer to AOD.
+  // Mapping of eventID, sourceID, trackID to some integer.
+  // The first two indices are not sparse whereas the trackID index is sparse which explains
+  // the combination of vector and map
+  std::vector<std::vector<std::unordered_map<int, int>*>> mToStore;
 
-  // MC production metadata holder
-  TMap mMetaData;
+  // production metadata
+  std::vector<TString> mMetaDataKeys;
+  std::vector<TString> mMetaDataVals;
+  bool mIsMDSent{false};
 
   std::shared_ptr<DataRequest> mDataRequest;
   std::shared_ptr<o2::base::GRPGeomRequest> mGGCCDBRequest;
@@ -312,8 +314,10 @@ class AODProducerWorkflowDPL : public Task
   uint32_t mMcParticleW = 0xFFFFFFF0;          // 19 bits
   uint32_t mMcParticlePos = 0xFFFFFFF0;        // 19 bits
   uint32_t mMcParticleMom = 0xFFFFFFF0;        // 19 bits
-  uint32_t mCaloAmp = 0xFFFFFF00;              // 15 bits
-  uint32_t mCaloTime = 0xFFFFFF00;             // 15 bits
+  uint32_t mCaloAmp = 0xFFFFFF00;              // 15 bits todo check which truncation should actually be used
+  uint32_t mCaloTime = 0xFFFFFF00;             // 15 bits todo check which truncation should actually be used
+  uint32_t mCPVPos = 0xFFFFF800;               // 12 bits
+  uint32_t mCPVAmpl = 0xFFFFFF00;              // 15 bits
   uint32_t mMuonTr1P = 0xFFFFFC00;             // 13 bits
   uint32_t mMuonTrThetaX = 0xFFFFFF00;         // 15 bits
   uint32_t mMuonTrThetaY = 0xFFFFFF00;         // 15 bits
@@ -410,6 +414,14 @@ class AODProducerWorkflowDPL : public Task
     uint8_t fwdLabelMask = 0;
   };
 
+  // counters for TPC clusters
+  struct TPCCounters {
+    uint8_t shared = 0;
+    uint8_t found = 0;
+    uint8_t crossed = 0;
+  };
+  std::vector<TPCCounters> mTPCCounters;
+
   void updateTimeDependentParams(ProcessingContext& pc);
 
   void addRefGlobalBCsForTOF(const o2::dataformats::VtxTrackRef& trackRef, const gsl::span<const GIndex>& GIndices,
@@ -486,11 +498,7 @@ class AODProducerWorkflowDPL : public Task
   std::uint64_t fillBCSlice(int (&slice)[2], double tmin, double tmax, const std::map<uint64_t, int>& bcsMap) const;
 
   // helper for tpc clusters
-  void countTPCClusters(const o2::tpc::TrackTPC& track,
-                        const gsl::span<const o2::tpc::TPCClRefElem>& tpcClusRefs,
-                        const gsl::span<const unsigned char>& tpcClusShMap,
-                        const o2::tpc::ClusterNativeAccess& tpcClusAcc,
-                        uint8_t& shared, uint8_t& found, uint8_t& crossed);
+  void countTPCClusters(const o2::globaltracking::RecoContainer& data);
 
   // helper for trd pattern
   uint8_t getTRDPattern(const o2::trd::TrackTRD& track);
@@ -502,7 +510,7 @@ class AODProducerWorkflowDPL : public Task
 };
 
 /// create a processor spec
-framework::DataProcessorSpec getAODProducerWorkflowSpec(GID::mask_t src, bool enableSV, bool useMC, std::string resFile, bool CTPConfigPerRun);
+framework::DataProcessorSpec getAODProducerWorkflowSpec(GID::mask_t src, bool enableSV, bool useMC, bool CTPConfigPerRun);
 
 // helper interface for calo cells to "befriend" emcal and phos cells
 class CellHelper

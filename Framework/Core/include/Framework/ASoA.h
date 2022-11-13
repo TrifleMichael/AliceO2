@@ -24,7 +24,10 @@
 #include "Framework/Kernels.h"
 #include <arrow/table.h>
 #include <arrow/array.h>
+#include <arrow/util/config.h>
+#if ARROW_VERSION_MAJOR < 10
 #include <arrow/util/variant.h>
+#endif
 #include <gandiva/selection_vector.h>
 #include <cassert>
 #include <fmt/format.h>
@@ -42,16 +45,17 @@ struct Preslice {
     if (newDataframe) {
       fullSize = input->num_rows();
       newDataframe = false;
-      return o2::framework::getSlices(index.name.c_str(), input, mValues, mCounts);
-    } else {
-      return arrow::Status::OK();
+      if (fullSize != 0) {
+        return o2::framework::getSlices(index.name.c_str(), input, mValues, mCounts);
+      }
     }
+    return arrow::Status::OK();
   };
 
   void setNewDF()
   {
     newDataframe = true;
-  };
+  }
 
   std::shared_ptr<arrow::NumericArray<arrow::Int32Type>> mValues = nullptr;
   std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> mCounts = nullptr;
@@ -62,6 +66,11 @@ struct Preslice {
   arrow::Status getSliceFor(int value, std::shared_ptr<arrow::Table> const& input, std::shared_ptr<arrow::Table>& output, uint64_t& offset) const
   {
     arrow::Status status;
+    if (fullSize == 0) {
+      offset = 0;
+      output = input->Slice(0, 0);
+      return arrow::Status::OK();
+    }
     for (auto slice = 0; slice < mValues->length(); ++slice) {
       if (mValues->Value(slice) == value) {
         output = input->Slice(offset, mCounts->Value(slice));
@@ -1017,6 +1026,10 @@ constexpr bool is_binding_compatible_v()
   return are_bindings_compatible_v<T>(originals_pack_t<B>{});
 }
 
+template <typename T, typename B>
+struct is_binding_compatible : std::conditional_t<is_binding_compatible_v<T, typename B::binding_t>(), std::true_type, std::false_type> {
+};
+
 //! Helper to check if a type T is an iterator
 template <typename T>
 inline constexpr bool is_soa_iterator_v = framework::is_base_of_template_v<RowViewCore, T> || framework::is_specialization_v<T, RowViewCore>;
@@ -1045,11 +1058,7 @@ auto select(T const& t, framework::expressions::Filter const& f)
   return Filtered<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
 }
 
-template <typename C, typename... Cs>
-arrow::ChunkedArray* getColumnByType(framework::pack<Cs...> columns, arrow::Table* table)
-{
-  return table->column(framework::has_type_at_v<C>(columns)).get();
-}
+arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label);
 
 /// A Table class which observes an arrow::Table and provides
 /// It is templated on a set of Column / DynamicColumn types.
@@ -1196,6 +1205,19 @@ class Table
   Table(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
     : Table(ArrowHelpers::joinTables(std::move(tables)), offset)
   {
+  }
+
+  template <typename Key>
+  inline arrow::ChunkedArray* getIndexToKey()
+  {
+    if constexpr (framework::has_type_conditional_v<is_binding_compatible, Key, external_index_columns_t>) {
+      using IC = framework::pack_element_t<framework::has_type_at_conditional<is_binding_compatible, Key>(external_index_columns_t{}), external_index_columns_t>;
+      return mColumnChunks[framework::has_type_at<IC>(persistent_columns_t{})];
+    } else if constexpr (std::is_same_v<table_t, Key>) {
+      return nullptr;
+    } else {
+      static_assert(framework::always_static_assert_v<Key>, "This table does not have an index to this type");
+    }
   }
 
   unfiltered_iterator begin()
@@ -1349,7 +1371,8 @@ class Table
   arrow::ChunkedArray* lookupColumn()
   {
     if constexpr (T::persistent::value) {
-      return getColumnByType<T>(persistent_columns_t{}, mTable.get());
+      auto label = T::columnLabel();
+      return getIndexFromLabel(mTable.get(), label);
     } else {
       return nullptr;
     }
@@ -1498,21 +1521,18 @@ void notBoundTable(const char* tableName);
 
 namespace row_helpers
 {
-template <typename T, typename... Cs>
-std::array<arrow::ChunkedArray*, sizeof...(Cs)> getArrowColumnsTyped(const T& table, framework::pack<Cs...>)
+template <typename... Cs>
+std::array<arrow::ChunkedArray*, sizeof...(Cs)> getArrowColumns(arrow::Table* table, framework::pack<Cs...>)
 {
   static_assert(std::conjunction_v<typename Cs::persistent...>, "Arrow columns: only persistent columns accepted (not dynamic and not index ones");
-  return {o2::soa::getColumnByType<Cs>(typename T::persistent_columns_t{}, table.asArrowTable().get())...};
+  return std::array<arrow::ChunkedArray*, sizeof...(Cs)>{o2::soa::getIndexFromLabel(table, Cs::columnLabel())...};
 }
 
-template <size_t N>
-auto getChunksFromColumns(std::array<arrow::ChunkedArray*, N>& columns, uint64_t ci)
+template <typename... Cs>
+std::array<std::shared_ptr<arrow::Array>, sizeof...(Cs)> getChunks(arrow::Table* table, framework::pack<Cs...>, uint64_t ci)
 {
-  std::array<std::shared_ptr<arrow::Array>, N> chunks;
-  for (size_t i = 0; i < N; ++i) {
-    chunks[i] = columns[i]->chunk(ci);
-  }
-  return chunks;
+  static_assert(std::conjunction_v<typename Cs::persistent...>, "Arrow chunks: only persistent columns accepted (not dynamic and not index ones");
+  return std::array<std::shared_ptr<arrow::Array>, sizeof...(Cs)>{o2::soa::getIndexFromLabel(table, Cs::columnLabel())->chunk(ci)...};
 }
 
 template <typename T, typename C>
@@ -1523,7 +1543,7 @@ typename C::type getSingleRowPersistentData(arrow::Table* table, T& rowIterator,
     ci = colIterator.mCurrentChunk;
     ai = *(colIterator.mCurrentPos) - colIterator.mFirstIndex;
   }
-  return std::static_pointer_cast<o2::soa::arrow_array_for_t<typename C::type>>(o2::soa::getColumnByType<C>(typename T::parent_t::persistent_columns_t{}, table)->chunk(ci))->raw_values()[ai];
+  return std::static_pointer_cast<o2::soa::arrow_array_for_t<typename C::type>>(o2::soa::getIndexFromLabel(table, C::columnLabel())->chunk(ci))->raw_values()[ai];
 }
 
 template <typename T, typename C>

@@ -52,6 +52,7 @@
 #include "Framework/TopologyPolicy.h"
 #include "Framework/WorkflowSpecNode.h"
 #include "Framework/GuiCallbackContext.h"
+#include "Framework/DeviceContext.h"
 #include "ControlServiceHelpers.h"
 #include "ProcessingPoliciesHelpers.h"
 #include "DriverServerContext.h"
@@ -73,7 +74,6 @@
 #include <Configuration/ConfigurationInterface.h>
 #include <Configuration/ConfigurationFactory.h>
 #include <Monitoring/MonitoringFactory.h>
-#include <InfoLogger/InfoLogger.hxx>
 #include "ResourcesMonitoringHelper.h"
 
 #include <fairmq/Device.h>
@@ -146,7 +146,6 @@
 
 using namespace o2::monitoring;
 using namespace o2::configuration;
-using namespace AliceO2::InfoLogger;
 
 using namespace o2::framework;
 namespace bpo = boost::program_options;
@@ -156,8 +155,6 @@ using DeviceSpecs = std::vector<DeviceSpec>;
 using DeviceInfos = std::vector<DeviceInfo>;
 using DeviceControls = std::vector<DeviceControl>;
 using DataProcessorSpecs = std::vector<DataProcessorSpec>;
-
-template class std::vector<DeviceSpec>;
 
 std::vector<DeviceMetricsInfo> gDeviceMetricsInfos;
 
@@ -255,7 +252,7 @@ int calculateExitCode(DriverInfo& driverInfo, DeviceSpecs& deviceSpecs, DeviceIn
       LOGP(error, "SEVERE: Device {} ({}) had at least one message above severity {}: {}",
            spec.name,
            info.pid,
-           info.minFailureLevel,
+           (int)info.minFailureLevel,
            std::regex_replace(info.firstSevereError, regexp, ""));
       return 1;
     }
@@ -527,7 +524,7 @@ struct ControlWebSocketHandler : public WebSocketHandler {
     }
     size_t timestamp = uv_now(mContext.loop);
     for (auto& callback : *mContext.metricProcessingCallbacks) {
-      callback(*mContext.registry, *mContext.metrics, *mContext.specs, *mContext.infos, mContext.driver->metrics, timestamp);
+      callback(mContext.registry, *mContext.metrics, *mContext.specs, *mContext.infos, mContext.driver->metrics, timestamp);
     }
     for (auto& metricsInfo : *mContext.metrics) {
       std::fill(metricsInfo.changed.begin(), metricsInfo.changed.end(), false);
@@ -684,7 +681,7 @@ void handleChildrenStdio(uv_loop_t* loop,
   }
 }
 
-void handle_crash(int /* sig */)
+void handle_crash(int sig)
 {
   // dump demangled stack trace
   void* array[1024];
@@ -693,8 +690,20 @@ void handle_crash(int /* sig */)
 
   {
     char const* msg = "*** Program crashed (Segmentation fault, FPE, BUS, ABRT, KILL)\nBacktrace by DPL:\n";
-    int len = strlen(msg); /* the byte length of the string */
-    auto retVal = write(STDERR_FILENO, msg, len);
+    auto retVal = write(STDERR_FILENO, msg, strlen(msg));
+    msg = "UNKNOWN SIGNAL\n";
+    if (sig == SIGSEGV) {
+      msg = "SEGMENTATION FAULT\n";
+    } else if (sig == SIGABRT) {
+      msg = "ABRT\n";
+    } else if (sig == SIGBUS) {
+      msg = "BUS ERROR\n";
+    } else if (sig == SIGILL) {
+      msg = "ILLEGAL INSTRUCTION\n";
+    } else if (sig == SIGFPE) {
+      msg = "FLOATING POINT EXCEPTION\n";
+    }
+    retVal = write(STDERR_FILENO, msg, strlen(msg));
     (void)retVal;
   }
   demangled_backtrace_symbols(array, size, STDERR_FILENO);
@@ -717,7 +726,7 @@ void spawnDevice(DeviceRef ref,
                  std::vector<DeviceControl>&,
                  std::vector<DeviceExecution>& executions,
                  std::vector<DeviceInfo>& deviceInfos,
-                 ServiceRegistry& serviceRegistry,
+                 ServiceRegistryRef serviceRegistry,
                  boost::program_options::variables_map& varmap,
                  std::vector<DeviceStdioContext>& childFds,
                  unsigned parentCPU,
@@ -1005,14 +1014,14 @@ void doDPLException(RuntimeErrorRef& e, char const* processName)
   if (err.maxBacktrace != 0) {
     LOGP(fatal,
          "Unhandled o2::framework::runtime_error reached the top of main of {}, device shutting down."
-         "\n Reason: {}"
+         " Reason: {}"
          "\n Backtrace follow: \n",
          processName, err.what);
     demangled_backtrace_symbols(err.backtrace, err.maxBacktrace, STDERR_FILENO);
   } else {
     LOGP(fatal,
          "Unhandled o2::framework::runtime_error reached the top of main of {}, device shutting down."
-         "\n Reason: {}"
+         " Reason: {}"
          "\n Recompile with DPL_ENABLE_BACKTRACE=1 to get more information.",
          processName, err.what);
   }
@@ -1088,6 +1097,7 @@ int doChild(int argc, char** argv, ServiceRegistry& serviceRegistry,
   std::unique_ptr<DeviceState> deviceState;
   std::unique_ptr<ComputingQuotaEvaluator> quotaEvaluator;
   std::unique_ptr<FairMQDeviceProxy> deviceProxy;
+  std::unique_ptr<DeviceContext> deviceContext;
 
   auto afterConfigParsingCallback = [&simpleRawDeviceService,
                                      &runningWorkflow,
@@ -1098,27 +1108,31 @@ int doChild(int argc, char** argv, ServiceRegistry& serviceRegistry,
                                      &deviceState,
                                      &deviceProxy,
                                      &processingPolicies,
+                                     &deviceContext,
                                      &loop](fair::mq::DeviceRunner& r) {
+    ServiceRegistryRef serviceRef = {serviceRegistry};
     simpleRawDeviceService = std::make_unique<SimpleRawDeviceService>(nullptr, spec);
-    serviceRegistry.registerService(ServiceRegistryHelpers::handleForService<RawDeviceService>(simpleRawDeviceService.get()));
+    serviceRef.registerService(ServiceRegistryHelpers::handleForService<RawDeviceService>(simpleRawDeviceService.get()));
 
     deviceState = std::make_unique<DeviceState>();
     deviceState->loop = loop;
     deviceState->tracingFlags = DeviceStateHelpers::parseTracingFlags(r.fConfig.GetPropertyAsString("dpl-tracing-flags"));
-    serviceRegistry.registerService(ServiceRegistryHelpers::handleForService<DeviceState>(deviceState.get()));
+    serviceRef.registerService(ServiceRegistryHelpers::handleForService<DeviceState>(deviceState.get()));
 
     quotaEvaluator = std::make_unique<ComputingQuotaEvaluator>(uv_now(loop));
-    serviceRegistry.registerService(ServiceRegistryHelpers::handleForService<ComputingQuotaEvaluator>(quotaEvaluator.get()));
+    serviceRef.registerService(ServiceRegistryHelpers::handleForService<ComputingQuotaEvaluator>(quotaEvaluator.get()));
 
-    serviceRegistry.registerService(ServiceRegistryHelpers::handleForService<DeviceSpec const>(&spec));
-    serviceRegistry.registerService(ServiceRegistryHelpers::handleForService<RunningWorkflowInfo const>(&runningWorkflow));
+    deviceContext = std::make_unique<DeviceContext>();
+    serviceRef.registerService(ServiceRegistryHelpers::handleForService<DeviceSpec const>(&spec));
+    serviceRef.registerService(ServiceRegistryHelpers::handleForService<RunningWorkflowInfo const>(&runningWorkflow));
+    serviceRef.registerService(ServiceRegistryHelpers::handleForService<DeviceContext>(deviceContext.get()));
 
     // The decltype stuff is to be able to compile with both new and old
     // FairMQ API (one which uses a shared_ptr, the other one a unique_ptr.
     decltype(r.fDevice) device;
     device = make_matching<decltype(device), DataProcessingDevice>(ref, serviceRegistry, processingPolicies);
 
-    serviceRegistry.get<RawDeviceService>().setDevice(device.get());
+    serviceRef.get<RawDeviceService>().setDevice(device.get());
     r.fDevice = std::move(device);
     fair::Logger::SetConsoleColor(false);
 
@@ -1128,7 +1142,7 @@ int doChild(int argc, char** argv, ServiceRegistry& serviceRegistry,
       serviceRegistry.declareService(service, *deviceState.get(), r.fConfig);
     }
     if (ResourcesMonitoringHelper::isResourcesMonitoringEnabled(spec.resourceMonitoringInterval)) {
-      serviceRegistry.get<Monitoring>().enableProcessMonitoring(spec.resourceMonitoringInterval, {PmMeasurement::Cpu, PmMeasurement::Mem, PmMeasurement::Smaps});
+      serviceRef.get<Monitoring>().enableProcessMonitoring(spec.resourceMonitoringInterval, {PmMeasurement::Cpu, PmMeasurement::Mem, PmMeasurement::Smaps});
     }
   };
 
@@ -1323,7 +1337,8 @@ int runStateMachine(DataProcessorSpecs const& workflow,
     service.driverStartup(serviceRegistry, varmap);
   }
 
-  serviceRegistry.registerService(ServiceRegistryHelpers::handleForService<DevicesManager>(devicesManager));
+  ServiceRegistryRef ref{serviceRegistry};
+  ref.registerService(ServiceRegistryHelpers::handleForService<DevicesManager>(devicesManager));
 
   GuiCallbackContext guiContext;
   guiContext.plugin = debugGUI;
@@ -1334,17 +1349,17 @@ int runStateMachine(DataProcessorSpecs const& workflow,
 
   // This is to make sure we can process metrics, commands, configuration
   // changes coming from websocket (or even via any standard uv_stream_t, I guess).
-  DriverServerContext serverContext;
-  serverContext.registry = &serviceRegistry;
-  serverContext.loop = loop;
-  serverContext.controls = &controls;
-  serverContext.infos = &infos;
-  serverContext.specs = &runningWorkflow.devices;
-  serverContext.metrics = &metricsInfos;
-  serverContext.driver = &driverInfo;
-  serverContext.metricProcessingCallbacks = &metricProcessingCallbacks;
-  serverContext.gui = &guiContext;
-  serverContext.isDriver = frameworkId.empty();
+  DriverServerContext serverContext{
+    .registry = {serviceRegistry},
+    .loop = loop,
+    .controls = &controls,
+    .infos = &infos,
+    .specs = &runningWorkflow.devices,
+    .metrics = &metricsInfos,
+    .metricProcessingCallbacks = &metricProcessingCallbacks,
+    .driver = &driverInfo,
+    .gui = &guiContext,
+    .isDriver = frameworkId.empty()};
 
   uv_tcp_t serverHandle;
   serverHandle.data = &serverContext;
@@ -1788,8 +1803,10 @@ int runStateMachine(DataProcessorSpecs const& workflow,
             "--aod-memory-rate-limit",
             "--aod-writer-json",
             "--aod-writer-ntfmerge",
+            "--aod-writer-resdir",
             "--aod-writer-resfile",
             "--aod-writer-resmode",
+            "--aod-writer-maxfilesize",
             "--aod-writer-keep",
             "--aod-parent-access-level",
             "--aod-parent-base-path-replacement",
@@ -2016,8 +2033,8 @@ int runStateMachine(DataProcessorSpecs const& workflow,
         boost::property_tree::ptree finalConfig;
         assert(infos.size() == runningWorkflow.devices.size());
         for (size_t di = 0; di < infos.size(); ++di) {
-          auto info = infos[di];
-          auto spec = runningWorkflow.devices[di];
+          auto& info = infos[di];
+          auto& spec = runningWorkflow.devices[di];
           finalConfig.put_child(spec.name, info.currentConfig);
         }
         LOG(info) << "Dumping used configuration in dpl-config.json";
@@ -2370,7 +2387,7 @@ void initialiseDriverControl(bpo::variables_map const& varmap,
     };
   } else if ((varmap["dump-workflow"].as<bool>() == true) || (varmap["run"].as<bool>() == false && varmap.count("id") == 0 && isOutputToPipe())) {
     control.callbacks = {[filename = varmap["dump-workflow-file"].as<std::string>()](WorkflowSpec const& workflow,
-                                                                                     DeviceSpecs const,
+                                                                                     DeviceSpecs const&,
                                                                                      DeviceExecutions const&,
                                                                                      DataProcessorInfos& dataProcessorInfos,
                                                                                      CommandInfo const& commandInfo) {
@@ -2661,11 +2678,11 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
               str << physicalWorkflow[x].name << ":\n";
               str << "inputs:\n";
               for (auto& input : physicalWorkflow[x].inputs) {
-                str << fmt::format("- {}\n", input);
+                str << "- " << input << "\n";
               }
               str << "outputs:\n";
               for (auto& output : physicalWorkflow[x].outputs) {
-                str << fmt::format("- {}\n", output);
+                str << "- " << output << "\n";
               }
             }
             throw std::runtime_error(physicalWorkflow[i].name + " has circular dependency with " + physicalWorkflow[j].name + ":\n" + str.str());
@@ -2755,6 +2772,10 @@ int doMain(int argc, char** argv, o2::framework::WorkflowSpec const& workflow,
       fair::Logger::SetConsoleSeverity(fair::Severity::warning);
     } else if (logLevel == "error") {
       fair::Logger::SetConsoleSeverity(fair::Severity::error);
+    } else if (logLevel == "important") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::important);
+    } else if (logLevel == "alarm") {
+      fair::Logger::SetConsoleSeverity(fair::Severity::alarm);
     } else if (logLevel == "fatal") {
       fair::Logger::SetConsoleSeverity(fair::Severity::fatal);
     } else {

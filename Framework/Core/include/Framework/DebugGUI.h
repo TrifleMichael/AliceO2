@@ -24,6 +24,7 @@
 
 namespace o2::framework
 {
+struct ServiceRegistry;
 /// Plugin interface for DPL GUIs.
 struct DebugGUI {
   virtual std::function<void(void)> getGUIDebugger(std::vector<o2::framework::DeviceInfo> const& infos,

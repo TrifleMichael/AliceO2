@@ -12,6 +12,7 @@
 #define O2_FRAMEWORK_COMMONSERVICES_H_
 
 #include "Framework/ServiceSpec.h"
+#include "Framework/ServiceRegistryRef.h"
 #include "Framework/TypeIdHelpers.h"
 
 class TDatabasePDG;
@@ -26,13 +27,20 @@ struct ThreadPool {
 /// A few ServiceSpecs for services we know about and that / are needed by
 /// everyone.
 struct CommonServices {
+  template <typename T>
+  static ServiceId simpleServiceId()
+  {
+    return []() -> uint32_t {
+      return TypeIdHelpers::uniqueId<T>();
+    };
+  }
   /// An helper for services which do not need any / much special initialization or
   /// configuration.
-  template <typename I, typename T>
+  template <typename I, typename T, enum ServiceKind KIND = ServiceKind::Serial>
   static ServiceInit simpleServiceInit()
   {
-    return [](ServiceRegistry&, DeviceState&, fair::mq::ProgOptions&) -> ServiceHandle {
-      return ServiceHandle{TypeIdHelpers::uniqueId<I>(), new T, ServiceKind::Serial, typeid(T).name()};
+    return [](ServiceRegistryRef, DeviceState&, fair::mq::ProgOptions&) -> ServiceHandle {
+      return ServiceHandle{TypeIdHelpers::uniqueId<I>(), new T, KIND, typeid(T).name()};
     };
   }
 
@@ -40,7 +48,7 @@ struct CommonServices {
   template <typename I, typename T>
   static ServiceInit singletonServiceInit()
   {
-    return [](ServiceRegistry&, DeviceState&, fair::mq::ProgOptions&) -> ServiceHandle {
+    return [](ServiceRegistryRef, DeviceState&, fair::mq::ProgOptions&) -> ServiceHandle {
       return ServiceHandle{TypeIdHelpers::uniqueId<I>(), T::instance(), ServiceKind::Serial, typeid(T).name()};
     };
   }
@@ -50,11 +58,11 @@ struct CommonServices {
     return [](InitContext&, void* service) -> void* { return service; };
   }
 
+  static ServiceSpec deviceContextSpec();
+  static ServiceSpec dataProcessorContextSpec();
   static ServiceSpec driverClientSpec();
   static ServiceSpec monitoringSpec();
   static ServiceSpec datatakingContextSpec();
-  static ServiceSpec infologgerContextSpec();
-  static ServiceSpec infologgerSpec();
   static ServiceSpec configurationSpec();
   static ServiceSpec controlSpec();
   static ServiceSpec rootFileSpec();
@@ -74,20 +82,20 @@ struct CommonServices {
   static ServiceSpec decongestionSpec();
   static ServiceSpec asyncQueue();
   static ServiceSpec guiMetricsSpec();
+  static ServiceSpec dataAllocatorSpec();
 
   static std::vector<ServiceSpec> defaultServices(int numWorkers = 0);
   static std::vector<ServiceSpec> requiredServices();
 };
 
 struct CommonAnalysisServices {
-  static ServiceSpec databasePDGSpec();
-
   template <typename T>
   static void addAnalysisService(std::vector<ServiceSpec>& specs)
   {
-    if constexpr (std::is_same_v<T, TDatabasePDG>) {
-      specs.push_back(databasePDGSpec());
-    }
+    std::vector<LoadableService> loadableServices = {};
+    char const* analysisServices = "O2FrameworkPhysicsSupport:PDGSupport";
+    loadableServices = ServiceHelpers::parseServiceSpecString(analysisServices);
+    ServiceHelpers::loadFromPlugin(loadableServices, specs);
   }
 };
 

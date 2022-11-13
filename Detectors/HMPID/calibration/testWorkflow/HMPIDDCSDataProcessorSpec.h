@@ -74,8 +74,6 @@ class HMPIDDCSDataProcessor : public o2::framework::Task
       std::string ccdbpath = ic.options().get<std::string>("ccdb-path");
       auto& mgr = CcdbManager::instance();
       mgr.setURL(ccdbpath);
-      CcdbApi api;
-      api.init(mgr.getURL());
       long ts = std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::system_clock::now().time_since_epoch())
                   .count();
@@ -96,10 +94,10 @@ class HMPIDDCSDataProcessor : public o2::framework::Task
 
     } // end else
 
-    // LOG(info) << "Listing Data Points for HMPID:";
-    // for (auto& i : vect) {
-    // LOG(info) << i;
-    // }
+    LOG(info) << "Listing Data Points for HMPID:";
+    for (auto& i : vect) {
+      LOG(info) << i;
+    }
 
     mProcessor = std::make_unique<o2::hmpid::HMPIDDCSProcessor>();
     bool useVerboseMode = ic.options().get<bool>("use-verbose-mode");
@@ -134,27 +132,28 @@ class HMPIDDCSDataProcessor : public o2::framework::Task
     if (mCheckRunStartStop) {
       const auto* grp = mRunChecker.check(); // check if there is a run with HMP
       // this is an example of what it will return
+      static size_t runCount = 0;
+      const size_t logPrescale = 10;
       if (mRunChecker.getRunStatus() == RunStatus::NONE) {
-        LOGP(info, "No run with is ongoing or finished");
+        if ((runCount % logPrescale) == 0) {
+          LOGP(info, "No run with HMP is ongoing or finished");
+        }
       } else if (mRunChecker.getRunStatus() ==
                  RunStatus::START) { // saw new run with wanted detectors
         LOGP(info, "Run {} has started", mRunChecker.getFollowedRun());
         grp->print();
-        mProcessor->setRunNumberFromGRP(
-          mRunChecker.getFollowedRun()); // ef: just the same as for emcal?
-                                         // ef: set startValidity here if run-specific object
+        mProcessor->setRunNumberFromGRP(mRunChecker.getFollowedRun()); // ef: just the same as for emcal ef: set startValidity here if run-specific object
         if (mProcessor->getStartValidity() == o2::ccdb::CcdbObjectInfo::INFINITE_TIMESTAMP) {
           mProcessor->setStartValidity(dataTime);
         }
-      } else if (mRunChecker.getRunStatus() ==
-                 RunStatus::ONGOING) { // run which was already seen is still
-                                       // ongoing
-        LOGP(info, "Run {} is still ongoing", mRunChecker.getFollowedRun());
-      } else if (mRunChecker.getRunStatus() ==
-                 RunStatus::STOP) { // run which was already seen was stopped
-                                    // (EOR seen)
+      } else if (mRunChecker.getRunStatus() == RunStatus::ONGOING) { // run which was already seen is still ongoing
+        if ((runCount % logPrescale) == 0) {
+          LOGP(info, "Run {} is still ongoing", mRunChecker.getFollowedRun());
+        }
+      } else if (mRunChecker.getRunStatus() == RunStatus::STOP) { // run which was already seen was stopped (EOR seen)
         LOGP(info, "Run {} was stopped", mRunChecker.getFollowedRun());
       }
+      runCount++;
     } else {
       mProcessor->setRunNumberFromGRP(-2); // ef: just the same as for emcal?
     }

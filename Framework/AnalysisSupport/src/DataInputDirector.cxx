@@ -29,6 +29,8 @@
 
 #if __has_include(<TJAlienFile.h>)
 #include <TJAlienFile.h>
+
+#include <utility>
 #endif
 
 std::vector<std::string> getColumnNames(o2::header::DataHeader dh)
@@ -37,12 +39,10 @@ std::vector<std::string> getColumnNames(o2::header::DataHeader dh)
   auto origin = std::string(dh.dataOrigin.str);
 
   // default: column names = {}
-  return std::vector<std::string>({});
+  return {};
 }
 
-namespace o2
-{
-namespace framework
+namespace o2::framework
 {
 using namespace rapidjson;
 
@@ -57,7 +57,7 @@ FileNameHolder* makeFileNameHolder(std::string fileName)
 DataInputDescriptor::DataInputDescriptor(bool alienSupport, int level, o2::monitoring::Monitoring* monitoring, int allowedParentLevel, std::string parentFileReplacement) : mAlienSupport(alienSupport),
                                                                                                                                                                             mMonitoring(monitoring),
                                                                                                                                                                             mAllowedParentLevel(allowedParentLevel),
-                                                                                                                                                                            mParentFileReplacement(parentFileReplacement),
+                                                                                                                                                                            mParentFileReplacement(std::move(parentFileReplacement)),
                                                                                                                                                                             mLevel(level)
 {
 }
@@ -383,7 +383,7 @@ bool DataInputDescriptor::readTree(DataAllocator& outputs, header::DataHeader dh
       // first argument is 0 as the parent file object contains only 1 file
       return parentFile->readTree(outputs, dh, 0, parentNumTF, treename, totalSizeCompressed, totalSizeUncompressed);
     }
-    throw std::runtime_error(fmt::format(R"(Couldn't get TTree "{}" from "{}". Please check https://aliceo2group.github.io/analysis-framework/docs/troubleshooting/treenotfound.html for more information.)", fileAndFolder.folderName + "/" + treename, fileAndFolder.file->GetName()));
+    throw std::runtime_error(fmt::format(R"(Couldn't get TTree "{}" from "{}". Please check https://aliceo2group.github.io/analysis-framework/docs/troubleshooting/#tree-not-found for more information.)", fileAndFolder.folderName + "/" + treename, fileAndFolder.file->GetName()));
   }
 
   // create table output
@@ -419,7 +419,7 @@ DataInputDirector::DataInputDirector()
   createDefaultDataInputDescriptor();
 }
 
-DataInputDirector::DataInputDirector(std::string inputFile, o2::monitoring::Monitoring* monitoring, int allowedParentLevel, std::string parentFileReplacement) : mMonitoring(monitoring), mAllowedParentLevel(allowedParentLevel), mParentFileReplacement(parentFileReplacement)
+DataInputDirector::DataInputDirector(std::string inputFile, o2::monitoring::Monitoring* monitoring, int allowedParentLevel, std::string parentFileReplacement) : mMonitoring(monitoring), mAllowedParentLevel(allowedParentLevel), mParentFileReplacement(std::move(parentFileReplacement))
 {
   if (inputFile.size() && inputFile[0] == '@') {
     inputFile.erase(0, 1);
@@ -431,7 +431,7 @@ DataInputDirector::DataInputDirector(std::string inputFile, o2::monitoring::Moni
   createDefaultDataInputDescriptor();
 }
 
-DataInputDirector::DataInputDirector(std::vector<std::string> inputFiles, o2::monitoring::Monitoring* monitoring, int allowedParentLevel, std::string parentFileReplacement) : mMonitoring(monitoring), mAllowedParentLevel(allowedParentLevel), mParentFileReplacement(parentFileReplacement)
+DataInputDirector::DataInputDirector(std::vector<std::string> inputFiles, o2::monitoring::Monitoring* monitoring, int allowedParentLevel, std::string parentFileReplacement) : mMonitoring(monitoring), mAllowedParentLevel(allowedParentLevel), mParentFileReplacement(std::move(parentFileReplacement))
 {
   for (auto inputFile : inputFiles) {
     mdefaultInputFiles.emplace_back(makeFileNameHolder(inputFile));
@@ -506,7 +506,6 @@ bool DataInputDirector::readJsonDocument(Document* jsonDoc)
 {
   // initialisations
   std::string fileName("");
-  int ntfm = -1;
   const char* itemName;
 
   // is it a proper json document?
@@ -829,5 +828,4 @@ void DataInputDirector::printOut()
   }
 }
 
-} // namespace framework
-} // namespace o2
+} // namespace o2::framework

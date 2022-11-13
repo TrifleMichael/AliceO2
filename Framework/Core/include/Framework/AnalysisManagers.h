@@ -346,26 +346,26 @@ struct OutputManager<Spawns<T>> {
 };
 
 /// Builds specialization
-template <typename... Os>
-static inline auto extractOriginalsVector(framework::pack<Os...>, ProcessingContext& pc)
+template <typename... Ts>
+static inline auto doExtractOriginal(framework::pack<Ts...>, ProcessingContext& pc)
 {
-  return std::vector{extractOriginal<Os>(pc)...};
-}
-
-template <typename O>
-static inline auto extractTypedOriginal(ProcessingContext& pc)
-{
-  if constexpr (soa::is_type_with_originals_v<O>) {
-    return O{extractOriginalsVector(soa::originals_pack_t<O>{}, pc)};
+  if constexpr (sizeof...(Ts) == 1) {
+    return pc.inputs().get<TableConsumer>(aod::MetadataTrait<framework::pack_element_t<0, framework::pack<Ts...>>>::metadata::tableLabel())->asArrowTable();
   } else {
-    return O{pc.inputs().get<TableConsumer>(aod::MetadataTrait<O>::metadata::tableLabel())->asArrowTable()};
+    return std::vector{pc.inputs().get<TableConsumer>(aod::MetadataTrait<Ts>::metadata::tableLabel())->asArrowTable()...};
   }
 }
 
-template <typename... Os>
-static inline auto extractOriginalsTuple(framework::pack<Os...>, ProcessingContext& pc)
+template <typename O>
+static inline auto extractOriginalJoined(ProcessingContext& pc)
 {
-  return std::make_tuple(extractTypedOriginal<Os>(pc)...);
+  return o2::soa::ArrowHelpers::joinTables({doExtractOriginal(soa::make_originals_from_type<O>(), pc)});
+}
+
+template <typename... Os>
+static inline auto extractOriginalsVector(framework::pack<Os...>, ProcessingContext& pc)
+{
+  return std::vector{extractOriginalJoined<Os>(pc)...};
 }
 
 template <typename T>
@@ -378,9 +378,8 @@ struct OutputManager<Builds<T>> {
 
   static bool prepare(ProcessingContext& pc, Builds<T>& what)
   {
-    return what.build(what.pack(),
-                      extractTypedOriginal<typename Builds<T>::Key>(pc),
-                      extractOriginalsTuple(what.originals_pack(), pc));
+    return what.template build<typename T::indexing_t>(what.pack(), what.originals_pack(),
+                                                       extractOriginalsVector(what.originals_pack(), pc));
   }
 
   static bool finalize(ProcessingContext& pc, Builds<T>& what)
@@ -622,8 +621,7 @@ struct PresliceManager<Preslice<T>> {
   static bool processTable(Preslice<T>& container, T1& table)
   {
     if constexpr (o2::soa::is_binding_compatible_v<T, std::decay_t<T1>>()) {
-      auto status = o2::framework::getSlices(container.index.name.c_str(), table.asArrowTable(), container.mValues, container.mCounts);
-      return status.ok();
+      return container.processTable(table.asArrowTable()).ok();
     } else {
       return false;
     }

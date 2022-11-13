@@ -90,7 +90,7 @@ std::vector<MetricIndices> createDefaultIndices(std::vector<DeviceMetricsInfo>& 
   return results;
 }
 
-uint64_t calculateAvailableSharedMemory(ServiceRegistry& registry)
+uint64_t calculateAvailableSharedMemory(ServiceRegistryRef registry)
 {
   return registry.get<RateLimitConfig>().maxMemory;
 }
@@ -110,7 +110,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
     .postProcessing = CommonMessageBackendsHelpers<ArrowContext>::sendCallback(),
     .preEOS = CommonMessageBackendsHelpers<ArrowContext>::clearContextEOS(),
     .postEOS = CommonMessageBackendsHelpers<ArrowContext>::sendCallbackEOS(),
-    .metricHandling = [](ServiceRegistry& registry,
+    .metricHandling = [](ServiceRegistryRef registry,
                          std::vector<DeviceMetricsInfo>& allDeviceMetrics,
                          std::vector<DeviceSpec>& specs,
                          std::vector<DeviceInfo>& infos,
@@ -268,14 +268,14 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
                        for (size_t di = 0; di < specs.size(); di++) {
                          if (availableSharedMemory < possibleOffer) {
                            if (lowSharedMemoryCount == 0) {
-                             LOGP(info, "We do not have enough shared memory ({}MB) to offer {}MB", availableSharedMemory, possibleOffer);
+                             LOGP(detail, "We do not have enough shared memory ({}MB) to offer {}MB", availableSharedMemory, possibleOffer);
                            }
                            lowSharedMemoryCount++;
                            enoughSharedMemoryCount = 0;
                            break;
                          } else {
                            if (enoughSharedMemoryCount == 0) {
-                             LOGP(info, "We are back in a state where we enough shared memory: {}MB", availableSharedMemory);
+                             LOGP(detail, "We are back in a state where we enough shared memory: {}MB", availableSharedMemory);
                            }
                            enoughSharedMemoryCount++;
                            lowSharedMemoryCount = 0;
@@ -293,7 +293,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
                            continue;
                          }
                          possibleOffer = std::min(MAX_QUANTUM_SHARED_MEMORY, availableSharedMemory);
-                         LOGP(info, "Offering {}MB out of {} to {}", possibleOffer, availableSharedMemory, specs[candidate].id);
+                         LOGP(detail, "Offering {}MB out of {} to {}", possibleOffer, availableSharedMemory, specs[candidate].id);
                          manager.queueMessage(specs[candidate].id.c_str(), fmt::format("/shm-offer {}", possibleOffer).data());
                          availableSharedMemory -= possibleOffer;
                          offeredSharedMemory += possibleOffer;
@@ -311,12 +311,12 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
                        static int64_t lastShmOfferConsumed = 0;
                        static int64_t lastUnusedOfferedMemory = 0;
                        if (shmOfferConsumed != lastShmOfferConsumed) {
-                         LOGP(info, "Offer consumed so far {}", shmOfferConsumed);
+                         LOGP(detail, "Offer consumed so far {}", shmOfferConsumed);
                          lastShmOfferConsumed = shmOfferConsumed;
                        }
                        int unusedOfferedMemory = (offeredSharedMemory - (totalBytesExpired + shmOfferConsumed) / 1000000);
                        if (lastUnusedOfferedMemory != unusedOfferedMemory) {
-                         LOGP(info, "unusedOfferedMemory:{} = offered:{} - (expired:{} + consumed:{}) / 1000000", unusedOfferedMemory, offeredSharedMemory, totalBytesExpired / 1000000, shmOfferConsumed / 1000000);
+                         LOGP(detail, "unusedOfferedMemory:{} = offered:{} - (expired:{} + consumed:{}) / 1000000", unusedOfferedMemory, offeredSharedMemory, totalBytesExpired / 1000000, shmOfferConsumed / 1000000);
                          lastUnusedOfferedMemory = unusedOfferedMemory;
                        }
                        // availableSharedMemory is the amount of memory which we know is available to be offered.
@@ -364,7 +364,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
                        monitoring.send(Metric{(uint64_t)arrow->bytesDestroyed(), "arrow-bytes-destroyed"}.addTag(Key::Subsystem, monitoring::tags::Value::DPL));
                        monitoring.send(Metric{(uint64_t)arrow->messagesDestroyed(), "arrow-messages-destroyed"}.addTag(Key::Subsystem, monitoring::tags::Value::DPL));
                        monitoring.flushBuffer(); },
-    .driverInit = [](ServiceRegistry& registry, boost::program_options::variables_map const& vm) {
+    .driverInit = [](ServiceRegistryRef registry, boost::program_options::variables_map const& vm) {
                        auto config = new RateLimitConfig{};
                        int readers = std::stoll(vm["readers"].as<std::string>());
                        if (vm.count("aod-memory-rate-limit") && vm["aod-memory-rate-limit"].defaulted() == false) {

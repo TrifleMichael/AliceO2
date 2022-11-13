@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <numeric>
 #include <algorithm>
+#include <chrono>
 
 using namespace o2::tpc;
 
@@ -65,9 +66,10 @@ ResidualsContainer::ResidualsContainer(ResidualsContainer&& rhs)
   runNumber = rhs.runNumber;
   tfOrbits = std::move(rhs.tfOrbits);
   sumOfResiduals = std::move(rhs.sumOfResiduals);
+  lumi = std::move(rhs.lumi);
 }
 
-void ResidualsContainer::init(const TrackResiduals* residualsEngine, std::string outputDir, bool wFile, bool wBinnedResid, bool wUnbinnedResid, bool wTrackData, int autosave)
+void ResidualsContainer::init(const TrackResiduals* residualsEngine, std::string outputDir, bool wFile, bool wBinnedResid, bool wUnbinnedResid, bool wTrackData, int autosave, int compression)
 {
   trackResiduals = residualsEngine;
   writeToRootFile = wFile;
@@ -80,7 +82,7 @@ void ResidualsContainer::init(const TrackResiduals* residualsEngine, std::string
     fileName += ".root";
     std::string fileNameTmp = outputDir + fileName;
     fileNameTmp += ".part"; // to prevent premature external usage of the file use temporary name
-    fileOut = std::make_unique<TFile>(fileNameTmp.c_str(), "recreate");
+    fileOut = std::make_unique<TFile>(fileNameTmp.c_str(), "recreate", "", compression);
   }
   if (writeUnbinnedResiduals) {
     treeOutResidualsUnbinned = std::make_unique<TTree>("unbinnedResid", "TPC unbinned residuals");
@@ -112,6 +114,7 @@ void ResidualsContainer::init(const TrackResiduals* residualsEngine, std::string
     }
     treeOutRecords->Branch("firstTForbit", &tfOrbitsPtr);
     treeOutRecords->Branch("sumOfResiduals", &sumOfResidualsPtr);
+    treeOutRecords->Branch("lumi", &lumiPtr);
   }
 }
 
@@ -126,7 +129,7 @@ void ResidualsContainer::fillStatisticsBranches()
   }
 }
 
-void ResidualsContainer::fill(const o2::dataformats::TFIDInfo& ti, const std::pair<gsl::span<const o2::tpc::TrackData>, gsl::span<const TrackResiduals::UnbinnedResid>> data)
+void ResidualsContainer::fill(const o2::dataformats::TFIDInfo& ti, const std::pair<gsl::span<const o2::tpc::TrackData>, gsl::span<const UnbinnedResid>> data, const o2::ctp::LumiInfo* lumiInput)
 {
   // receives large vector of unbinned residuals and fills the sector-wise vectors
   // with binned residuals and statistics
@@ -189,6 +192,9 @@ void ResidualsContainer::fill(const o2::dataformats::TFIDInfo& ti, const std::pa
   }
   runNumber = ti.runNumber;
   tfOrbits.push_back(ti.firstTForbit);
+  if (lumiInput) {
+    lumi.push_back(*lumiInput);
+  }
 
   if (autosaveInterval > 0 && (tfOrbits.size() % autosaveInterval) == 0 && writeToRootFile) {
     writeToFile(false);
@@ -291,6 +297,8 @@ void ResidualsContainer::merge(ResidualsContainer* prev)
   std::swap(prev->tfOrbits, tfOrbits);
   prev->sumOfResiduals.insert(prev->sumOfResiduals.end(), sumOfResiduals.begin(), sumOfResiduals.end());
   std::swap(prev->sumOfResiduals, sumOfResiduals);
+  prev->lumi.insert(prev->lumi.end(), lumi.begin(), lumi.end());
+  std::swap(prev->lumi, lumi);
 }
 
 void ResidualsContainer::print()
@@ -321,6 +329,7 @@ void ResidualAggregator::initOutput()
 void ResidualAggregator::finalizeSlot(Slot& slot)
 {
   LOG(info) << "Finalizing slot";
+  auto finalizeStartTime = std::chrono::high_resolution_clock::now();
   auto cont = slot.getContainer();
   cont->print();
   if (!mWriteOutput) {
@@ -351,13 +360,18 @@ void ResidualAggregator::finalizeSlot(Slot& slot)
       LOG(error) << "Failed to store residuals meta data file " << metaFileName << ", reason: " << e.what();
     }
   }
+  std::chrono::duration<double, std::milli> finalizeDuration = std::chrono::high_resolution_clock::now() - finalizeStartTime;
+  LOGP(info, "Finalizing calibration slot took: {} ms", std::chrono::duration_cast<std::chrono::milliseconds>(finalizeDuration).count());
 }
 
 Slot& ResidualAggregator::emplaceNewSlot(bool front, TFType tStart, TFType tEnd)
 {
+  auto emplaceStartTime = std::chrono::high_resolution_clock::now();
   auto& cont = getSlots();
   auto& slot = front ? cont.emplace_front(tStart, tEnd) : cont.emplace_back(tStart, tEnd);
   slot.setContainer(std::make_unique<ResidualsContainer>());
-  slot.getContainer()->init(&mTrackResiduals, mOutputDir, mWriteOutput, mWriteBinnedResiduals, mWriteUnbinnedResiduals, mWriteTrackData, mAutosaveInterval);
+  slot.getContainer()->init(&mTrackResiduals, mOutputDir, mWriteOutput, mWriteBinnedResiduals, mWriteUnbinnedResiduals, mWriteTrackData, mAutosaveInterval, mCompressionSetting);
+  std::chrono::duration<double, std::milli> emplaceDuration = std::chrono::high_resolution_clock::now() - emplaceStartTime;
+  LOGP(info, "Emplacing new calibration slot took: {} ms", std::chrono::duration_cast<std::chrono::milliseconds>(emplaceDuration).count());
   return slot;
 }

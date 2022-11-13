@@ -38,6 +38,7 @@
 #include "EMCALReconstruction/AltroDecoder.h"
 #include "EMCALReconstruction/RawDecodingError.h"
 #include "EMCALReconstruction/RecoParam.h"
+#include "EMCALReconstruction/ReconstructionErrors.h"
 #include "EMCALWorkflow/RawToCellConverterSpec.h"
 #include "SimulationDataFormat/MCCompLabel.h"
 #include "SimulationDataFormat/MCTruthContainer.h"
@@ -54,8 +55,10 @@ RawToCellConverterSpec::~RawToCellConverterSpec()
 
 void RawToCellConverterSpec::init(framework::InitContext& ctx)
 {
-  auto& ilctx = ctx.services().get<AliceO2::InfoLogger::InfoLoggerContext>();
-  ilctx.setField(AliceO2::InfoLogger::InfoLoggerContext::FieldName::Detector, "EMC");
+  if (ctx.services().active<AliceO2::InfoLogger::InfoLoggerContext>()) {
+    auto& ilctx = ctx.services().get<AliceO2::InfoLogger::InfoLoggerContext>();
+    ilctx.setField(AliceO2::InfoLogger::InfoLoggerContext::FieldName::Detector, "EMC");
+  }
 
   LOG(debug) << "[EMCALRawToCellConverter - init] Initialize converter ";
   if (!mGeometry) {
@@ -334,6 +337,8 @@ void RawToCellConverterSpec::run(framework::ProcessingContext& ctx)
             iCol = map.getColumn(chan.getHardwareAddress());
             chantype = map.getChannelType(chan.getHardwareAddress());
           } catch (Mapper::AddressNotFoundException& ex) {
+            ErrorTypeFEE mappingError{feeID, ErrorTypeFEE::ErrorSource_t::ALTRO_ERROR, AltroDecoderError::errorTypeToInt(AltroDecoderError::ErrorType_t::ALTRO_MAPPING_ERROR), -1, chan.getHardwareAddress()};
+            mOutputDecoderErrors.push_back(mappingError);
             if (mNumErrorMessages < mMaxErrorMessages) {
               LOG(warning) << "Mapping error DDL " << feeID << ": " << ex.what();
               mNumErrorMessages++;
@@ -378,7 +383,7 @@ void RawToCellConverterSpec::run(framework::ProcessingContext& ctx)
               mErrorMessagesSuppressed++;
             }
             if (mCreateRawDataErrors) {
-              mOutputDecoderErrors.emplace_back(feeID, ErrorTypeFEE::ErrorSource_t::GEOMETRY_ERROR, 0, CellID, chan.getHardwareAddress()); // 0 -> Cell ID out of range
+              mOutputDecoderErrors.emplace_back(feeID, ErrorTypeFEE::ErrorSource_t::GEOMETRY_ERROR, reconstructionerrors::getErrorCodeFromGeometryError(reconstructionerrors::GeometryError_t::CELL_RANGE_EXCEED), CellID, chan.getHardwareAddress()); // 0 -> Cell ID out of range
             }
             continue;
           }
@@ -408,7 +413,7 @@ void RawToCellConverterSpec::run(framework::ProcessingContext& ctx)
               mErrorMessagesSuppressed++;
             }
             if (mCreateRawDataErrors) {
-              mOutputDecoderErrors.emplace_back(feeID, ErrorTypeFEE::ErrorSource_t::GEOMETRY_ERROR, 2, CellID, chan.getHardwareAddress()); // Geometry error codes will start from 100
+              mOutputDecoderErrors.emplace_back(feeID, ErrorTypeFEE::ErrorSource_t::GEOMETRY_ERROR, reconstructionerrors::getErrorCodeFromGeometryError(reconstructionerrors::GeometryError_t::CELL_INDEX_NEGATIVE), CellID, chan.getHardwareAddress()); // Geometry error codes will start from 100
             }
             continue;
           }
@@ -561,7 +566,7 @@ void RawToCellConverterSpec::run(framework::ProcessingContext& ctx)
               mErrorMessagesSuppressed++;
             }
             if (mCreateRawDataErrors) {
-              mOutputDecoderErrors.emplace_back(cell.mDDLID, ErrorTypeFEE::GAIN_ERROR, 0, cell.mFecID, cell.mHWAddressLG);
+              mOutputDecoderErrors.emplace_back(cell.mDDLID, ErrorTypeFEE::GAIN_ERROR, reconstructionerrors::getErrorCodeFromGainError(reconstructionerrors::GainError_t::LGNOHG), cell.mFecID, cell.mHWAddressLG);
             }
           }
           continue;
@@ -577,7 +582,7 @@ void RawToCellConverterSpec::run(framework::ProcessingContext& ctx)
             mErrorMessagesSuppressed++;
           }
           if (mCreateRawDataErrors) {
-            mOutputDecoderErrors.emplace_back(cell.mDDLID, ErrorTypeFEE::GAIN_ERROR, 1, cell.mFecID, cell.mHWAddressHG);
+            mOutputDecoderErrors.emplace_back(cell.mDDLID, ErrorTypeFEE::GAIN_ERROR, reconstructionerrors::getErrorCodeFromGainError(reconstructionerrors::GainError_t::HGNOLG), cell.mFecID, cell.mHWAddressHG);
           }
           continue;
         }

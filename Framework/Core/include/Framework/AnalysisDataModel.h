@@ -12,7 +12,6 @@
 #define O2_FRAMEWORK_ANALYSISDATAMODEL_H_
 
 #include "Framework/ASoA.h"
-#include "MathUtils/Utils.h"
 #include <cmath>
 #include "Framework/DataTypes.h"
 #include "CommonConstants/MathConstants.h"
@@ -117,16 +116,16 @@ DECLARE_SOA_DYNAMIC_COLUMN(Sign, sign, //! Charge: positive: 1, negative: -1
 DECLARE_SOA_DYNAMIC_COLUMN(Px, px, //! Momentum in x-direction in GeV/c
                            [](float signed1Pt, float snp, float alpha) -> float {
                              auto pt = 1.f / std::abs(signed1Pt);
-                             float cs, sn;
-                             math_utils::sincos(alpha, sn, cs);
+                             // FIXME: GCC & clang should optimize to sincosf
+                             float cs = cosf(alpha), sn = sinf(alpha);
                              auto r = std::sqrt((1.f - snp) * (1.f + snp));
                              return pt * (r * cs - snp * sn);
                            });
 DECLARE_SOA_DYNAMIC_COLUMN(Py, py, //! Momentum in y-direction in GeV/c
                            [](float signed1Pt, float snp, float alpha) -> float {
                              auto pt = 1.f / std::abs(signed1Pt);
-                             float cs, sn;
-                             math_utils::sincos(alpha, sn, cs);
+                             // FIXME: GCC & clang should optimize to sincosf
+                             float cs = cosf(alpha), sn = sinf(alpha);
                              auto r = std::sqrt((1.f - snp) * (1.f + snp));
                              return pt * (snp * cs + r * sn);
                            });
@@ -434,7 +433,7 @@ DECLARE_SOA_EXPRESSION_COLUMN(Eta, eta, float, //!
 DECLARE_SOA_EXPRESSION_COLUMN(Pt, pt, float, //!
                               ifnode(nabs(aod::fwdtrack::signed1Pt) < o2::constants::math::Almost0, o2::constants::math::VeryBig, nabs(1.f / aod::fwdtrack::signed1Pt)));
 DECLARE_SOA_EXPRESSION_COLUMN(P, p, float, //!
-                              ifnode(nabs(aod::fwdtrack::signed1Pt) < o2::constants::math::Almost0, o2::constants::math::VeryBig, 0.5f * (ntan(PIQuarter - 0.5f * natan(aod::fwdtrack::tgl)) + 1.f / ntan(PIQuarter - 0.5f * natan(aod::fwdtrack::tgl))) / nabs(aod::fwdtrack::signed1Pt)));
+                              ifnode((nabs(aod::fwdtrack::signed1Pt) < o2::constants::math::Almost0) || (nabs(PIQuarter - 0.5f * natan(aod::fwdtrack::tgl)) < o2::constants::math::Almost0), o2::constants::math::VeryBig, 0.5f * (ntan(PIQuarter - 0.5f * natan(aod::fwdtrack::tgl)) + 1.f / ntan(PIQuarter - 0.5f * natan(aod::fwdtrack::tgl))) / nabs(aod::fwdtrack::signed1Pt)));
 DECLARE_SOA_DYNAMIC_COLUMN(Px, px, //!
                            [](float pt, float phi) -> float {
                              return pt * std::cos(phi);
@@ -665,6 +664,30 @@ DECLARE_SOA_TABLE(CaloTriggers, "AOD", "CALOTRIGGER", //! Trigger information fr
                   o2::soa::Index<>, calotrigger::BCId, calotrigger::FastOrAbsID,
                   calotrigger::LnAmplitude, calotrigger::TriggerBits, calotrigger::CaloType);
 using CaloTrigger = CaloTriggers::iterator;
+
+namespace cpvcluster
+{
+DECLARE_SOA_INDEX_COLUMN(BC, bc);                          //! BC index
+DECLARE_SOA_COLUMN(PosX, posX, float);                     //! X position in cm
+DECLARE_SOA_COLUMN(PosZ, posZ, float);                     //! Z position in cm
+DECLARE_SOA_COLUMN(Amplitude, amplitude, float);           //! Signal amplitude
+DECLARE_SOA_COLUMN(ClusterStatus, clusterStatus, uint8_t); //! 8 bits packed cluster status (bits 0-4 = pads mult, bits 5-6 = (module number - 2), bit 7 = isUnfolded)
+DECLARE_SOA_DYNAMIC_COLUMN(PadMult, padMult, [](uint8_t status) -> uint8_t {
+  return status & 0b00011111;
+}); //! Multiplicity of pads in cluster
+DECLARE_SOA_DYNAMIC_COLUMN(ModuleNumber, moduleNumber, [](uint8_t status) -> uint8_t {
+  return 2 + ((status & 0b01100000) >> 5);
+}); //! CPV module number (2, 3 or 4)
+DECLARE_SOA_DYNAMIC_COLUMN(IsUnfolded, isUnfolded, [](uint8_t status) -> bool {
+  return (status & 0b01100000) >> 7;
+}); //! Number of local maxima in cluster
+} // namespace cpvcluster
+
+DECLARE_SOA_TABLE(CPVClusters, "AOD", "CPVCLUSTER", //! CPV clusters
+                  o2::soa::Index<>, cpvcluster::BCId, cpvcluster::PosX, cpvcluster::PosZ, cpvcluster::Amplitude,
+                  cpvcluster::ClusterStatus, cpvcluster::PadMult<cpvcluster::ClusterStatus>,
+                  cpvcluster::ModuleNumber<cpvcluster::ClusterStatus>, cpvcluster::IsUnfolded<cpvcluster::ClusterStatus>);
+using CPVCluster = CPVClusters::iterator;
 
 namespace zdc
 {
@@ -1110,13 +1133,14 @@ using HepMCHeavyIon = HepMCHeavyIons::iterator;
 
 namespace indices
 {
-DECLARE_SOA_INDEX_COLUMN(Collision, collision); //!
-DECLARE_SOA_INDEX_COLUMN(BC, bc);               //!
-DECLARE_SOA_INDEX_COLUMN(Zdc, zdc);             //!
-DECLARE_SOA_INDEX_COLUMN(FV0A, fv0a);           //!
-DECLARE_SOA_INDEX_COLUMN(FV0C, fv0c);           //!
-DECLARE_SOA_INDEX_COLUMN(FT0, ft0);             //!
-DECLARE_SOA_INDEX_COLUMN(FDD, fdd);             //!
+DECLARE_SOA_INDEX_COLUMN(Collision, collision);        //!
+DECLARE_SOA_ARRAY_INDEX_COLUMN(Collision, collisions); //!
+DECLARE_SOA_INDEX_COLUMN(BC, bc);                      //!
+DECLARE_SOA_INDEX_COLUMN(Zdc, zdc);                    //!
+DECLARE_SOA_INDEX_COLUMN(FV0A, fv0a);                  //!
+DECLARE_SOA_INDEX_COLUMN(FV0C, fv0c);                  //!
+DECLARE_SOA_INDEX_COLUMN(FT0, ft0);                    //!
+DECLARE_SOA_INDEX_COLUMN(FDD, fdd);                    //!
 } // namespace indices
 
 // First entry: Collision
@@ -1133,6 +1157,11 @@ DECLARE_SOA_INDEX_TABLE_EXCLUSIVE(MatchedBCCollisionsExclusive, BCs, "MA_BCCOL_E
                                   indices::BCId, indices::CollisionId);
 DECLARE_SOA_INDEX_TABLE(MatchedBCCollisionsSparse, BCs, "MA_BCCOL_SP", //!
                         indices::BCId, indices::CollisionId);
+
+DECLARE_SOA_INDEX_TABLE_EXCLUSIVE(MatchedBCCollisionsExclusiveMulti, BCs, "MA_BCCOLS_EX", //!
+                                  indices::BCId, indices::CollisionIds);
+DECLARE_SOA_INDEX_TABLE(MatchedBCCollisionsSparseMulti, BCs, "MA_BCCOLS_SP", //!
+                        indices::BCId, indices::CollisionIds);
 
 DECLARE_SOA_INDEX_TABLE_EXCLUSIVE(Run3MatchedToBCExclusive, BCs, "MA_RN3_BC_EX", //!
                                   indices::BCId, indices::ZdcId, indices::FT0Id, indices::FV0AId, indices::FDDId);

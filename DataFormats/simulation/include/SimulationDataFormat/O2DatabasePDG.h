@@ -15,7 +15,9 @@
 
 #ifndef O2_O2DATABASEPDG_H
 #define O2_O2DATABASEPDG_H
+#include <string>
 #include "TDatabasePDG.h"
+#include "TParticlePDG.h"
 
 namespace o2
 {
@@ -35,6 +37,10 @@ class O2DatabasePDG
     auto db = TDatabasePDG::Instance();
     if (!initialized) {
       addALICEParticles(db);
+      if (const char* o2Root = std::getenv("O2_ROOT")) {
+        auto inputExtraPDGs = std::string(o2Root) + "/share/Detectors/gconfig/data/extra_ions_pdg_table.dat";
+        db->ReadPDGTable(inputExtraPDGs.c_str());
+      }
       initialized = true;
     }
     return db;
@@ -43,9 +49,40 @@ class O2DatabasePDG
   // adds ALICE particles to a given TDatabasePDG instance
   static void addALICEParticles(TDatabasePDG* db = TDatabasePDG::Instance());
 
+  // get particle's (if any) mass
+  static Double_t MassImpl(TParticlePDG* particle, bool& success)
+  {
+    success = false;
+    if (!particle) {
+      return -1.;
+    }
+    success = true;
+    return particle->Mass();
+  }
+
+  // determine particle to get mass for based on PDG
+  static Double_t Mass(int pdg, bool& success)
+  {
+    auto db = Instance();
+
+    if (pdg < IONBASELOW || pdg > IONBASEHIGH) {
+      // not an ion, return immediately
+      return MassImpl(db->GetParticle(pdg), success);
+    }
+    if (auto particle = db->GetParticle(pdg)) {
+      // see if this ion can be found
+      return MassImpl(particle, success);
+    }
+    // if we are here, try one last time to look for ground state of potential isomere state
+    pdg = pdg / 10 * 10;
+    return MassImpl(db->GetParticle(pdg), success);
+  }
+
  private:
   // private constructor
   O2DatabasePDG() = delete;
+  static constexpr int IONBASELOW{1000000000};
+  static constexpr int IONBASEHIGH{1099999999};
 };
 
 // by keeping this inline, we can use it in other parts of the code, for instance Framework or Analysis,

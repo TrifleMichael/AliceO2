@@ -49,7 +49,7 @@ struct MFTTrackingParam : public o2::conf::ConfigurableParamHelper<MFTTrackingPa
   /// minimum number of detector stations for a CA track
   Int_t MinTrackStationsCA = 4;
   /// maximum distance for a cluster to be attached to a seed line (LTF)
-  Float_t LTFclsRCut = 0.200; // Temporary for misaligned detector. Default 0.0100
+  Float_t LTFclsRCut = 0.0100;
   /// maximum distance for a cluster to be attached to a seed line (CA road)
   Float_t ROADclsRCut = 0.0400;
   /// number of bins in r-direction
@@ -66,6 +66,14 @@ struct MFTTrackingParam : public o2::conf::ConfigurableParamHelper<MFTTrackingPa
   Bool_t LTFConeRadius = kFALSE;
   /// road for CA algo : cylinder or cone (default)
   Bool_t CAConeRadius = kFALSE;
+
+  // cuts to reject to low or too high mult events, or externally provided IRFrames
+  float cutMultClusLow = 0;   /// reject ROF with estimated cluster mult. below this value (no cut if <0)
+  float cutMultClusHigh = -1; /// reject ROF with estimated cluster mult. above this value (no cut if <0)
+  bool irFramesOnly = false;  ///< track only ROFs that overlap one of the IRFrames (provided externally by ITS)
+
+  bool isMultCutRequested() const { return cutMultClusLow >= 0.f && cutMultClusHigh > 0.f; };
+  bool isPassingMultCut(float mult) const { return mult >= cutMultClusLow && (mult <= cutMultClusHigh || cutMultClusHigh <= 0.f); }
 
   O2ParamDef(MFTTrackingParam, "MFTTracking");
 };
