@@ -163,9 +163,7 @@ BOOST_AUTO_TEST_CASE(test_with_break)
     delete dst;
   }
 
-
   sleep(10);
-
 
   std::vector<CURL*> handleVector2;
   std::vector<std::string*> destinations2;
@@ -241,6 +239,35 @@ BOOST_AUTO_TEST_CASE(asynch_batch_callback)
   for(std::string* dst : destinations) {
     delete dst;
   }
+
+  curl_global_cleanup();
+}
+
+BOOST_AUTO_TEST_CASE(external_loop_test)
+{
+  if (curl_global_init(CURL_GLOBAL_ALL))
+  {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
+
+  uv_loop_t loop;
+
+  CCDBDownloader downloader(&loop);
+  std::string dst = "";
+  CURL* handle = testHandle(&dst);
+
+  CURLcode curlCode = downloader.perform(handle);
+
+  BOOST_CHECK(curlCode == CURLE_OK);
+  std::cout << "CURL code: " << curlCode << "\n";
+
+  long httpCode;
+  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+  BOOST_CHECK(httpCode == 200);
+  std::cout << "HTTP code: " << httpCode << "\n";
+
+  curl_easy_cleanup(handle);
 
   curl_global_cleanup();
 }

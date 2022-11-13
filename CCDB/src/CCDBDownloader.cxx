@@ -19,7 +19,17 @@ namespace ccdb {
 
 CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
 {
-  loop = uv_loop ? uv_loop : new uv_loop_t();
+  if (uv_loop)
+  {
+    loop = uv_loop;
+    externalLoop = true;
+  }
+  else
+  {
+    loop = new uv_loop_t();
+    externalLoop = false;
+  }
+
   // Preparing timer to be used by curl
   timeout = new uv_timer_t();
   timeout->data = this;
@@ -69,12 +79,18 @@ CCDBDownloader::~CCDBDownloader()
 
   // Close the loop and if any handles are running then signal to close, and run loop once to close them
   // This may take more then one iteration of loop - hence the "while"
-  while (UV_EBUSY == uv_loop_close(loop)) {
-    closeLoop = false;
+  if (externalLoop)
+  {    
     uv_walk(loop, closeHandles, this);
-    uv_run(loop, UV_RUN_ONCE);
   }
-
+  else
+  {
+    while (UV_EBUSY == uv_loop_close(loop)) {
+      closeLoop = false;
+      uv_walk(loop, closeHandles, this);
+      uv_run(loop, UV_RUN_ONCE);
+    }
+  }
   curl_multi_cleanup(curlMultiHandle);
 }
 
@@ -82,7 +98,6 @@ void closeHandles(uv_handle_t* handle, void* arg)
 { 
   auto CD = (CCDBDownloader*)arg;
   if (!uv_is_closing(handle) && CD->handleMap.find(handle) != CD->handleMap.end()) {
-  // if (!uv_is_closing(handle)) {
     CD->handleMap.erase(handle);
     uv_close(handle, onUVClose);
   }

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <thread> // get_id
+#include <thread>
 #include <mutex>
 #include <condition_variable>
 #include <unordered_map>
@@ -19,6 +19,11 @@ namespace o2
 {
 namespace ccdb
 {
+
+/*
+ Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.
+ Because non-static functions are used in the functions below, they must be non-member.
+*/
 
 /**
  * uv_walk callback which is used to close passed handle.
@@ -115,6 +120,12 @@ class CCDBDownloader
   void setSocketTimoutTime(int timoutMS);
 
  private:
+
+  /**
+   * Indicates whether the loop that the downloader is running on has been created by it or provided externally.
+   * In case of external loop, the loop will not be closed after downloader is deleted.
+   */
+  bool externalLoop;
 
   /**
    * Current amount of handles which are performed on.
