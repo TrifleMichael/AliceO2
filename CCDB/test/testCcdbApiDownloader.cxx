@@ -29,20 +29,25 @@ using namespace std;
 namespace o2{
 namespace ccdb{
 
-size_t writeToString(void *contents, size_t size, size_t nmemb, std::string *dst)
+size_t CurlWrite_CallbackFunc_StdString2(void* contents, size_t size, size_t nmemb, std::string* s)
 {
-  char *conts = (char *)contents;
-  for (int i = 0; i < nmemb; i++)
-  {
-    (*dst) += *(conts++);
+  size_t newLength = size * nmemb;
+  size_t oldLength = s->size();
+  try {
+    s->resize(oldLength + newLength);
+  } catch (std::bad_alloc& e) {
+    LOG(error) << "memory error when getting data from CCDB";
+    return 0;
   }
+
+  std::copy((char*)contents, (char*)contents + newLength, s->begin() + oldLength);
   return size * nmemb;
 }
 
 CURL* testHandle(std::string* dst)
 {
   CURL* handle = curl_easy_init();
-  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeToString);
+  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
   curl_easy_setopt(handle, CURLOPT_URL, "http://ccdb-test.cern.ch:8080/latest/");
   return handle;
