@@ -15,6 +15,7 @@
 /// @brief  Descriptor of geometrical constraint
 
 #include "Align/GeometricalConstraint.h"
+#include "Align/AlignConfig.h"
 #include "DetectorsCommonDataFormats/AlignParam.h"
 #include "Align/utils.h"
 #include "Framework/Logger.h"
@@ -54,6 +55,7 @@ void GeometricalConstraint::writeChildrenConstraints(FILE* conOut) const
   // matRel = mPar^-1*mChild
   TGeoHMatrix mPar;
   //
+  const auto& algConf = AlignConfig::Instance();
   // in case of parent assigned use its matrix,
   // otherwise Alice global frame is assumed to be the parent -> Unit matrix
   if (mParent && doJac) {
@@ -105,7 +107,9 @@ void GeometricalConstraint::writeChildrenConstraints(FILE* conOut) const
     }
     int cmtStatus = nContCh[ics] > 0 ? kOff : kOn; // do we comment this constraint?
     if (cmtStatus) {
-      LOG(info) << "No contributors to constraint of " << getDOFName(ics) << " of " << getName();
+      if (algConf.verbose > 0) {
+        LOG(info) << "No contributors to constraint of " << getDOFName(ics) << " of " << getName();
+      }
     }
     if (mSigma[ics] > 0) {
       fprintf(conOut, "\n%s%s\t%e\t%e\t%s %s of %s Auto\n", comment[cmtStatus], kKeyConstr[kMeas], 0.0, mSigma[ics],
@@ -203,7 +207,7 @@ void GeometricalConstraint::checkConstraint() const
       } // local to global
       //
       matRel.MultiplyLeft(&mPar);
-      constrCoefGeom(matRel, jac); // Jacobian for analytical constraint used by MillePeded
+      constrCoefGeom(matRel, jac); // Jacobian for analytical constraint used by MillePede
                                    //
       TGeoHMatrix tau;
       child->delta2Matrix(tau, parsC); // child correction matrix in the child frame
@@ -314,8 +318,14 @@ void GeometricalConstraint::constrCoefGeom(const TGeoHMatrix& matRD, double* jac
   const double *rd = matRD.GetRotationMatrix(), *ri = matRI.GetRotationMatrix();
   const double /**td=matRD.GetTranslation(),*/* ti = matRI.GetTranslation();
   //
-  // the angles are in degrees, while we use sinX->X approximation...
-  const double cf[kNDOFGeom] = {1, 1, 1, DegToRad(), DegToRad(), DegToRad()};
+  //// the angles are in radians, while we use sinX->X approximation...
+  // const double cf[kNDOFGeom] = {1., 1., 1., DegToRad(), DegToRad(), DegToRad()};
+  // const double sgc[kNDOFGeom] = {1., 1., 1., -RadToDeg(), RadToDeg(), -RadToDeg()};
+
+  // the angles are in radians
+  const double cf[kNDOFGeom] = {1., 1., 1., 1., 1., 1.};
+  const double sgc[kNDOFGeom] = {1., 1., 1., -1., 1., -1.};
+
   //
   // since the TAU is supposed to convert local corrections in the child frame to corrections
   // in the parent frame, we scale angular degrees of freedom back to degrees and assign the
@@ -326,7 +336,6 @@ void GeometricalConstraint::constrCoefGeom(const TGeoHMatrix& matRD, double* jac
   //  -cospsi*sinthe*cosphi + sinpsi*sinphi;  cospsi*sinthe*sinphi + sinpsi*cosphi;  costhe*cospsi;
   //
   const double kJTol = 1e-4; // treat derivatives below this threshold as 0
-  const double sgc[kNDOFGeom] = {1., 1., 1., -RadToDeg(), RadToDeg(), -RadToDeg()};
   //
   double dDPar[kNDOFGeom][4][4] = {
     // dDX[4][4]

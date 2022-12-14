@@ -39,6 +39,12 @@ int TPCClusterDecompressor::decompress(const CompressedClustersFlat* clustersCom
 
 int TPCClusterDecompressor::decompress(const CompressedClusters* clustersCompressed, o2::tpc::ClusterNativeAccess& clustersNative, std::function<o2::tpc::ClusterNative*(size_t)> allocator, const GPUParam& param)
 {
+  if (clustersCompressed->nTracks && clustersCompressed->solenoidBz != -1e6f && clustersCompressed->solenoidBz != param.bzkG) {
+    throw std::runtime_error("Configured solenoid Bz does not match value used for track model encoding");
+  }
+  if (clustersCompressed->nTracks && clustersCompressed->maxTimeBin != -1e6 && clustersCompressed->maxTimeBin != param.par.continuousMaxTimeBin) {
+    throw std::runtime_error("Configured max time bin does not match value used for track model encoding");
+  }
   std::vector<ClusterNative> clusters[NSLICES][GPUCA_ROW_COUNT];
   std::atomic_flag locks[NSLICES][GPUCA_ROW_COUNT];
   for (unsigned int i = 0; i < NSLICES * GPUCA_ROW_COUNT; i++) {
@@ -80,6 +86,19 @@ int TPCClusterDecompressor::decompress(const CompressedClusters* clustersCompres
       ClusterNative* cl = buffer + clusters[i][j].size();
       unsigned int end = offsets[i][j] + ((i * GPUCA_ROW_COUNT + j >= clustersCompressed->nSliceRows) ? 0 : clustersCompressed->nSliceRowClusters[i * GPUCA_ROW_COUNT + j]);
       decompressHits(clustersCompressed, offsets[i][j], end, cl);
+      if (param.rec.tpc.clustersShiftTimebins != 0.f) {
+        for (unsigned int k = 0; k < clustersNative.nClusters[i][j]; k++) {
+          auto& cl = buffer[k];
+          float t = cl.getTime() + param.rec.tpc.clustersShiftTimebins;
+          if (t < 0) {
+            t = 0;
+          }
+          if (param.par.continuousMaxTimeBin > 0 && t > param.par.continuousMaxTimeBin) {
+            t = param.par.continuousMaxTimeBin;
+          }
+          cl.setTime(t);
+        }
+      }
       std::sort(buffer, buffer + clustersNative.nClusters[i][j]);
     }
   }

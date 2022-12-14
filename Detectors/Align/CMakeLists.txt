@@ -9,7 +9,7 @@
 # granted to it by virtue of its status as an Intergovernmental Organization
 # or submit itself to any jurisdiction.
 
-add_compile_options(-O0 -g -fPIC)
+#add_compile_options(-O0 -g -fPIC)
 
 o2_add_library(Align
                SOURCES  src/GeometricalConstraint.cxx
@@ -20,7 +20,6 @@ o2_add_library(Align
                         src/AlignableDetectorTOF.cxx
                         #src/AlignableDetectorTPC.cxx
                         src/AlignableDetectorTRD.cxx
-                        src/DOFStatistics.cxx
                         src/Millepede2Record.cxx
                         src/AlignmentPoint.cxx
                         src/ResidualsController.cxx
@@ -38,6 +37,7 @@ o2_add_library(Align
                         src/AlignConfig.cxx
                         src/Mille.cxx
                PUBLIC_LINK_LIBRARIES O2::FrameworkLogger
+                                     O2::Steer
                                      O2::ReconstructionDataFormats
                                      O2::DetectorsCommonDataFormats
                                      O2::DetectorsBase
@@ -78,7 +78,6 @@ o2_target_root_dictionary(
           include/Align/ResidualsController.h
           include/Align/ResidualsControllerFast.h
           include/Align/GeometricalConstraint.h
-          include/Align/DOFStatistics.h
           include/Align/utils.h
           include/Align/AlignConfig.h
           )

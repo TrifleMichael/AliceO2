@@ -37,10 +37,11 @@
 #pragma link C++ class o2::align::ResidualsController + ;
 #pragma link C++ class o2::align::ResidualsControllerFast + ;
 #pragma link C++ class o2::align::GeometricalConstraint + ;
-#pragma link C++ class o2::align::DOFStatistics + ;
 #pragma link C++ class o2::align::utils;
 
 #pragma link C++ class o2::align::AlignConfig + ;
 #pragma link C++ class o2::conf::ConfigurableParamHelper < o2::align::AlignConfig> + ;
+
+#pragma link C++ class std::vector < o2::track::TrackParametrization < double>> + ;
 
 #endif

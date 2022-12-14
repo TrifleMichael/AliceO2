@@ -87,6 +87,14 @@ void TrackMCH::setCovariances(const TMatrixD& src, double (&dest)[SCovSize])
   }
 }
 
+//__________________________________________________________________________
+InteractionRecord TrackMCH::getMeanIR(uint32_t refOrbit) const
+{
+  InteractionRecord startIR(0, refOrbit);
+  auto trackBCinTF = std::llround(mTimeMUS.getTimeStamp() / constants::lhc::LHCBunchSpacingMUS);
+  return startIR + trackBCinTF;
+}
+
 std::ostream& operator<<(std::ostream& os, const o2::mch::TrackMCH& t)
 {
   os << asString(t);

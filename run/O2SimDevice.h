@@ -22,7 +22,7 @@
 #include "../macro/o2sim.C"
 #include "TVirtualMC.h"
 #include "TMessage.h"
-#include <SimulationDataFormat/Stack.h>
+#include <DetectorsBase/Stack.h>
 #include <SimulationDataFormat/PrimaryChunk.h>
 #include <TRandom.h>
 #include <SimConfig/SimConfig.h>
@@ -252,7 +252,7 @@ class O2SimDevice final : public fair::mq::Device
 
             // Process one event
             auto& conf = o2::conf::SimConfig::Instance();
-            if (strcmp(conf.getMCEngine().c_str(), "TGeant4") == 0) {
+            if (strcmp(conf.getMCEngine().c_str(), "TGeant4") == 0 || strcmp(conf.getMCEngine().c_str(), "O2TrivialMCEngine") == 0) {
               // this is preferred and necessary for Geant4
               // since repeated "ProcessRun" might have significant overheads
               mVMC->ProcessEvent();

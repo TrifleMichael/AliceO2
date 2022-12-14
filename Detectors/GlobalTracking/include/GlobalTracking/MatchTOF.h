@@ -40,6 +40,7 @@
 #include "TPCFastTransform.h"
 #include "CommonDataFormat/InteractionRecord.h"
 #include "CorrectionMapsHelper.h"
+#include "GlobalTracking/MatchTOFParams.h"
 
 // from FIT
 #include "DataFormatsFT0/RecPoints.h"
@@ -197,8 +198,8 @@ class MatchTOF
   bool prepareFITData();
   int prepareInteractionTimes();
   bool prepareTPCData();
-  void addTPCSeed(const o2::tpc::TrackTPC& _tr, o2::dataformats::GlobalTrackID srcGID);
-  void addITSTPCSeed(const o2::dataformats::TrackTPCITS& _tr, o2::dataformats::GlobalTrackID srcGID);
+  void addTPCSeed(const o2::tpc::TrackTPC& _tr, o2::dataformats::GlobalTrackID srcGID, float time0, float terr);
+  void addITSTPCSeed(const o2::dataformats::TrackTPCITS& _tr, o2::dataformats::GlobalTrackID srcGID, float time0, float terr);
   void addTRDSeed(const o2::trd::TrackTRD& _tr, o2::dataformats::GlobalTrackID srcGID, float time0, float terr);
   void addConstrainedSeed(o2::track::TrackParCov& trc, o2::dataformats::GlobalTrackID srcGID, o2::track::TrackLTIntegral intLT0, timeEst timeMUS);
   //  void addTPCTRDSeed(const o2::track::TrackParCov& _tr, o2::dataformats::GlobalTrackID srcGID, int tpcID);
@@ -219,6 +220,9 @@ class MatchTOF
   // Data members
   const o2::globaltracking::RecoContainer* mRecoCont = nullptr;
   o2::InteractionRecord mStartIR{0, 0}; ///< IR corresponding to the start of the TF
+
+  // TOF matching params (work in progress)
+  const MatchTOFParams* mMatchParams = nullptr;
 
   // for derived class
   int mCurrTracksTreeEntry = 0; ///< current tracks tree entry loaded to memory
@@ -321,7 +325,7 @@ class MatchTOF
   TStopwatch mTimerMatchITSTPC;
   TStopwatch mTimerMatchTPC;
   TStopwatch mTimerDBG;
-  ClassDefNV(MatchTOF, 4);
+  ClassDefNV(MatchTOF, 5);
 };
 } // namespace globaltracking
 } // namespace o2
