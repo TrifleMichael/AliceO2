@@ -16,6 +16,7 @@
 
 #include "CCDB/CcdbApi.h"
 #include "CCDB/CCDBQuery.h"
+#include "CCDB/CCDBDownloader.h"
 
 #include "CommonUtils/StringUtils.h"
 #include "CommonUtils/FileSystemUtils.h"
@@ -61,6 +62,7 @@ CcdbApi::CcdbApi()
 
 CcdbApi::~CcdbApi()
 {
+  delete ccdbDownloader;
   curl_global_cleanup();
 }
 
@@ -90,6 +92,8 @@ void CcdbApi::curlInit()
   CcdbApi::mJAlienCredentials = std::make_unique<TJAlienCredentials>();
   CcdbApi::mJAlienCredentials->loadCredentials();
   CcdbApi::mJAlienCredentials->selectPreferedCredentials();
+  
+  ccdbDownloader = new CCDBDownloader();
 }
 
 void CcdbApi::init(std::string const& host)
