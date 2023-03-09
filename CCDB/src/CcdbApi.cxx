@@ -1263,7 +1263,7 @@ bool CcdbApi::getCCDBEntryHeaders(std::string const& url, std::string const& eta
   curlSetSSLOptions(curl);
 
   /* Perform the request */
-  ccdbDownloader->perform(curl);
+  curl_easy_perform(curl);
   long http_code = 404;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
   if (http_code == 304) {
