@@ -71,6 +71,8 @@ BOOST_AUTO_TEST_CASE(perform_test)
   BOOST_CHECK(curlCode == CURLE_OK);
   std::cout << "CURL code: " << curlCode << "\n";
 
+  downloader.showSocketInfo(); // TO BE DELETED
+
   long httpCode;
   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
   BOOST_CHECK(httpCode == 200);

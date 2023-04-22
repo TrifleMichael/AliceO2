@@ -27,8 +27,26 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+/* 
+TODO:
+- hold number of sockets opened thus for
+- number of requests performed for each socket
+- job id
+*/
+
 namespace o2::ccdb
 {
+
+// TEMPORARY FOR TESTING
+void CCDBDownloader::showSocketInfo()
+{
+  std::cout << "\n\n";
+  for (auto it = mTransfersPerSocketMap.begin(); it != mTransfersPerSocketMap.end(); it++) {
+    curl_socket_t socket = it->first;
+    int uses = it->second;
+    std::cout << "Socket: " << socket << ", Uses: " << uses << '\n';
+  }
+}
 
 CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
 {
@@ -256,6 +274,11 @@ int CCDBDownloader::handleSocket(CURL* easy, curl_socket_t s, int action, void* 
         uv_poll_stop(((CCDBDownloader::curl_context_t*)socketp)->poll_handle);
         CD->destroyCurlContext((CCDBDownloader::curl_context_t*)socketp);
         curl_multi_assign(socketData->curlm, s, nullptr);
+
+        if (CD->mTransfersPerSocketMap.find(sock) == CD->mTransfersPerSocketMap.end()) {
+          CD->mTransfersPerSocketMap[sock] = 0;
+        }
+        CD->mTransfersPerSocketMap[s]++;
       }
       break;
     default:

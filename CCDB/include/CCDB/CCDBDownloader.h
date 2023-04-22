@@ -139,6 +139,11 @@ class CCDBDownloader
   void setSocketTimoutTime(int timoutMS);
 
  private:
+
+
+
+  std::unordered_map<curl_socket_t, int> mTransfersPerSocketMap;
+
   /**
    * Indicates whether the loop that the downloader is running on has been created by it or provided externally.
    * In case of external loop, the loop will not be closed after downloader is deleted.
