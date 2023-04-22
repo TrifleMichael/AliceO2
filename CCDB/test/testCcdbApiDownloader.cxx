@@ -80,6 +80,8 @@ BOOST_AUTO_TEST_CASE(perform_test)
 
   curl_easy_cleanup(handle);
   curl_global_cleanup();
+
+  BOOST_CHECK(1 == 2); // TO BE DELETED - MOCK TO SEE PRINTS IN THIS TEST
 }
 
 BOOST_AUTO_TEST_CASE(blocking_batch_test)
