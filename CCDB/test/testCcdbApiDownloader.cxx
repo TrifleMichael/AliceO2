@@ -82,6 +82,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
   curl_global_cleanup();
 
   BOOST_CHECK(1 == 2); // TO BE DELETED - MOCK TO SEE PRINTS IN THIS TEST
+  BOOST_CHECK(1 != 1); // TO BE DELETED - somehow tests passed with the errors above
 }
 
 BOOST_AUTO_TEST_CASE(blocking_batch_test)

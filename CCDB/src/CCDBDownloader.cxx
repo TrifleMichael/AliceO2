@@ -29,9 +29,11 @@
 
 /* 
 TODO:
-- hold number of sockets opened thus for
-- number of requests performed for each socket
+- hold number of sockets opened thus for DONE
+- number of requests performed for each socket DONE
 - job id
+
+- Attach data above to http header (to be done in CcdbApi?)
 */
 
 namespace o2::ccdb
