@@ -277,8 +277,8 @@ int CCDBDownloader::handleSocket(CURL* easy, curl_socket_t s, int action, void* 
         CD->destroyCurlContext((CCDBDownloader::curl_context_t*)socketp);
         curl_multi_assign(socketData->curlm, s, nullptr);
 
-        if (CD->mTransfersPerSocketMap.find(sock) == CD->mTransfersPerSocketMap.end()) {
-          CD->mTransfersPerSocketMap[sock] = 0;
+        if (CD->mTransfersPerSocketMap.find(s) == CD->mTransfersPerSocketMap.end()) {
+          CD->mTransfersPerSocketMap[s] = 0;
         }
         CD->mTransfersPerSocketMap[s]++;
       }
