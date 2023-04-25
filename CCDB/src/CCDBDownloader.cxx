@@ -34,6 +34,7 @@ TODO:
 - job id
 
 - Attach data above to http header (to be done in CcdbApi?)
+- Make sure that headers are always added (all CcdbApi performs, and all CcdbDownloader performs)
 */
 
 namespace o2::ccdb
@@ -447,8 +448,10 @@ void CCDBDownloader::runLoop()
   uv_run(mUVLoop, UV_RUN_DEFAULT);
 }
 
-CURLcode CCDBDownloader::perform(CURL* handle)
+CURLcode CCDBDownloader::perform(CURL* handle, curl_slist* headers)
 {
+  // TODO: ADD SOCKET DATA TO HEADER
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
   return batchBlockingPerform(handleVector).back();

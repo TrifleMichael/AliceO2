@@ -1759,7 +1759,7 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
 CURLcode CcdbApi::CURL_perform(CURL* handle, curl_slist* headers) const
 {
   if (mIsCCDBDownloaderEnabled) {
-    return mDownloader->perform(handle);
+    return mDownloader->perform(handle, headers);
   }
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   return curl_easy_perform(handle);
