@@ -56,7 +56,7 @@ unique_ptr<TJAlienCredentials> CcdbApi::mJAlienCredentials = nullptr;
 CcdbApi::CcdbApi()
 {
   std::string host = boost::asio::ip::host_name();
-  mUniqueAgentID = fmt::format("{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6));
+  mUniqueAgentID = fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), getenv("ALIEN_PROC_ID"));
 
   mIsCCDBDownloaderEnabled = getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI") && atoi(getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI"));
   if (mIsCCDBDownloaderEnabled) {
@@ -1756,11 +1756,12 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
-CURLcode CcdbApi::CURL_perform(CURL* handle) const
+CURLcode CcdbApi::CURL_perform(CURL* handle, curl_slist* headers) const
 {
   if (mIsCCDBDownloaderEnabled) {
     return mDownloader->perform(handle);
   }
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   return curl_easy_perform(handle);
 }
 
