@@ -74,7 +74,7 @@ CcdbApi::~CcdbApi()
 void CcdbApi::setUniqueAgentID()
 {
   std::string host = boost::asio::ip::host_name();
-  const char* jobID = getenv("ALIEN_PROC_ID");
+  char const* jobID = getenv("ALIEN_PROC_ID");
   if (jobID) {
     mUniqueAgentID = fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), jobID);
   } else {
