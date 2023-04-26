@@ -57,7 +57,7 @@ CcdbApi::CcdbApi()
 {
   std::string host = boost::asio::ip::host_name();
   const char* jobID = getenv("ALIEN_PROC_ID");
-  std::cout << jobID << std::endl;
+  std::cout << "ALIENC PROC ID " << jobID << std::endl;
   mUniqueAgentID = fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), jobID);
 
   mIsCCDBDownloaderEnabled = getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI") && atoi(getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI"));
