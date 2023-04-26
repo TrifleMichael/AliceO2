@@ -57,8 +57,11 @@ CcdbApi::CcdbApi()
 {
   std::string host = boost::asio::ip::host_name();
   const char* jobID = getenv("ALIEN_PROC_ID");
-  std::cout << "ALIENC PROC ID " << jobID << std::endl;
-  mUniqueAgentID = fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), jobID);
+  if (jobID) {
+    mUniqueAgentID = fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), jobID);
+  } else {
+    mUniqueAgentID = fmt::format("{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6));
+  }
 
   mIsCCDBDownloaderEnabled = getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI") && atoi(getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI"));
   if (mIsCCDBDownloaderEnabled) {
