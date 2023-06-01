@@ -167,6 +167,7 @@ BOOST_AUTO_TEST_CASE(asynch_batch_test)
 
 BOOST_AUTO_TEST_CASE(test_with_break)
 {
+  std::cout << "TEST WITH BREAK\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -216,6 +217,7 @@ BOOST_AUTO_TEST_CASE(test_with_break)
     delete dst;
   }
 
+  BOOST_CHECK(1 == 2);
   curl_global_cleanup();
 }
 
@@ -335,6 +337,8 @@ BOOST_AUTO_TEST_CASE(base_timeout)
   curl_easy_cleanup(handle);
   curl_global_cleanup();
 }
+
+
 
 } // namespace ccdb
 } // namespace o2
