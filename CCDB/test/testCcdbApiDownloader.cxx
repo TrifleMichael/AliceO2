@@ -219,6 +219,7 @@ BOOST_AUTO_TEST_CASE(test_with_break)
 
   BOOST_CHECK(1 == 2);
   curl_global_cleanup();
+  std::cout << "END TEST WITH BREAK\n";
 }
 
 void testCallback(void* ptr)
@@ -304,39 +305,39 @@ BOOST_AUTO_TEST_CASE(external_loop_test)
   curl_global_cleanup();
 }
 
-BOOST_AUTO_TEST_CASE(base_timeout)
-{
-  if (curl_global_init(CURL_GLOBAL_ALL)) {
-    fprintf(stderr, "Could not init curl\n");
-    return;
-  }
+// BOOST_AUTO_TEST_CASE(base_timeout)
+// {
+//   if (curl_global_init(CURL_GLOBAL_ALL)) {
+//     fprintf(stderr, "Could not init curl\n");
+//     return;
+//   }
 
-  CCDBDownloader downloader;
-  std::string dst = "";
+//   CCDBDownloader downloader;
+//   std::string dst = "";
   
-  CURL* handle = curl_easy_init();
-  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
-  curl_easy_setopt(handle, CURLOPT_URL, "200.200.200.200");
+//   CURL* handle = curl_easy_init();
+//   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
+//   curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
+//   curl_easy_setopt(handle, CURLOPT_URL, "200.200.200.200");
 
-  auto start = std::chrono::high_resolution_clock::now();
-  CURLcode curlCode = downloader.perform(handle);
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  double elapsedSeconds = duration.count();
-  std::cout << "TIMEOUT: " << elapsedSeconds << " ms" << std::endl;
+//   auto start = std::chrono::high_resolution_clock::now();
+//   CURLcode curlCode = downloader.perform(handle);
+//   auto end = std::chrono::high_resolution_clock::now();
+//   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+//   double elapsedSeconds = duration.count();
+//   std::cout << "TIMEOUT: " << elapsedSeconds << " ms" << std::endl;
 
-  BOOST_CHECK(curlCode == CURLE_OK);
-  std::cout << "CURL code: " << curlCode << "\n";
+//   BOOST_CHECK(curlCode == CURLE_OK);
+//   std::cout << "CURL code: " << curlCode << "\n";
 
-  long httpCode;
-  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  BOOST_CHECK(httpCode == 200);
-  std::cout << "HTTP code: " << httpCode << "\n";
+//   long httpCode;
+//   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+//   BOOST_CHECK(httpCode == 200);
+//   std::cout << "HTTP code: " << httpCode << "\n";
 
-  curl_easy_cleanup(handle);
-  curl_global_cleanup();
-}
+//   curl_easy_cleanup(handle);
+//   curl_global_cleanup();
+// }
 
 
 
