@@ -142,6 +142,10 @@ void CCDBDownloader::checkStopSignal(uv_timer_t* handle)
 
 void CCDBDownloader::closesocketCallback(void* clientp, curl_socket_t item)
 {
+  auto end = std::chrono::high_resolution_clock::now();
+  std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+  std::cout << "closesocketCallback:" << std::ctime(&end_time) << "\n";
+
   auto CD = (CCDBDownloader*)clientp;
   if (CD->mSocketTimerMap.find(item) != CD->mSocketTimerMap.end()) {
     auto timer = CD->mSocketTimerMap[item];
@@ -158,6 +162,12 @@ void CCDBDownloader::closesocketCallback(void* clientp, curl_socket_t item)
 
 curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct curl_sockaddr* address)
 {
+  
+  
+  auto end = std::chrono::high_resolution_clock::now();
+  std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+  std::cout << "opensocketCallback:" << std::ctime(&end_time) << "\n";
+
   auto CD = (CCDBDownloader*)clientp;
   auto sock = socket(address->family, address->socktype, address->protocol);
 
@@ -182,6 +192,10 @@ void CCDBDownloader::asyncUVHandleCheckQueue(uv_async_t* handle)
 
 void CCDBDownloader::closeSocketByTimer(uv_timer_t* handle)
 {
+  auto end = std::chrono::high_resolution_clock::now();
+  std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+  std::cout << "closeSocketByTimer:" << std::ctime(&end_time) << "\n";
+
   auto data = (DataForClosingSocket*)handle->data;
   auto CD = data->CD;
   auto sock = data->socket;
@@ -197,6 +211,10 @@ void CCDBDownloader::closeSocketByTimer(uv_timer_t* handle)
 
 void CCDBDownloader::curlTimeout(uv_timer_t* handle)
 {
+  auto end = std::chrono::high_resolution_clock::now();
+  std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+  std::cout << "curlTimeout:" << std::ctime(&end_time) << "\n";
+
   auto CD = (CCDBDownloader*)handle->data;
   int running_handles;
   curl_multi_socket_action(CD->mCurlMultiHandle, CURL_SOCKET_TIMEOUT, 0, &running_handles);
