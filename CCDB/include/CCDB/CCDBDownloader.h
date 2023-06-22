@@ -183,7 +183,6 @@ class CCDBDownloader
   void setOnlineTimeoutSettings();
 
  private:
-
   /**
    * Used in debug to detect whether uv loop closed prematurely.
    */
