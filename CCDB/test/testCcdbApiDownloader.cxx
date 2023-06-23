@@ -46,12 +46,13 @@ size_t CurlWrite_CallbackFunc_StdString2(void* contents, size_t size, size_t nme
   return size * nmemb;
 }
 
-CURL* createTestHandle(std::string* dst)
+CURL* createTestHandle(std::string* dst, std::string uniqueUserAgent)
 {
   CURL* handle = curl_easy_init();
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString2);
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
-  curl_easy_setopt(handle, CURLOPT_URL, "http://ccdb-test.cern.ch:8080/latest/");
+  curl_easy_setopt(handle, CURLOPT_URL, "http://ccdb-test.cern.ch:8080/");
+  curl_easy_setopt(handle, CURLOPT_USERAGENT, uniqueUserAgent.c_str());
   return handle;
 }
 
@@ -64,7 +65,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
 
   CCDBDownloader downloader;
   std::string dst = "";
-  CURL* handle = createTestHandle(&dst);
+  CURL* handle = createTestHandle(&dst, CCDBDownloader::getUniqueAgentID());
 
   CURLcode curlCode = downloader.perform(handle);
 
@@ -92,7 +93,7 @@ BOOST_AUTO_TEST_CASE(blocking_batch_test)
   std::vector<std::string*> destinations;
   for (int i = 0; i < 100; i++) {
     destinations.push_back(new std::string());
-    handleVector.push_back(createTestHandle(destinations.back()));
+    handleVector.push_back(createTestHandle(destinations.back(), CCDBDownloader::getUniqueAgentID()));
   }
 
   auto curlCodes = downloader.batchBlockingPerform(handleVector);
@@ -132,7 +133,7 @@ BOOST_AUTO_TEST_CASE(asynch_batch_test)
   std::vector<std::string*> destinations;
   for (int i = 0; i < 10; i++) {
     destinations.push_back(new std::string());
-    handleVector.push_back(createTestHandle(destinations.back()));
+    handleVector.push_back(createTestHandle(destinations.back(), CCDBDownloader::getUniqueAgentID()));
   }
 
   bool flag = false;
@@ -177,7 +178,7 @@ BOOST_AUTO_TEST_CASE(test_with_break)
   std::vector<std::string*> destinations;
   for (int i = 0; i < 100; i++) {
     destinations.push_back(new std::string());
-    handleVector.push_back(createTestHandle(destinations.back()));
+    handleVector.push_back(createTestHandle(destinations.back(), CCDBDownloader::getUniqueAgentID()));
   }
 
   auto curlCodes = downloader.batchBlockingPerform(handleVector);
@@ -237,7 +238,7 @@ BOOST_AUTO_TEST_CASE(asynch_batch_callback)
   std::vector<std::string*> destinations;
   for (int i = 0; i < 10; i++) {
     destinations.push_back(new std::string());
-    handleVector.push_back(createTestHandle(destinations.back()));
+    handleVector.push_back(createTestHandle(destinations.back(), CCDBDownloader::getUniqueAgentID()));
   }
 
   int testValue = 0;
@@ -285,7 +286,7 @@ BOOST_AUTO_TEST_CASE(external_loop_test)
 
   CCDBDownloader downloader(&loop);
   std::string dst = "";
-  CURL* handle = createTestHandle(&dst);
+  CURL* handle = createTestHandle(&dst, CCDBDownloader::getUniqueAgentID());
 
   CURLcode curlCode = downloader.perform(handle);
 

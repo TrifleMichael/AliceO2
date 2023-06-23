@@ -25,6 +25,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <fairlogger/Logger.h>
+#include <boost/asio/ip/host_name.hpp>
+#include <CCDB/CCDBTimeStampUtils.h>
+#include "CommonUtils/StringUtils.h"
 
 namespace o2::ccdb
 {
@@ -134,6 +137,17 @@ CCDBDownloader::~CCDBDownloader()
   // delete mTimeoutTimer; ---> not necessay (done elsewhere??)
 
   curlMultiErrorCheck(curl_multi_cleanup(mCurlMultiHandle));
+}
+
+std::string CCDBDownloader::getUniqueAgentID()
+{
+  std::string host = boost::asio::ip::host_name();
+  char const* jobID = getenv("ALIEN_PROC_ID");
+  if (jobID) {
+    return fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), jobID);
+  } else {
+    return fmt::format("{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6));
+  }
 }
 
 void closeHandles(uv_handle_t* handle, void* arg)

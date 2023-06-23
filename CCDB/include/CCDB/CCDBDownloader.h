@@ -180,6 +180,11 @@ class CCDBDownloader
    */
   void setOnlineTimeoutSettings();
 
+  /**
+   * Returns the unique user agent. Used in tests.
+   */
+  static std::string getUniqueAgentID();
+
  private:
   /**
    * Indicates whether the loop that the downloader is running on has been created by it or provided externally.
