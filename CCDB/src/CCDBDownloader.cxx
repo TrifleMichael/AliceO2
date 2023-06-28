@@ -473,4 +473,4 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
   return codeVector;
 }
 
-} // namespace o2
+} // namespace o2::ccdb
