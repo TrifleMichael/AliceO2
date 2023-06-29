@@ -328,6 +328,12 @@ BOOST_AUTO_TEST_CASE(asynchTest)
   delete uvLoop;
 }
 
+void testCallback(void* p)
+{
+  auto i = (int*)p;
+  (*i)++;
+}
+
 BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
 {
   auto uvLoop = new uv_loop_t();
