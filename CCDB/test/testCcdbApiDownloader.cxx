@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE(asynchTest)
   auto results = downloader->batchAsynchPerform(handleVector);
 
   while (*results.requestsLeft > 0) {
-    downloader->runLoop();
+    downloader->runLoop(false);
   }
 
   CURLcode curlCode = (*results.curlCodes)[0];
@@ -353,7 +353,7 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
   auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &x);
 
   while (*results.requestsLeft > 0 || !(*results.callbackFinished)) {
-    downloader->runLoop();
+    downloader->runLoop(false);
   }
 
   BOOST_CHECK(x == 1);
