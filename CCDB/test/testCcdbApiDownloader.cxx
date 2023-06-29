@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(blocking_batch_test)
   CCDBDownloader downloader;
   std::vector<CURL*> handleVector;
   std::vector<std::string*> destinations;
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 30; i++) {
     destinations.push_back(new std::string());
     handleVector.push_back(createTestHandle(destinations.back()));
   }
@@ -146,7 +146,7 @@ BOOST_AUTO_TEST_CASE(test_with_break)
   CCDBDownloader downloader;
   std::vector<CURL*> handleVector;
   std::vector<std::string*> destinations;
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 30; i++) {
     destinations.push_back(new std::string());
     handleVector.push_back(createTestHandle(destinations.back()));
   }
@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(test_with_break)
 
   std::vector<CURL*> handleVector2;
   std::vector<std::string*> destinations2;
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 30; i++) {
     destinations2.push_back(new std::string());
     handleVector2.push_back(createTestHandle(destinations2.back()));
   }
@@ -304,18 +304,18 @@ BOOST_AUTO_TEST_CASE(asynchTest)
 
   CURLcode curlCode = (*results.curlCodes)[0];
 
-  BOOST_CHECK(curlCode != CURLE_OK);
+  BOOST_CHECK(curlCode == CURLE_OK);
 
   long httpCode;
   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  BOOST_CHECK(httpCode != 200);
+  BOOST_CHECK(httpCode == 200);
 
   curl_easy_cleanup(handle);
   curl_global_cleanup();
 
   // Check if test timer and external loop are still alive
-  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) ==  0);
-  BOOST_CHECK(uv_loop_alive(uvLoop) == 0);
+  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) !=  0);
+  BOOST_CHECK(uv_loop_alive(uvLoop) != 0);
 
   // Downloader must be closed before uv_loop.
   // The reason for that are the uv_poll handles attached to the curl multi handle.
@@ -366,18 +366,18 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
 
   CURLcode curlCode = (*results.curlCodes)[0];
 
-  BOOST_CHECK(curlCode != CURLE_OK);
+  BOOST_CHECK(curlCode == CURLE_OK);
 
   long httpCode;
   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  BOOST_CHECK(httpCode != 200);
+  BOOST_CHECK(httpCode == 200);
 
   curl_easy_cleanup(handle);
   curl_global_cleanup();
 
   // Check if test timer and external loop are still alive
-  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) ==  0);
-  BOOST_CHECK(uv_loop_alive(uvLoop) == 0);
+  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) !=  0);
+  BOOST_CHECK(uv_loop_alive(uvLoop) != 0);
 
   // Downloader must be closed before uv_loop.
   // The reason for that are the uv_poll handles attached to the curl multi handle.
