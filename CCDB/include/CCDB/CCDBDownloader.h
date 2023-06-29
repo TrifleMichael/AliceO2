@@ -28,11 +28,19 @@ typedef struct uv_poll_s uv_poll_t;
 typedef struct uv_signal_s uv_signal_t;
 typedef struct uv_async_s uv_async_t;
 typedef struct uv_handle_s uv_handle_t;
+typedef struct uv_work_s uv_work_t;
 
 using namespace std;
 
 namespace o2::ccdb
 {
+
+  // TODO comment
+  typedef struct AsynchronousResults {
+    std::vector<CURLcode>* curlCodes;
+    size_t* requestsLeft;
+    bool* callbackFinished;
+  } AsynchronousResults;
 
 /*
  Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.
@@ -73,6 +81,7 @@ void onUVClose(uv_handle_t* handle);
 class CCDBDownloader
 {
  public:
+
   /**
    * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
    * When the timer runs out it closes the socket. The period for which socket stays open is defined by socketTimeoutMS.
@@ -135,6 +144,12 @@ class CCDBDownloader
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
+  // TODO comment
+  struct AsynchronousResults batchAsynchPerform(std::vector<CURL*> const& handleVector);
+
+  // TODO comment
+  struct AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
+
   /**
    * Limits the number of parallel connections. Should be used only if no transfers are happening.
    */
@@ -169,6 +184,9 @@ class CCDBDownloader
    * Sets the timeout values selected for the online environment.
    */
   void setOnlineTimeoutSettings();
+
+  static void afterWorkCleanup(uv_work_t *req, int status); // TODO comment
+  static void uvWorkWrapper(uv_work_t* workHandle); // TODO MOVE
 
   /**
    * Run the uvLoop once.
@@ -237,15 +255,19 @@ class CCDBDownloader
    * All easy handles coming from one request have an identical PerformData structure.
    */
   typedef struct PerformData {
-    std::condition_variable* cv;
-    bool* completionFlag;
     CURLcode* codeDestination;
     void (*cbFun)(void*);
-    std::thread* cbThread;
     void* cbData;
     size_t* requestsLeft;
     RequestType type;
+    bool* callbackFinished;
   } PerformData;
+
+  typedef struct CallbackData {
+    void (*cbFun)(void*);
+    void* cbData;
+    bool* callbackFinished;
+  } CallbackData;
 
   /**
    * Called by CURL in order to close a socket. It will be called by CURL even if a timeout timer closed the socket beforehand.
@@ -310,6 +332,9 @@ class CCDBDownloader
    * Create a new multi_handle for the downloader
    */
   void initializeMultiHandle();
+
+  // TODO comment
+  void uvCallbackWrapper(CallbackData* data);
 
   /**
    * Release resources reserver for the transfer, mark transfer as complete, passe the CURLcode to the destination and launche callbacks if it is specified in PerformData.

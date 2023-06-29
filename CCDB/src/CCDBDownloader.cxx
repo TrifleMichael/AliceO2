@@ -37,39 +37,25 @@ void uvErrorCheck(int code)
   if (code != 0) {
     char buf[1000];
     uv_strerror_r(code, buf, 1000);
-    LOG(error) << "CCDBDownloader: UV error - " << buf;
+    std::cout << "CCDBDownloader: UV error - " << buf;
   }
 }
 
 void curlEasyErrorCheck(CURLcode code)
 {
   if (code != CURLE_OK) {
-    LOG(error) << "CCDBDownloader: CURL error - " << curl_easy_strerror(code);
+    std::cout << "CCDBDownloader: CURL error - " << curl_easy_strerror(code);
   }
 }
 
 void curlMultiErrorCheck(CURLMcode code)
 {
   if (code != CURLM_OK) {
-    LOG(error) << "CCDBDownloader: CURL error - " << curl_multi_strerror(code);
+    std::cout << "CCDBDownloader: CURL error - " << curl_multi_strerror(code);
   }
 }
-namespace
-{
-std::string uniqueAgentID()
-{
-  std::string host = boost::asio::ip::host_name();
-  char const* jobID = getenv("ALIEN_PROC_ID");
-  if (jobID) {
-    return fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), jobID);
-  } else {
-    return fmt::format("{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6));
-  }
-}
-} // namespace
 
 CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
-  : mUserAgentId(uniqueAgentID())
 {
   if (uv_loop) {
     mExternalLoop = true;
@@ -155,12 +141,12 @@ void CCDBDownloader::closesocketCallback(void* clientp, curl_socket_t item)
       }
       CD->mSocketTimerMap.erase(item);
       if (close(item) == -1) {
-        LOG(error) << "CCDBDownloader: Socket failed to close";
+        std::cout << "CCDBDownloader: Socket failed to close";
       }
     }
   } else {
     if (close(item) == -1) {
-      LOG(error) << "CCDBDownloader: Socket failed to close";
+      std::cout << "CCDBDownloader: Socket failed to close";
     }
   }
 }
@@ -170,7 +156,7 @@ curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct cur
   auto CD = (CCDBDownloader*)clientp;
   auto sock = socket(address->family, address->socktype, address->protocol);
   if (sock == -1) {
-    LOG(error) << "CCDBDownloader: Socket failed to open";
+    std::cout << "CCDBDownloader: Socket failed to open";
   }
 
   if (CD->mExternalLoop) {
@@ -197,7 +183,7 @@ void CCDBDownloader::closeSocketByTimer(uv_timer_t* handle)
     uvErrorCheck(uv_timer_stop(CD->mSocketTimerMap[sock]));
     CD->mSocketTimerMap.erase(sock);
     if (close(sock) == -1) {
-      LOG(error) << "CCDBDownloader: Socket failed to close";
+      std::cout << "CCDBDownloader: Socket failed to close";
     }
     delete data;
   }
@@ -344,6 +330,28 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
   uv_close((uv_handle_t*)context->poll_handle, curlCloseCB);
 }
 
+void CCDBDownloader::afterWorkCleanup(uv_work_t *workHandle, int status)
+{
+  auto data = (CallbackData*)workHandle->data;
+  delete data;
+  delete workHandle;
+}
+
+void CCDBDownloader::uvWorkWrapper(uv_work_t* workHandle)
+{
+  auto data = (CallbackData*)workHandle->data;
+  data->cbFun(data->cbData);
+  *data->callbackFinished = true;
+}
+
+void CCDBDownloader::uvCallbackWrapper(CallbackData* data)
+{
+  auto workHandle = new uv_work_t();
+  mHandleMap[(uv_handle_t*)(workHandle)] = true;
+  workHandle->data = data;
+  uv_queue_work(mUVLoop, workHandle, uvWorkWrapper, afterWorkCleanup); // TODO: Close in after work
+}
+
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
   mHandlesInUse--;
@@ -359,12 +367,13 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       case BLOCKING:
         break;
       case ASYNCHRONOUS:
-        // Temporary change before asynchronous calls are reintroduced
-        LOG(error) << "CCDBDownloader: Illegal request type";
         break;
       case ASYNCHRONOUS_WITH_CALLBACK:
-        // Temporary change before asynchronous calls will callbacks are reintroduced
-        LOG(error) << "CCDBDownloader: Illegal request type";
+        auto CBData = new CallbackData();
+        CBData->cbFun = data->cbFun;
+        CBData->cbData = data->cbData;
+        CBData->callbackFinished = data->callbackFinished;
+        uvCallbackWrapper(CBData);
         break;
     }
   }
@@ -471,6 +480,64 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
     uv_run(mUVLoop, UV_RUN_ONCE);
   }
   return codeVector;
+}
+
+struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
+{
+  struct AsynchronousResults results;
+
+  auto codeVector = new std::vector<CURLcode>(handleVector.size());
+  results.requestsLeft = new size_t();
+  results.curlCodes = codeVector;
+
+  *results.requestsLeft = handleVector.size();
+
+  for (int i = 0; i < handleVector.size(); i++) {
+    auto* data = new CCDBDownloader::PerformData();
+    data->codeDestination = &(*codeVector)[i];
+    (*codeVector)[i] = CURLE_FAILED_INIT;
+
+    data->type = ASYNCHRONOUS;
+    data->requestsLeft = results.requestsLeft;
+
+    setHandleOptions(handleVector[i], data);
+    mHandlesToBeAdded.push_back(handleVector[i]);
+  }
+  checkHandleQueue();
+
+  return results;
+}
+
+struct AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
+{
+  struct AsynchronousResults results;
+
+  auto codeVector = new std::vector<CURLcode>(handleVector.size());
+  results.requestsLeft = new size_t();
+  results.curlCodes = codeVector;
+
+  *results.requestsLeft = handleVector.size();
+
+  results.callbackFinished = new bool();
+  *results.callbackFinished = false;
+
+  for (int i = 0; i < handleVector.size(); i++) {
+    auto* data = new CCDBDownloader::PerformData();
+    data->codeDestination = &(*codeVector)[i];
+    data->cbFun = func;
+    data->cbData = arg;
+    data->callbackFinished = results.callbackFinished;
+    (*codeVector)[i] = CURLE_FAILED_INIT;
+
+    data->type = ASYNCHRONOUS_WITH_CALLBACK;
+    data->requestsLeft = results.requestsLeft;
+
+    setHandleOptions(handleVector[i], data);
+    mHandlesToBeAdded.push_back(handleVector[i]);
+  }
+  checkHandleQueue();
+
+  return results;
 }
 
 } // namespace o2

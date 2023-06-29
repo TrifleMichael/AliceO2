@@ -274,5 +274,115 @@ BOOST_AUTO_TEST_CASE(external_loop_test)
   delete uvLoop;
 }
 
+BOOST_AUTO_TEST_CASE(asynchTest)
+{
+  auto uvLoop = new uv_loop_t();
+  uv_loop_init(uvLoop);
+
+  auto testTimer = new uv_timer_t();
+  uv_timer_init(uvLoop, testTimer);
+  uv_timer_start(testTimer, testTimerCB, 10, 10);
+
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
+
+  // Regular downloader test
+  auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
+  std::string dst = "";
+  CURL* handle = createTestHandle(&dst);
+
+  std::vector<CURL*> handleVector;
+  handleVector.push_back(handle);
+
+  auto results = downloader->batchAsynchPerform(handleVector);
+
+  while (*results.requestsLeft > 0) {
+    downloader->runLoop();
+  }
+
+  CURLcode curlCode = (*results.curlCodes)[0];
+
+  BOOST_CHECK(curlCode != CURLE_OK);
+
+  long httpCode;
+  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+  BOOST_CHECK(httpCode != 200);
+
+  curl_easy_cleanup(handle);
+  curl_global_cleanup();
+
+  // Check if test timer and external loop are still alive
+  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) ==  0);
+  BOOST_CHECK(uv_loop_alive(uvLoop) == 0);
+
+  // Downloader must be closed before uv_loop.
+  // The reason for that are the uv_poll handles attached to the curl multi handle.
+  // The multi handle must be cleaned (via destuctor) before poll handles attached to them are removed (via walking and closing).
+  delete downloader;
+  while (uv_loop_alive(uvLoop) && uv_loop_close(uvLoop) == UV_EBUSY) {
+    uv_walk(uvLoop, closeAllHandles, nullptr);
+    uv_run(uvLoop, UV_RUN_ONCE);
+  }
+  delete uvLoop;
+}
+
+BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
+{
+  auto uvLoop = new uv_loop_t();
+  uv_loop_init(uvLoop);
+
+  auto testTimer = new uv_timer_t();
+  uv_timer_init(uvLoop, testTimer);
+  uv_timer_start(testTimer, testTimerCB, 10, 10);
+
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
+
+  auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
+  std::string dst = "";
+  CURL* handle = createTestHandle(&dst);
+
+  std::vector<CURL*> handleVector;
+  handleVector.push_back(handle);
+
+  int x = 0;
+  auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &x);
+
+  while (*results.requestsLeft > 0 || !(*results.callbackFinished)) {
+    downloader->runLoop();
+  }
+
+  BOOST_CHECK(x == 1);
+
+  CURLcode curlCode = (*results.curlCodes)[0];
+
+  BOOST_CHECK(curlCode != CURLE_OK);
+
+  long httpCode;
+  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+  BOOST_CHECK(httpCode != 200);
+
+  curl_easy_cleanup(handle);
+  curl_global_cleanup();
+
+  // Check if test timer and external loop are still alive
+  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) ==  0);
+  BOOST_CHECK(uv_loop_alive(uvLoop) == 0);
+
+  // Downloader must be closed before uv_loop.
+  // The reason for that are the uv_poll handles attached to the curl multi handle.
+  // The multi handle must be cleaned (via destuctor) before poll handles attached to them are removed (via walking and closing).
+  delete downloader;
+  while (uv_loop_alive(uvLoop) && uv_loop_close(uvLoop) == UV_EBUSY) {
+    uv_walk(uvLoop, closeAllHandles, nullptr);
+    uv_run(uvLoop, UV_RUN_ONCE);
+  }
+  delete uvLoop;
+}
+
 } // namespace ccdb
 } // namespace o2
