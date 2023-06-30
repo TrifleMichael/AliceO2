@@ -65,6 +65,17 @@ CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
     setupInternalUVLoop();
   }
 
+CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
+  : mUserAgentId(uniqueAgentID())
+{
+  if (uv_loop) {
+    mExternalLoop = true;
+    mUVLoop = uv_loop;
+  } else {
+    mExternalLoop = false;
+    setupInternalUVLoop();
+  }
+
   // Preparing timer to be used by curl
   mTimeoutTimer = new uv_timer_t();
   mTimeoutTimer->data = this;
@@ -141,7 +152,7 @@ void CCDBDownloader::closesocketCallback(void* clientp, curl_socket_t item)
       }
       CD->mSocketTimerMap.erase(item);
       if (close(item) == -1) {
-        std::cout << "CCDBDownloader: Socket failed to close";
+        LOG(error) << "CCDBDownloader: Socket failed to close";
       }
     }
   } else {
@@ -460,6 +471,7 @@ CURLcode CCDBDownloader::perform(CURL* handle)
 }
 
 std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> const& handleVector)
+std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> const& handleVector)
 {
   std::vector<CURLcode> codeVector(handleVector.size());
   size_t requestsLeft = handleVector.size();
@@ -484,6 +496,8 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
 
 struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
 {
+  std::vector<CURLcode> codeVector(handleVector.size());
+  size_t requestsLeft = handleVector.size();
   struct AsynchronousResults results;
 
   auto codeVector = new std::vector<CURLcode>(handleVector.size());
@@ -497,12 +511,17 @@ struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*>
     data->codeDestination = &(*codeVector)[i];
     (*codeVector)[i] = CURLE_FAILED_INIT;
 
+    data->type = BLOCKING;
+    data->requestsLeft = &requestsLeft;
     data->type = ASYNCHRONOUS;
     data->requestsLeft = results.requestsLeft;
 
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);
   }
+  checkHandleQueue();
+  while (requestsLeft > 0) {
+    uv_run(mUVLoop, UV_RUN_ONCE);
   checkHandleQueue();
 
   return results;
@@ -535,6 +554,8 @@ struct AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<C
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);
   }
+  return codeVector;
+}
   checkHandleQueue();
 
   return results;
