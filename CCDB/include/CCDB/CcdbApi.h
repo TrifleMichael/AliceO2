@@ -457,11 +457,8 @@ class CcdbApi //: public DatabaseInterface
    * @param noWait Using this flag will cause the loop to run only if sockets have pendind data.
    */
   void runDownloaderLoop(bool noWait);
-   * Set the number of times curl should retry in case of failure and the delay between thte attempts.
-   * @param numberRetries
-   * @param delay
-   */
-  void setCurlRetriesParameters(int numberRetries, int delay = 100000 /* microseconds */)
+  *Set the number of times curl should retry in case of failure and the delay between thte attempts.* @param numberRetries* @param delay* /
+    void setCurlRetriesParameters(int numberRetries, int delay = 100000 /* microseconds */)
   {
     mCurlRetries = numberRetries;
     mCurlDelayRetries = delay;
