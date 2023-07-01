@@ -512,9 +512,11 @@ GPUd() void GPUTPCCFDecodeZSLinkBase::Decode(int nBlocks, int nThreads, int iBlo
   }   // [CPU] for (unsigned int i = clusterer.mMinMaxCN[endpoint].minC; i < clusterer.mMinMaxCN[endpoint].maxC; i++)
 
 #ifdef GPUCA_CHECK_TPCZS_CORRUPTION
-  unsigned int maxOffset = iBlock < nBlocks - 1 ? clusterer.mPzsOffsets[iBlock + 1].offset : clusterer.mPzsOffsets[iBlock].offset + zs.count[endpoint];
-  if (iThread == 0 && pageDigitOffset != maxOffset) {
-    clusterer.raiseError(GPUErrors::ERROR_TPCZS_INVALID_OFFSET, clusterer.mISlice, pageDigitOffset, maxOffset);
+  if (iThread == 0 && iBlock < nBlocks - 1) {
+    uint32_t maxOffset = clusterer.mPzsOffsets[iBlock + 1].offset;
+    if (pageDigitOffset != maxOffset) {
+      clusterer.raiseError(GPUErrors::ERROR_TPCZS_INVALID_OFFSET, clusterer.mISlice, pageDigitOffset, maxOffset);
+    }
   }
 #endif
 }
@@ -622,8 +624,7 @@ GPUd() uint32_t GPUTPCCFDecodeZSDenseLink::DecodePage(GPUSharedMemory& smem, pro
 
     if (i == decHeader->nTimebinHeaders - 1 && decHeader->flags & o2::tpc::TPCZSHDRV2::ZSFlags::payloadExtendsToNextPage) {
       assert(o2::raw::RDHUtils::getMemorySize(*rawDataHeader) == TPCZSHDR::TPC_ZS_PAGE_SIZE);
-      // Disable check for dropped pages temporarily, decoding fails on large dataset when enabled...
-      if ((unsigned char)(raw::RDHUtils::getPageCounter(rawDataHeader) + 1) == raw::RDHUtils::getPageCounter(nextPage)) {
+      if ((unsigned short)(raw::RDHUtils::getPageCounter(rawDataHeader) + 1) == raw::RDHUtils::getPageCounter(nextPage)) {
         nSamplesWrittenTB = DecodeTB<DecodeInParallel, true>(clusterer, smem, iThread, page, pageDigitOffset, rawDataHeader, firstHBF, decHeader->cruID, payloadEnd, nextPage);
       } else {
         nSamplesWrittenTB = FillWithInvalid(clusterer, iThread, nThreads, pageDigitOffset, nSamplesInPage - nSamplesWritten);
