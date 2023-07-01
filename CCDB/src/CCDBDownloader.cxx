@@ -333,7 +333,6 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
 
 void CCDBDownloader::afterWorkCleanup(uv_work_t *workHandle, int status)
 {
-  // TODO Add status check
   auto data = (CallbackData*)workHandle->data;
   delete data;
   delete workHandle;

@@ -207,7 +207,7 @@ class CCDBDownloader
    * Is called a short time after uvWorkWrapper finished executing.
    *
    * @param workHandle Work handle which was used to perform the callback.
-   * @param status TODO COMMENT.
+   * @param status Not used but required by template. Its value will be set as UV_ECANCELED if the callback was cancelled.
    */
   static void afterWorkCleanup(uv_work_t *req, int status); 
 
