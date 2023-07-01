@@ -333,6 +333,7 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
 
 void CCDBDownloader::afterWorkCleanup(uv_work_t *workHandle, int status)
 {
+  // TODO Add status check
   auto data = (CallbackData*)workHandle->data;
   delete data;
   delete workHandle;
@@ -492,6 +493,7 @@ struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*>
   auto codeVector = new std::vector<CURLcode>(handleVector.size());
   results.requestsLeft = new size_t();
   results.curlCodes = codeVector;
+  results.callbackFinished = nullptr;
 
   *results.requestsLeft = handleVector.size();
 

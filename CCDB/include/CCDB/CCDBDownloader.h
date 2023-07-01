@@ -35,12 +35,17 @@ using namespace std;
 namespace o2::ccdb
 {
 
-  // TODO comment
-  typedef struct AsynchronousResults {
-    std::vector<CURLcode>* curlCodes;
-    size_t* requestsLeft;
-    bool* callbackFinished;
-  } AsynchronousResults;
+  // TODO move and check comment
+/**
+ * Contains the results of asynchronous call. It is updated from via runnign mUVLoop.
+ * Data stored in those structs needs to be freed after it's transfer finishes.
+ * If callback is not used then callbackFinished is a nullptr thus must not be freed.
+ */
+typedef struct AsynchronousResults {
+  std::vector<CURLcode>* curlCodes;
+  size_t* requestsLeft;
+  bool* callbackFinished;
+} AsynchronousResults;
 
 /*
  Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.
@@ -140,14 +145,27 @@ class CCDBDownloader
 
   /**
    * Perform on a batch of handles in a blocking manner. Has the same effect as calling curl_easy_perform() on all handles in the vector.
+   *
    * @param handleVector Handles to be performed on.
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
-  // TODO comment
+  // TODO check
+  /**
+   * Schedules performing on a batch of handles. To perform run the mUVLoop.
+   *
+   * @param handleVector Handles to be performed on.
+   */
   struct AsynchronousResults batchAsynchPerform(std::vector<CURL*> const& handleVector);
 
-  // TODO comment
+  // TODO check
+  /**
+   * Schedules performing on a batch of handles. To perform run the mUVLoop. After all callbacks finish it will execute func(arg)
+   *
+   * @param handleVector Handles to be performed on.
+   * @param func Function to be called as callback.
+   * @param arg Argument to be passed to func.
+   */
   struct AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
 
   /**
@@ -185,8 +203,20 @@ class CCDBDownloader
    */
   void setOnlineTimeoutSettings();
 
-  static void afterWorkCleanup(uv_work_t *req, int status); // TODO comment
-  static void uvWorkWrapper(uv_work_t* workHandle); // TODO MOVE
+  /** // TODO check, maybe move DESCRIBE status
+   * Is called a short time after uvWorkWrapper finished executing.
+   *
+   * @param workHandle Work handle which was used to perform the callback.
+   * @param status TODO COMMENT.
+   */
+  static void afterWorkCleanup(uv_work_t *req, int status); 
+
+  /** // TODO check, maybe move
+   * Wrapper which calls the uv_queue_work. Used in asynchronous callbacks.
+   *
+   * @param workHandle Work handle that will be used to perform the callback.
+   */
+  static void uvWorkWrapper(uv_work_t* workHandle);
 
   /**
    * Run the uvLoop once.
@@ -333,7 +363,12 @@ class CCDBDownloader
    */
   void initializeMultiHandle();
 
-  // TODO comment
+  // TODO Check
+  /**
+   * Schedules the callback function to run via uv_work.
+   *
+   * @param data Data describing the function and arguments which will be used to perform callback.
+   */
   void uvCallbackWrapper(CallbackData* data);
 
   /**
