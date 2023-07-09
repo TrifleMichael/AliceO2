@@ -481,6 +481,14 @@ o2::framework::ServiceSpec CommonServices::decongestionSpec()
       LOGP(debug, "Broadcasting oldest possible output {} due to {} ({})", oldestPossibleOutput.timeslice.value,
            oldestPossibleOutput.slot.index == -1 ? "channel" : "slot",
            oldestPossibleOutput.slot.index == -1 ? oldestPossibleOutput.channel.value : oldestPossibleOutput.slot.index);
+      if (decongestion->orderedCompletionPolicyActive) {
+        auto oldNextTimeslice = decongestion->nextTimeslice;
+        decongestion->nextTimeslice = std::max(decongestion->nextTimeslice, (int64_t)oldestPossibleOutput.timeslice.value);
+        if (oldNextTimeslice != decongestion->nextTimeslice) {
+          LOGP(error, "Some Lifetime::Timeframe data got dropped starting at {}", oldNextTimeslice);
+          timesliceIndex.rescan();
+        }
+      }
       DataProcessingHelpers::broadcastOldestPossibleTimeslice(proxy, oldestPossibleOutput.timeslice.value);
 
       for (int fi = 0; fi < proxy.getNumForwardChannels(); fi++) {
@@ -543,6 +551,14 @@ o2::framework::ServiceSpec CommonServices::decongestionSpec()
             }
           }
           decongestion.lastTimeslice = oldestPossibleOutput.timeslice.value;
+          if (decongestion.orderedCompletionPolicyActive) {
+            int64_t oldNextTimeslice = decongestion.nextTimeslice;
+            decongestion.nextTimeslice = std::max(decongestion.nextTimeslice, (int64_t)oldestPossibleOutput.timeslice.value);
+            if (oldNextTimeslice != decongestion.nextTimeslice) {
+              LOGP(error, "Some Lifetime::Timeframe data got dropped starting at {}", oldNextTimeslice);
+              timesliceIndex.rescan();
+            }
+          }
         },
         TimesliceId{oldestPossibleTimeslice}, -1); },
     .kind = ServiceKind::Serial};
@@ -813,42 +829,42 @@ o2::framework::ServiceSpec CommonServices::dataProcessingStats()
                    .kind = Kind::UInt64,
                    .scope = Scope::DPL,
                    .minPublishInterval = 0,
-                   .maxRefreshLatency = 0,
+                   .maxRefreshLatency = 10000,
                    .sendInitialValue = true},
         MetricSpec{.name = "arrow-messages-destroyed",
                    .metricId = static_cast<short>(ProcessingStatsId::ARROW_MESSAGES_DESTROYED),
                    .kind = Kind::UInt64,
                    .scope = Scope::DPL,
                    .minPublishInterval = 0,
-                   .maxRefreshLatency = 0,
+                   .maxRefreshLatency = 10000,
                    .sendInitialValue = true},
         MetricSpec{.name = "arrow-bytes-created",
                    .metricId = static_cast<short>(ProcessingStatsId::ARROW_BYTES_CREATED),
                    .kind = Kind::UInt64,
                    .scope = Scope::DPL,
                    .minPublishInterval = 0,
-                   .maxRefreshLatency = 0,
+                   .maxRefreshLatency = 10000,
                    .sendInitialValue = true},
         MetricSpec{.name = "arrow-messages-created",
                    .metricId = static_cast<short>(ProcessingStatsId::ARROW_MESSAGES_CREATED),
                    .kind = Kind::UInt64,
                    .scope = Scope::DPL,
                    .minPublishInterval = 0,
-                   .maxRefreshLatency = 0,
+                   .maxRefreshLatency = 10000,
                    .sendInitialValue = true},
         MetricSpec{.name = "arrow-bytes-expired",
                    .metricId = static_cast<short>(ProcessingStatsId::ARROW_BYTES_EXPIRED),
                    .kind = Kind::UInt64,
                    .scope = Scope::DPL,
                    .minPublishInterval = 0,
-                   .maxRefreshLatency = 0,
+                   .maxRefreshLatency = 10000,
                    .sendInitialValue = true},
         MetricSpec{.name = "shm-offer-bytes-consumed",
                    .metricId = static_cast<short>(ProcessingStatsId::SHM_OFFER_BYTES_CONSUMED),
                    .kind = Kind::UInt64,
                    .scope = Scope::DPL,
                    .minPublishInterval = 0,
-                   .maxRefreshLatency = 0,
+                   .maxRefreshLatency = 10000,
                    .sendInitialValue = true},
         MetricSpec{.name = "resources-missing",
                    .metricId = static_cast<short>(ProcessingStatsId::RESOURCES_MISSING),
@@ -876,7 +892,7 @@ o2::framework::ServiceSpec CommonServices::dataProcessingStats()
                    .kind = Kind::UInt64,
                    .scope = Scope::DPL,
                    .minPublishInterval = 0,
-                   .maxRefreshLatency = 0,
+                   .maxRefreshLatency = 10000,
                    .sendInitialValue = true}};
 
       for (auto& metric : metrics) {
@@ -892,7 +908,7 @@ o2::framework::ServiceSpec CommonServices::dataProcessingStats()
     },
     .postProcessing = [](ProcessingContext& context, void* service) {
       auto* stats = (DataProcessingStats*)service;
-      stats->updateStats({(short)ProcessingStatsId::PERFORMED_COMPUTATIONS, DataProcessingStats::Op::Add, 1}); 
+      stats->updateStats({(short)ProcessingStatsId::PERFORMED_COMPUTATIONS, DataProcessingStats::Op::Add, 1});
       flushMetrics(context.services(), *stats); },
     .preDangling = [](DanglingContext& context, void* service) {
        auto* stats = (DataProcessingStats*)service;
@@ -1056,15 +1072,18 @@ std::vector<ServiceSpec> CommonServices::defaultServices(std::string extraPlugin
     CommonMessageBackends::fairMQDeviceProxy(),
     dataSender(),
     objectCache(),
-    ccdbSupportSpec(),
-    ArrowSupport::arrowBackendSpec(),
-    CommonMessageBackends::fairMQBackendSpec(),
-    CommonMessageBackends::stringBackendSpec(),
-    decongestionSpec()};
+    ccdbSupportSpec()};
+
+  DeploymentMode deploymentMode = DefaultsHelpers::deploymentMode();
+  if (deploymentMode != DeploymentMode::OnlineDDS && deploymentMode != DeploymentMode::OnlineECS && deploymentMode != DeploymentMode::OnlineAUX) {
+    specs.push_back(ArrowSupport::arrowBackendSpec());
+  }
+  specs.push_back(CommonMessageBackends::fairMQBackendSpec());
+  specs.push_back(CommonMessageBackends::stringBackendSpec());
+  specs.push_back(decongestionSpec());
 
   std::string loadableServicesStr = extraPlugins;
   // Do not load InfoLogger by default if we are not at P2.
-  DeploymentMode deploymentMode = DefaultsHelpers::deploymentMode();
   if (deploymentMode == DeploymentMode::OnlineDDS || deploymentMode == DeploymentMode::OnlineECS || deploymentMode == DeploymentMode::OnlineAUX) {
     if (loadableServicesStr.empty() == false) {
       loadableServicesStr += ",";
