@@ -527,35 +527,32 @@ struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*>
   return results;
 }
 
-// struct AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
-// {
-//   struct AsynchronousResults results;
+struct AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
+{
+  struct AsynchronousResults results;
 
-//   auto codeVector = new std::vector<CURLcode>(handleVector.size());
-//   results.requestsLeft = new size_t();
-//   results.curlCodes = codeVector;
+  results.requestsLeft = std::make_shared<size_t>();
+  *results.requestsLeft = handleVector.size();
+  results.curlCodes = std::make_shared<std::vector<CURLcode>>(handleVector.size());
+  results.callbackFinished = std::make_shared<bool>();
+  *results.callbackFinished = false;
 
-//   *results.requestsLeft = handleVector.size();
+  for (int i = 0; i < handleVector.size(); i++) {
+    auto* data = new CCDBDownloader::PerformData();
+    data->codeDestination = &(*results.curlCodes)[i];
+    data->cbFun = func;
+    data->cbData = arg;
+    data->callbackFinished = results.callbackFinished;
+    (*results.curlCodes)[i] = CURLE_FAILED_INIT;
 
-//   results.callbackFinished = new bool();
-//   *results.callbackFinished = false;
+    data->type = ASYNCHRONOUS_WITH_CALLBACK;
+    data->requestsLeft = results.requestsLeft;
 
-//   for (int i = 0; i < handleVector.size(); i++) {
-//     auto* data = new CCDBDownloader::PerformData();
-//     data->codeDestination = &(*codeVector)[i];
-//     data->cbFun = func;
-//     data->cbData = arg;
-//     data->callbackFinished = results.callbackFinished;
-//     (*codeVector)[i] = CURLE_FAILED_INIT;
-
-//     data->type = ASYNCHRONOUS_WITH_CALLBACK;
-//     data->requestsLeft = results.requestsLeft;
-
-//     setHandleOptions(handleVector[i], data);
-//     mHandlesToBeAdded.push_back(handleVector[i]);
-//   }
-//   checkHandleQueue();
-//   return results;
-// }
+    setHandleOptions(handleVector[i], data);
+    mHandlesToBeAdded.push_back(handleVector[i]);
+  }
+  checkHandleQueue();
+  return results;
+}
 
 } // namespace o2

@@ -34,10 +34,9 @@ using namespace std;
 
 namespace o2::ccdb
 {
-/**
+/** TODO : Relocate this struct?
  * Contains the results of asynchronous call. It is updated via running mUVLoop.
- * Data stored in those structs needs to be freed after its transfer finishes.
- * If callback was not scheduled (via batchAsynchWithCallback) then callbackFinished is a nullptr thus must not be freed.
+ * Shared pointers are used to avoid the need to free members of this structor manually before deleting the struct.
  */
 typedef struct AsynchronousResults {
   shared_ptr<std::vector<CURLcode>> curlCodes;
@@ -162,7 +161,7 @@ class CCDBDownloader
    * @param func Function to be called as callback.
    * @param arg Argument to be passed to func.
    */
-  // struct AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
+  struct AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
 
   /**
    * Limits the number of parallel connections. Should be used only if no transfers are happening.
@@ -286,7 +285,7 @@ class CCDBDownloader
     void* cbData;
     shared_ptr<size_t> requestsLeft;
     RequestType type;
-    bool* callbackFinished;
+    shared_ptr<bool> callbackFinished;
   } PerformData;
 
   typedef struct CallbackData {

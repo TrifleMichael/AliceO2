@@ -303,66 +303,68 @@ void testCallback(void* p)
   (*i)++;
 }
 
-// BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
-// {
-//   // Prepare uv_loop to be provided to the downloader
-//   auto uvLoop = new uv_loop_t();
-//   uv_loop_init(uvLoop);
+// TODO Describe shared pointers in all instances of tests
 
-//   // Prepare test timer. It will be used to check whether the downloader affects external handles.
-//   auto testTimer = new uv_timer_t();
-//   uv_timer_init(uvLoop, testTimer);
-//   uv_timer_start(testTimer, testTimerCB, 10, 10);
+BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
+{
+  // Prepare uv_loop to be provided to the downloader
+  auto uvLoop = new uv_loop_t();
+  uv_loop_init(uvLoop);
 
-//   if (curl_global_init(CURL_GLOBAL_ALL)) {
-//     fprintf(stderr, "Could not init curl\n");
-//     return;
-//   }
+  // Prepare test timer. It will be used to check whether the downloader affects external handles.
+  auto testTimer = new uv_timer_t();
+  uv_timer_init(uvLoop, testTimer);
+  uv_timer_start(testTimer, testTimerCB, 10, 10);
 
-//   // Test the downloader
-//   auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
-//   std::string dst = "";
-//   CURL* handle = createTestHandle(&dst);
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
 
-//   std::vector<CURL*> handleVector;
-//   handleVector.push_back(handle);
+  // Test the downloader
+  auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
+  std::string dst = "";
+  CURL* handle = createTestHandle(&dst);
 
-//   // x will be modified in the callback
-//   int testVariable = 0;
-//   auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &testVariable);
+  std::vector<CURL*> handleVector;
+  handleVector.push_back(handle);
 
-//   // Run the loop until requests are done and the callback is finished
-//   while (*results.requestsLeft > 0 || !(*results.callbackFinished)) {
-//     downloader->runLoop(false);
-//   }
+  // x will be modified in the callback
+  int testVariable = 0;
+  auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &testVariable);
 
-//   // Check results
-//   BOOST_CHECK(testVariable == 1);
+  // Run the loop until requests are done and the callback is finished
+  while (*results.requestsLeft > 0 || !(*results.callbackFinished)) {
+    downloader->runLoop(false);
+  }
 
-//   CURLcode curlCode = (*results.curlCodes)[0];
-//   BOOST_CHECK(curlCode == CURLE_OK);
+  // Check results
+  BOOST_CHECK(testVariable == 1);
 
-//   long httpCode;
-//   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-//   BOOST_CHECK(httpCode == 200);
+  CURLcode curlCode = (*results.curlCodes)[0];
+  BOOST_CHECK(curlCode == CURLE_OK);
 
-//   curl_easy_cleanup(handle);
-//   curl_global_cleanup();
+  long httpCode;
+  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+  BOOST_CHECK(httpCode == 200);
 
-//   // Check if test timer and external loop are still alive
-//   BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) !=  0);
-//   BOOST_CHECK(uv_loop_alive(uvLoop) != 0);
+  curl_easy_cleanup(handle);
+  curl_global_cleanup();
 
-//   // Downloader must be closed before uv_loop.
-//   // The reason for that are the uv_poll handles attached to the curl multi handle.
-//   // The multi handle must be cleaned (via destuctor) before poll handles attached to them are removed (via walking and closing).
-//   delete downloader;
-//   while (uv_loop_alive(uvLoop) && uv_loop_close(uvLoop) == UV_EBUSY) {
-//     uv_walk(uvLoop, closeAllHandles, nullptr);
-//     uv_run(uvLoop, UV_RUN_ONCE);
-//   }
-//   delete uvLoop;
-// }
+  // Check if test timer and external loop are still alive
+  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) !=  0);
+  BOOST_CHECK(uv_loop_alive(uvLoop) != 0);
+
+  // Downloader must be closed before uv_loop.
+  // The reason for that are the uv_poll handles attached to the curl multi handle.
+  // The multi handle must be cleaned (via destuctor) before poll handles attached to them are removed (via walking and closing).
+  delete downloader;
+  while (uv_loop_alive(uvLoop) && uv_loop_close(uvLoop) == UV_EBUSY) {
+    uv_walk(uvLoop, closeAllHandles, nullptr);
+    uv_run(uvLoop, UV_RUN_ONCE);
+  }
+  delete uvLoop;
+}
 
 } // namespace ccdb
 } // namespace o2
