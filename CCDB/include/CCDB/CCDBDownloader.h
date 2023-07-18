@@ -34,17 +34,15 @@ using namespace std;
 
 namespace o2::ccdb
 {
-
-  // TODO move and check comment
 /**
- * Contains the results of asynchronous call. It is updated from via runnign mUVLoop.
- * Data stored in those structs needs to be freed after it's transfer finishes.
- * If callback is not used then callbackFinished is a nullptr thus must not be freed.
+ * Contains the results of asynchronous call. It is updated via running mUVLoop.
+ * Data stored in those structs needs to be freed after its transfer finishes.
+ * If callback was not scheduled (via batchAsynchWithCallback) then callbackFinished is a nullptr thus must not be freed.
  */
 typedef struct AsynchronousResults {
-  std::vector<CURLcode>* curlCodes;
-  size_t* requestsLeft;
-  bool* callbackFinished;
+  shared_ptr<std::vector<CURLcode>> curlCodes;
+  shared_ptr<size_t> requestsLeft;
+  shared_ptr<bool> callbackFinished;
 } AsynchronousResults;
 
 /*
@@ -150,7 +148,6 @@ class CCDBDownloader
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
-  // TODO check
   /**
    * Schedules performing on a batch of handles. To perform run the mUVLoop.
    *
@@ -158,15 +155,14 @@ class CCDBDownloader
    */
   struct AsynchronousResults batchAsynchPerform(std::vector<CURL*> const& handleVector);
 
-  // TODO check
   /**
-   * Schedules performing on a batch of handles. To perform run the mUVLoop. After all callbacks finish it will execute func(arg)
+   * Schedules performing on a batch of handles. To perform run the mUVLoop. After all callbacks finish it will execute `func(arg)`
    *
    * @param handleVector Handles to be performed on.
    * @param func Function to be called as callback.
    * @param arg Argument to be passed to func.
    */
-  struct AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
+  // struct AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
 
   /**
    * Limits the number of parallel connections. Should be used only if no transfers are happening.
@@ -288,7 +284,7 @@ class CCDBDownloader
     CURLcode* codeDestination;
     void (*cbFun)(void*);
     void* cbData;
-    size_t* requestsLeft;
+    shared_ptr<size_t> requestsLeft;
     RequestType type;
     bool* callbackFinished;
   } PerformData;
