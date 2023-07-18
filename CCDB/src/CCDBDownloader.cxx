@@ -55,6 +55,20 @@ void curlMultiErrorCheck(CURLMcode code)
   }
 }
 
+namespace
+{
+std::string uniqueAgentID()
+{
+  std::string host = boost::asio::ip::host_name();
+  char const* jobID = getenv("ALIEN_PROC_ID");
+  if (jobID) {
+    return fmt::format("{}-{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6), jobID);
+  } else {
+    return fmt::format("{}-{}-{}", host, getCurrentTimestamp() / 1000, o2::utils::Str::getRandomString(6));
+  }
+}
+} // namespace
+
 CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
   : mUserAgentId(uniqueAgentID())
 {
