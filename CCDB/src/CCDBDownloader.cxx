@@ -485,7 +485,6 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
 
 struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
 {
-  std::vector<CURLcode> codeVector(handleVector.size());
   size_t requestsLeft = handleVector.size();
   struct AsynchronousResults results;
 
