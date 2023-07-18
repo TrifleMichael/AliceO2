@@ -64,18 +64,12 @@ void checkCodesAndCleanHandles(std::vector<CURL*> handleVector, std::vector<CURL
 {
   for (CURLcode code : curlCodes) {
     BOOST_CHECK(code == CURLE_OK);
-    if (code != CURLE_OK) {
-      std::cout << "CURL Code: " << code << "\n";
-    }
   }
 
   for (CURL* handle : handleVector) {
     long httpCode;
     curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
     BOOST_CHECK(httpCode == 200);
-    if (httpCode != 200) {
-      std::cout << "HTTP Code: " << httpCode << "\n";
-    }
     curl_easy_cleanup(handle);
   }
 }
@@ -105,12 +99,10 @@ BOOST_AUTO_TEST_CASE(perform_test)
   CURLcode curlCode = downloader.perform(handle);
 
   BOOST_CHECK(curlCode == CURLE_OK);
-  std::cout << "CURL code: " << curlCode << "\n";
 
   long httpCode;
   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
   BOOST_CHECK(httpCode == 200);
-  std::cout << "HTTP code: " << httpCode << "\n";
 
   curl_easy_cleanup(handle);
   curl_global_cleanup();
@@ -248,11 +240,13 @@ BOOST_AUTO_TEST_CASE(external_loop_test)
   delete uvLoop;
 }
 
-BOOST_AUTO_TEST_CASE(asynchTest)
+BOOST_AUTO_TEST_CASE(asynch_test)
 {
+  // Prepare uv_loop to be provided to the downloader
   auto uvLoop = new uv_loop_t();
   uv_loop_init(uvLoop);
 
+  // Prepare test timer. It will be used to check whether the downloader affects external handles.
   auto testTimer = new uv_timer_t();
   uv_timer_init(uvLoop, testTimer);
   uv_timer_start(testTimer, testTimerCB, 10, 10);
@@ -262,7 +256,7 @@ BOOST_AUTO_TEST_CASE(asynchTest)
     return;
   }
 
-  // Regular downloader test
+  // Regular downloader test using asynchronous perform
   auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
   std::string dst = "";
   CURL* handle = createTestHandle(&dst);
@@ -272,10 +266,12 @@ BOOST_AUTO_TEST_CASE(asynchTest)
 
   auto results = downloader->batchAsynchPerform(handleVector);
 
+  // Run loop until all requests are finished
   while (*results.requestsLeft > 0) {
     downloader->runLoop(false);
   }
 
+  // Check results
   CURLcode curlCode = (*results.curlCodes)[0];
   BOOST_CHECK(curlCode == CURLE_OK);
 
@@ -309,9 +305,11 @@ void testCallback(void* p)
 
 BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
 {
+  // Prepare uv_loop to be provided to the downloader
   auto uvLoop = new uv_loop_t();
   uv_loop_init(uvLoop);
 
+  // Prepare test timer. It will be used to check whether the downloader affects external handles.
   auto testTimer = new uv_timer_t();
   uv_timer_init(uvLoop, testTimer);
   uv_timer_start(testTimer, testTimerCB, 10, 10);
@@ -321,6 +319,7 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
     return;
   }
 
+  // Test the downloader
   auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
   std::string dst = "";
   CURL* handle = createTestHandle(&dst);
@@ -328,14 +327,17 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
 
-  int x = 0;
-  auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &x);
+  // x will be modified in the callback
+  int testVariable = 0;
+  auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &testVariable);
 
+  // Run the loop until requests are done and the callback is finished
   while (*results.requestsLeft > 0 || !(*results.callbackFinished)) {
     downloader->runLoop(false);
   }
 
-  BOOST_CHECK(x == 1);
+  // Check results
+  BOOST_CHECK(testVariable == 1);
 
   CURLcode curlCode = (*results.curlCodes)[0];
   BOOST_CHECK(curlCode == CURLE_OK);
