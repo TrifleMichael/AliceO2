@@ -34,16 +34,6 @@ using namespace std;
 
 namespace o2::ccdb
 {
-/** TODO : Relocate this struct?
- * Contains the results of asynchronous call. It is updated via running mUVLoop.
- * Shared pointers are used to avoid the need to free members of this structor manually before deleting the struct.
- */
-typedef struct AsynchronousResults {
-  shared_ptr<std::vector<CURLcode>> curlCodes;
-  shared_ptr<size_t> requestsLeft;
-  shared_ptr<bool> callbackFinished;
-} AsynchronousResults;
-
 /*
  Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.
  Because non-static functions are used in the functions below, they must be non-member.
@@ -83,6 +73,15 @@ void onUVClose(uv_handle_t* handle);
 class CCDBDownloader
 {
  public:
+  /** TODO : Relocate this struct?
+   * Contains the results of asynchronous call. It is updated via running mUVLoop.
+   * Shared pointers are used to avoid the need to free members of this structor manually before deleting the struct.
+   */
+  typedef struct {
+    shared_ptr<std::vector<CURLcode>> curlCodes;
+    shared_ptr<size_t> requestsLeft;
+    shared_ptr<bool> callbackFinished;
+  } AsynchronousResults;
 
   /**
    * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
@@ -152,7 +151,7 @@ class CCDBDownloader
    *
    * @param handleVector Handles to be performed on.
    */
-  struct AsynchronousResults batchAsynchPerform(std::vector<CURL*> const& handleVector);
+  AsynchronousResults batchAsynchPerform(std::vector<CURL*> const& handleVector);
 
   /**
    * Schedules performing on a batch of handles. To perform run the mUVLoop. After all callbacks finish it will execute `func(arg)`
@@ -161,7 +160,7 @@ class CCDBDownloader
    * @param func Function to be called as callback.
    * @param arg Argument to be passed to func.
    */
-  struct AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
+  AsynchronousResults batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
 
   /**
    * Limits the number of parallel connections. Should be used only if no transfers are happening.
@@ -291,7 +290,7 @@ class CCDBDownloader
   typedef struct CallbackData {
     void (*cbFun)(void*);
     void* cbData;
-    bool* callbackFinished;
+    shared_ptr<bool> callbackFinished;
   } CallbackData;
 
   /**
@@ -358,7 +357,6 @@ class CCDBDownloader
    */
   void initializeMultiHandle();
 
-  // TODO Check
   /**
    * Schedules the callback function to run via uv_work.
    *

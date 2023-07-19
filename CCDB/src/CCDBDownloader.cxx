@@ -477,8 +477,7 @@ CURLcode CCDBDownloader::perform(CURL* handle)
 std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> const& handleVector)
 {
   std::vector<CURLcode> codeVector(handleVector.size());
-  // requestsLeft is a shared pointer to adhere to type handled by AsynchronousResults
-  // AsynchronousResults uses shared pointers so that it's members don't have to be manually freed after request is done
+  // requestsLeft is a shared pointer to adhere to type handled by PerformData
   auto requestsLeft = std::make_shared<size_t>();
   *requestsLeft = handleVector.size();
 
@@ -494,16 +493,16 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
     mHandlesToBeAdded.push_back(handleVector[i]);
   }
   checkHandleQueue();
-  while (requestsLeft > 0) {
+  while (*requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
   }
   return codeVector;
 }
 
-struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
+CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
 {
   size_t requestsLeft = handleVector.size();
-  struct AsynchronousResults results;
+  AsynchronousResults results;
   // AsynchronousResults uses shared pointers so that it's members don't have to be manually freed after request is done
 
   results.requestsLeft = std::make_shared<size_t>();
@@ -527,9 +526,9 @@ struct AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*>
   return results;
 }
 
-struct AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
+CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
 {
-  struct AsynchronousResults results;
+  AsynchronousResults results;
 
   results.requestsLeft = std::make_shared<size_t>();
   *results.requestsLeft = handleVector.size();
@@ -554,5 +553,7 @@ struct AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<C
   checkHandleQueue();
   return results;
 }
+
+} // namespace o2
 
 } // namespace o2
