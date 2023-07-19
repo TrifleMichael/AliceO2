@@ -9,7 +9,5 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-#include "FDDRaw/DigitBlockFDD.h"
-
-template class o2::fit::DigitBlockFIT<o2::fdd::SingleLUT, o2::fdd::Digit, o2::fdd::ChannelData>;
-template class o2::fit::DigitBlockFIText<o2::fdd::SingleLUT, o2::fdd::Digit, o2::fdd::ChannelData, o2::fdd::TriggersExt>;
+#include "Generators/PrimaryGeneratorParam.h"
+O2ParamImpl(o2::eventgen::PrimaryGeneratorParam);
