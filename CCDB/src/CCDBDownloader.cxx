@@ -37,21 +37,21 @@ void uvErrorCheck(int code)
   if (code != 0) {
     char buf[1000];
     uv_strerror_r(code, buf, 1000);
-    std::cout << "CCDBDownloader: UV error - " << buf;
+    LOG(error) << "CCDBDownloader: UV error - " << buf;
   }
 }
 
 void curlEasyErrorCheck(CURLcode code)
 {
   if (code != CURLE_OK) {
-    std::cout << "CCDBDownloader: CURL error - " << curl_easy_strerror(code);
+    LOG(error) << "CCDBDownloader: CURL error - " << curl_easy_strerror(code);
   }
 }
 
 void curlMultiErrorCheck(CURLMcode code)
 {
   if (code != CURLM_OK) {
-    std::cout << "CCDBDownloader: CURL error - " << curl_multi_strerror(code);
+    LOG(error) << "CCDBDownloader: CURL error - " << curl_multi_strerror(code);
   }
 }
 
@@ -161,7 +161,7 @@ void CCDBDownloader::closesocketCallback(void* clientp, curl_socket_t item)
     }
   } else {
     if (close(item) == -1) {
-      std::cout << "CCDBDownloader: Socket failed to close";
+      LOG(error) << "CCDBDownloader: Socket failed to close";
     }
   }
 }
@@ -171,7 +171,7 @@ curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct cur
   auto CD = (CCDBDownloader*)clientp;
   auto sock = socket(address->family, address->socktype, address->protocol);
   if (sock == -1) {
-    std::cout << "CCDBDownloader: Socket failed to open";
+    LOG(error) << "CCDBDownloader: Socket failed to open";
   }
 
   if (CD->mExternalLoop) {
@@ -198,7 +198,7 @@ void CCDBDownloader::closeSocketByTimer(uv_timer_t* handle)
     uvErrorCheck(uv_timer_stop(CD->mSocketTimerMap[sock]));
     CD->mSocketTimerMap.erase(sock);
     if (close(sock) == -1) {
-      std::cout << "CCDBDownloader: Socket failed to close";
+      LOG(error) << "CCDBDownloader: Socket failed to close";
     }
     delete data;
   }
@@ -364,7 +364,7 @@ void CCDBDownloader::uvCallbackWrapper(CallbackData* data)
   auto workHandle = new uv_work_t();
   mHandleMap[(uv_handle_t*)(workHandle)] = true;
   workHandle->data = data;
-  uv_queue_work(mUVLoop, workHandle, uvWorkWrapper, afterWorkCleanup); // TODO: Close in after work
+  uv_queue_work(mUVLoop, workHandle, uvWorkWrapper, afterWorkCleanup);
 }
 
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)

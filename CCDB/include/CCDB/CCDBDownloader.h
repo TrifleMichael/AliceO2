@@ -34,6 +34,7 @@ using namespace std;
 
 namespace o2::ccdb
 {
+
 /*
  Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.
  Because non-static functions are used in the functions below, they must be non-member.

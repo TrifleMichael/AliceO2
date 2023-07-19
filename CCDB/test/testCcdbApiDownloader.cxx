@@ -303,8 +303,6 @@ void testCallback(void* p)
   (*i)++;
 }
 
-// TODO Describe shared pointers in all instances of tests
-
 BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
 {
   // Prepare uv_loop to be provided to the downloader
@@ -329,7 +327,7 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
 
-  // x will be modified in the callback
+  // testVariable will be modified in the callback
   int testVariable = 0;
   auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &testVariable);
 
