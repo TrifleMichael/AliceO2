@@ -73,16 +73,6 @@ void onUVClose(uv_handle_t* handle);
 class CCDBDownloader
 {
  public:
-  /** TODO : Relocate this struct?
-   * Contains the results of asynchronous call. It is updated via running mUVLoop.
-   * Shared pointers are used to avoid the need to free members of this structor manually before deleting the struct.
-   */
-  typedef struct {
-    shared_ptr<std::vector<CURLcode>> curlCodes;
-    shared_ptr<size_t> requestsLeft;
-    shared_ptr<bool> callbackFinished;
-  } AsynchronousResults;
-
   /**
    * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
    * When the timer runs out it closes the socket. The period for which socket stays open is defined by socketTimeoutMS.
@@ -147,6 +137,16 @@ class CCDBDownloader
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
   /**
+   * Contains the results of asynchronous call. It is updated via running mUVLoop.
+   * Shared pointers are used to avoid the need to free members of this structor manually before deleting the struct.
+   */
+  typedef struct {
+    shared_ptr<std::vector<CURLcode>> curlCodes;
+    shared_ptr<size_t> requestsLeft;
+    shared_ptr<bool> callbackFinished;
+  } AsynchronousResults;
+
+  /**
    * Schedules performing on a batch of handles. To perform run the mUVLoop.
    *
    * @param handleVector Handles to be performed on.
@@ -197,20 +197,13 @@ class CCDBDownloader
    */
   void setOnlineTimeoutSettings();
 
-  /** // TODO check, maybe move DESCRIBE status
+  /**
    * Is called a short time after uvWorkWrapper finished executing.
    *
    * @param workHandle Work handle which was used to perform the callback.
-   * @param status Not used but required by template. Its value will be set as UV_ECANCELED if the callback was cancelled.
+   * @param status Not used but required by template. Its value would be set as UV_ECANCELED if the callback was cancelled.
    */
-  static void afterWorkCleanup(uv_work_t *req, int status); 
-
-  /** // TODO check, maybe move
-   * Wrapper which calls the uv_queue_work. Used in asynchronous callbacks.
-   *
-   * @param workHandle Work handle that will be used to perform the callback.
-   */
-  static void uvWorkWrapper(uv_work_t* workHandle);
+  static void afterWorkCleanup(uv_work_t *req, int status);
 
   /**
    * Run the uvLoop once.
@@ -393,6 +386,13 @@ class CCDBDownloader
    * If multi_handles uses less then maximum number of handles then add handles from the queue.
    */
   void checkHandleQueue();
+
+  /**
+   * Wrapper which calls the uv_queue_work. Used in asynchronous callbacks.
+   *
+   * @param workHandle Work handle that will be used to perform the callback.
+   */
+  static void uvWorkWrapper(uv_work_t* workHandle);
 };
 
 /**

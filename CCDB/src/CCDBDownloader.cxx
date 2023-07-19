@@ -555,5 +555,3 @@ CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std:
 }
 
 } // namespace o2
-
-} // namespace o2
