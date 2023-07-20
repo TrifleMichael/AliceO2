@@ -17,10 +17,8 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <unordered_map>
+#include <unordered_set>
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
@@ -85,10 +83,13 @@ class CCDBDownloader
    */
   uv_loop_t* mUVLoop;
 
-  /**
+  /** TODO REMOVE
    * Map used to store active uv_handles belonging to the CcdbDownloader. If internal uv_loop is used, then all uv_handles should be marked in this map.
    */
-  std::unordered_map<uv_handle_t*, bool> mHandleMap;
+  // std::unordered_map<uv_handle_t*, bool> mHandleMap;
+
+  // TODO Comment
+  std::unordered_set<uv_handle_t*> mHandleSet;
 
   /**
    * Time for which sockets will stay open after last download finishes

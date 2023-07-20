@@ -13,16 +13,14 @@
 #include "CommonUtils/StringUtils.h"
 #include "CCDB/CCDBTimeStampUtils.h"
 
-#include <curl/curl.h>
-#include <unordered_map>
-#include <cstdio>
-#include <cstdlib>
+// #include <curl/curl.h>
+// #include <unordered_map>
+// #include <unordered_set>
+// #include <cstdio>
+// #include <cstdlib>
 #include <uv.h>
-#include <string>
-#include <thread>
-#include <vector>
-#include <condition_variable>
-#include <mutex>
+// #include <string>
+// #include <vector>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -84,7 +82,7 @@ CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
   mTimeoutTimer = new uv_timer_t();
   mTimeoutTimer->data = this;
   uvErrorCheck(uv_timer_init(mUVLoop, mTimeoutTimer));
-  mHandleMap[(uv_handle_t*)mTimeoutTimer] = true;
+  mHandleSet.insert((uv_handle_t*)mTimeoutTimer);
 
   initializeMultiHandle();
 }
@@ -127,7 +125,7 @@ void closeHandles(uv_handle_t* handle, void* arg)
 {
   auto CD = (CCDBDownloader*)arg;
   // Close only handles belonging to the Downloader
-  if (CD->mHandleMap.find(handle) != CD->mHandleMap.end()) {
+  if (CD->mHandleSet.find(handle) != CD->mHandleSet.end()) {
     if (!uv_is_closing(handle)) {
       uv_close(handle, onUVClose);
     }
@@ -177,7 +175,7 @@ curl_socket_t opensocketCallback(void* clientp, curlsocktype purpose, struct cur
   if (CD->mExternalLoop) {
     CD->mSocketTimerMap[sock] = new uv_timer_t();
     uvErrorCheck(uv_timer_init(CD->mUVLoop, CD->mSocketTimerMap[sock]));
-    CD->mHandleMap[(uv_handle_t*)CD->mSocketTimerMap[sock]] = true;
+    CD->mHandleSet.insert((uv_handle_t*)CD->mSocketTimerMap[sock]);
 
     auto data = new DataForClosingSocket();
     data->CD = CD;
@@ -327,7 +325,7 @@ CCDBDownloader::curl_context_t* CCDBDownloader::createCurlContext(curl_socket_t 
   context->poll_handle = new uv_poll_t();
 
   uvErrorCheck(uv_poll_init_socket(mUVLoop, context->poll_handle, sockfd));
-  mHandleMap[(uv_handle_t*)(context->poll_handle)] = true;
+  mHandleSet.insert((uv_handle_t*)context->poll_handle);
   context->poll_handle->data = context;
 
   return context;
@@ -362,7 +360,7 @@ void CCDBDownloader::uvWorkWrapper(uv_work_t* workHandle)
 void CCDBDownloader::uvCallbackWrapper(CallbackData* data)
 {
   auto workHandle = new uv_work_t();
-  mHandleMap[(uv_handle_t*)(workHandle)] = true;
+  mHandleSet.insert((uv_handle_t*)workHandle);
   workHandle->data = data;
   uv_queue_work(mUVLoop, workHandle, uvWorkWrapper, afterWorkCleanup);
 }
