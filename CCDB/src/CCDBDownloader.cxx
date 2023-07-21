@@ -13,14 +13,7 @@
 #include "CommonUtils/StringUtils.h"
 #include "CCDB/CCDBTimeStampUtils.h"
 
-// #include <curl/curl.h>
-// #include <unordered_map>
-// #include <unordered_set>
-// #include <cstdio>
-// #include <cstdlib>
 #include <uv.h>
-// #include <string>
-// #include <vector>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
