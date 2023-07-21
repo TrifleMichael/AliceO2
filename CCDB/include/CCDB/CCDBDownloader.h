@@ -84,12 +84,9 @@ class CCDBDownloader
    */
   uv_loop_t* mUVLoop;
 
-  /** TODO REMOVE
-   * Map used to store active uv_handles belonging to the CcdbDownloader. If internal uv_loop is used, then all uv_handles should be marked in this map.
+  /**
+   * Set used to store active uv_handles belonging to the CcdbDownloader. If internal uv_loop is used, then all uv_handles should be marked in this set.
    */
-  // std::unordered_map<uv_handle_t*, bool> mHandleMap;
-
-  // TODO Comment
   std::unordered_set<uv_handle_t*> mHandleSet;
 
   /**
