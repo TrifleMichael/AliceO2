@@ -19,6 +19,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
+#include <memory>
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
