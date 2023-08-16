@@ -137,14 +137,12 @@ class CCDBDownloader
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
-  /**
-   * Contains the results of asynchronous call. It is updated via running mUVLoop.
-   * Shared pointers are used to avoid the need to free members of this structor manually before deleting the struct.
-   */
+  // TODO: Comment
   typedef struct {
-    shared_ptr<std::vector<CURLcode>> curlCodes;
-    shared_ptr<size_t> requestsLeft;
-    shared_ptr<bool> callbackFinished;
+    std::<CURLcode> curlCodes;
+    std::vector<bool> transferFinishedVector;
+    size_t requestsLeft;
+    bool callbackFinished;
   } AsynchronousResults;
 
   /**
@@ -276,9 +274,10 @@ class CCDBDownloader
     CURLcode* codeDestination;
     void (*cbFun)(void*);
     void* cbData;
-    shared_ptr<size_t> requestsLeft;
+    size_t* requestsLeft;
     RequestType type;
-    shared_ptr<bool> callbackFinished;
+    bool* callbackFinished;
+    bool* transferFinished;
   } PerformData;
 
   typedef struct CallbackData {

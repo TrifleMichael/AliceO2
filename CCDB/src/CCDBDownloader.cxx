@@ -375,6 +375,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
   *data->codeDestination = curlCode;
+  *data->transferFinished = true;
 
   // If no requests left then signal finished based on type of operation
   if (--(*data->requestsLeft) == 0) {
@@ -478,16 +479,16 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
 {
   std::vector<CURLcode> codeVector(handleVector.size());
   // requestsLeft is a shared pointer to adhere to type handled by PerformData
-  auto requestsLeft = std::make_shared<size_t>();
-  *requestsLeft = handleVector.size();
+  size_t requestsLeft = handleVector.size();
 
   for (int i = 0; i < handleVector.size(); i++) {
     auto* data = new CCDBDownloader::PerformData();
     data->codeDestination = &codeVector[i];
     codeVector[i] = CURLE_FAILED_INIT;
+    results->transferFinishedVector[i] = false;
 
     data->type = BLOCKING;
-    data->requestsLeft = requestsLeft;
+    data->requestsLeft = &requestsLeft;
 
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);
@@ -501,23 +502,22 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
 
 CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
 {
-  size_t requestsLeft = handleVector.size();
-  AsynchronousResults results;
-  // AsynchronousResults uses shared pointers so that it's members don't have to be manually freed after request is done
+  AsynchronousResults* results = new AsynchronousResults();
 
-  results.requestsLeft = std::make_shared<size_t>();
-  *results.requestsLeft = handleVector.size();
-  results.curlCodes = std::make_shared<std::vector<CURLcode>>(handleVector.size());
-  results.callbackFinished = std::make_shared<bool>();
-  *results.callbackFinished = true; // No callback has been scheduled
+  results->requestsLeft = handleVector.size();
+  results->curlCodes.reserve(handleVector.size());
+  results->transferFinishedVector.reserve(handleVector.size());
+  results->callbackFinished = true; // No callback has been scheduled
 
   for (int i = 0; i < handleVector.size(); i++) {
-    auto* data = new CCDBDownloader::PerformData();
-    data->codeDestination = &(*results.curlCodes)[i];
-    (*results.curlCodes)[i] = CURLE_FAILED_INIT;
+    results->curlCodes[i] = CURLE_FAILED_INIT;
+    results->transferFinishedVector[i] = false;
 
+    auto* data = new CCDBDownloader::PerformData();
+    data->codeDestination = &(results->curlCodes[i]);
+    data->transferFinished = &(results->transferFinishedVector);
     data->type = ASYNCHRONOUS;
-    data->requestsLeft = results.requestsLeft;
+    data->requestsLeft = &results->requestsLeft;
 
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);
@@ -526,32 +526,32 @@ CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vect
   return results;
 }
 
-CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
-{
-  AsynchronousResults results;
+// CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
+// {
+//   AsynchronousResults results;
 
-  results.requestsLeft = std::make_shared<size_t>();
-  *results.requestsLeft = handleVector.size();
-  results.curlCodes = std::make_shared<std::vector<CURLcode>>(handleVector.size());
-  results.callbackFinished = std::make_shared<bool>();
-  *results.callbackFinished = false;
+//   results.requestsLeft = std::make_shared<size_t>();
+//   *results.requestsLeft = handleVector.size();
+//   results.curlCodes = std::make_shared<std::vector<CURLcode>>(handleVector.size());
+//   results.callbackFinished = std::make_shared<bool>();
+//   *results.callbackFinished = false;
 
-  for (int i = 0; i < handleVector.size(); i++) {
-    auto* data = new CCDBDownloader::PerformData();
-    data->codeDestination = &(*results.curlCodes)[i];
-    data->cbFun = func;
-    data->cbData = arg;
-    data->callbackFinished = results.callbackFinished;
-    (*results.curlCodes)[i] = CURLE_FAILED_INIT;
+//   for (int i = 0; i < handleVector.size(); i++) {
+//     auto* data = new CCDBDownloader::PerformData();
+//     data->codeDestination = &(*results.curlCodes)[i];
+//     data->cbFun = func;
+//     data->cbData = arg;
+//     data->callbackFinished = results.callbackFinished;
+//     (*results.curlCodes)[i] = CURLE_FAILED_INIT;
 
-    data->type = ASYNCHRONOUS_WITH_CALLBACK;
-    data->requestsLeft = results.requestsLeft;
+//     data->type = ASYNCHRONOUS_WITH_CALLBACK;
+//     data->requestsLeft = results.requestsLeft;
 
-    setHandleOptions(handleVector[i], data);
-    mHandlesToBeAdded.push_back(handleVector[i]);
-  }
-  checkHandleQueue();
-  return results;
-}
+//     setHandleOptions(handleVector[i], data);
+//     mHandlesToBeAdded.push_back(handleVector[i]);
+//   }
+//   checkHandleQueue();
+//   return results;
+// }
 
 } // namespace o2
