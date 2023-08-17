@@ -345,28 +345,6 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
   uv_close((uv_handle_t*)context->poll_handle, curlCloseCB);
 }
 
-void CCDBDownloader::afterWorkCleanup(uv_work_t* workHandle, int status)
-{
-  auto data = (CallbackData*)workHandle->data;
-  delete data;
-  delete workHandle;
-}
-
-void CCDBDownloader::uvWorkWrapper(uv_work_t* workHandle)
-{
-  auto data = (CallbackData*)workHandle->data;
-  data->cbFun(data->cbData);
-  *data->callbackFinished = true;
-}
-
-void CCDBDownloader::uvCallbackWrapper(CallbackData* data)
-{
-  auto workHandle = new uv_work_t();
-  mHandleMap[(uv_handle_t*)(workHandle)] = true;
-  workHandle->data = data;
-  uv_queue_work(mUVLoop, workHandle, uvWorkWrapper, afterWorkCleanup);
-}
-
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
   mHandlesInUse--;
@@ -375,7 +353,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
   *data->codeDestination = curlCode;
-  *data->transferFinished = true;
 
   // If no requests left then signal finished based on type of operation
   if (--(*data->requestsLeft) == 0) {
@@ -383,13 +360,9 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       case BLOCKING:
         break;
       case ASYNCHRONOUS:
+        *data->transferFinished = 1; // TODO: Comment why no blocking transferFinished
         break;
-      case ASYNCHRONOUS_WITH_CALLBACK:
-        auto CBData = new CallbackData();
-        CBData->cbFun = data->cbFun;
-        CBData->cbData = data->cbData;
-        CBData->callbackFinished = data->callbackFinished;
-        uvCallbackWrapper(CBData);
+      case ASYNCHRONOUS_WITH_CALLBACK: // To be added
         break;
     }
   }
@@ -485,7 +458,6 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
     auto* data = new CCDBDownloader::PerformData();
     data->codeDestination = &codeVector[i];
     codeVector[i] = CURLE_FAILED_INIT;
-    results->transferFinishedVector[i] = false;
 
     data->type = BLOCKING;
     data->requestsLeft = &requestsLeft;
@@ -494,28 +466,30 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
     mHandlesToBeAdded.push_back(handleVector[i]);
   }
   checkHandleQueue();
-  while (*requestsLeft > 0) {
+  while (requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
   }
   return codeVector;
 }
 
-CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
+CCDBDownloader::AsynchronousResults* CCDBDownloader::batchAsynchPerform(std::vector<CURL*> const& handleVector)
 {
   AsynchronousResults* results = new AsynchronousResults();
 
   results->requestsLeft = handleVector.size();
+
+  // In 'for' below we will save pointers to locations in the vectors curlCodes and transferFinishedVector
+  // To make sure the vectors aren't relocated after saving pointers we set the proper size in advance
   results->curlCodes.reserve(handleVector.size());
   results->transferFinishedVector.reserve(handleVector.size());
-  results->callbackFinished = true; // No callback has been scheduled
 
   for (int i = 0; i < handleVector.size(); i++) {
     results->curlCodes[i] = CURLE_FAILED_INIT;
-    results->transferFinishedVector[i] = false;
+    results->transferFinishedVector[i] = 0;
 
     auto* data = new CCDBDownloader::PerformData();
-    data->codeDestination = &(results->curlCodes[i]);
-    data->transferFinished = &(results->transferFinishedVector);
+    data->codeDestination = &results->curlCodes[i];
+    data->transferFinished = &results->transferFinishedVector[i];
     data->type = ASYNCHRONOUS;
     data->requestsLeft = &results->requestsLeft;
 
@@ -526,32 +500,12 @@ CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchPerform(std::vect
   return results;
 }
 
-// CCDBDownloader::AsynchronousResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
-// {
-//   AsynchronousResults results;
-
-//   results.requestsLeft = std::make_shared<size_t>();
-//   *results.requestsLeft = handleVector.size();
-//   results.curlCodes = std::make_shared<std::vector<CURLcode>>(handleVector.size());
-//   results.callbackFinished = std::make_shared<bool>();
-//   *results.callbackFinished = false;
-
-//   for (int i = 0; i < handleVector.size(); i++) {
-//     auto* data = new CCDBDownloader::PerformData();
-//     data->codeDestination = &(*results.curlCodes)[i];
-//     data->cbFun = func;
-//     data->cbData = arg;
-//     data->callbackFinished = results.callbackFinished;
-//     (*results.curlCodes)[i] = CURLE_FAILED_INIT;
-
-//     data->type = ASYNCHRONOUS_WITH_CALLBACK;
-//     data->requestsLeft = results.requestsLeft;
-
-//     setHandleOptions(handleVector[i], data);
-//     mHandlesToBeAdded.push_back(handleVector[i]);
-//   }
-//   checkHandleQueue();
-//   return results;
-// }
+std::vector<CURLcode>::iterator CCDBDownloader::getAll(CCDBDownloader::AsynchronousResults* asynchResults)
+{
+  while (asynchResults->requestsLeft > 0) {
+    runLoop(false);
+  }
+  return asynchResults->curlCodes.begin();
+}
 
 } // namespace o2
