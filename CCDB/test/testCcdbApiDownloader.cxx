@@ -271,7 +271,7 @@ BOOST_AUTO_TEST_CASE(asynch_test)
     BOOST_CHECK(*curlCodesIterator == CURLE_OK);
   }
 
-  for(int i = 0; i < handleVector.size(); i++) {
+  for (int i = 0; i < handleVector.size(); i++) {
     long httpCode;
     curl_easy_getinfo(handleVector[i], CURLINFO_HTTP_CODE, &httpCode);
     BOOST_CHECK(httpCode == 200);
