@@ -292,7 +292,7 @@ class CCDBDownloader
   static void closesocketCallback(void* clientp, curl_socket_t item);
 
   /**
-   *  Is used to react to polling file descriptors in poll_handle.
+   * Is used to react to polling file descriptors in poll_handle.
    *
    * @param handle Handle assigned to this callback.
    * @param status Used to signal errors.
@@ -379,7 +379,7 @@ class CCDBDownloader
 };
 
 /**
- * Structure assigned  to a uv_timer_t before adding it to socketTimerMap. It stores the information about the socket connected to the timer.
+ * Structure assigned to a uv_timer_t before adding it to socketTimerMap. It stores the information about the socket connected to the timer.
  */
 typedef struct DataForClosingSocket {
   CCDBDownloader* CD;
