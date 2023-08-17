@@ -317,6 +317,28 @@ void CCDBDownloader::setOnlineTimeoutSettings()
   setHappyEyeballsHeadstartTime(500);
 }
 
+void CCDBDownloader::afterWorkCleanup(uv_work_t* workHandle, int status)
+{
+  auto data = (CallbackData*)workHandle->data;
+  delete data;
+  delete workHandle;
+}
+
+void CCDBDownloader::uvWorkWrapper(uv_work_t* workHandle)
+{
+  auto data = (CallbackData*)workHandle->data;
+  data->cbFun(data->cbData);
+  *data->callbackFinished = true;
+}
+
+void CCDBDownloader::uvCallbackWrapper(CallbackData* data)
+{
+  auto workHandle = new uv_work_t();
+  mHandleMap[(uv_handle_t*)(workHandle)] = true;
+  workHandle->data = data;
+  uv_queue_work(mUVLoop, workHandle, uvWorkWrapper, afterWorkCleanup);
+}
+
 CCDBDownloader::curl_context_t* CCDBDownloader::createCurlContext(curl_socket_t sockfd)
 {
   curl_context_t* context;
@@ -355,6 +377,24 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   *data->codeDestination = curlCode;
   *data->transferFinished = true;
   --(*data->requestsLeft);
+
+  if (--(*data->requestsLeft) == 0) {
+    switch (data->type) {
+      case BLOCKING:
+        break;
+      case ASYNCHRONOUS:
+        break;
+      case ASYNCHRONOUS_WITH_CALLBACK:
+        auto CBData = new CallbackData();
+        CBData->cbFun = data->cbFun;
+        CBData->cbData = data->cbData;
+        CBData->callbackFinished = data->callbackFinished;
+        uvCallbackWrapper(CBData);
+        break;
+    }
+  }
+
+
   delete data;
 
   checkHandleQueue();
@@ -496,6 +536,22 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchAsynchPerform(std::vector<
   checkHandleQueue();
   return results;
 }
+
+CCDBDownloader::TransferResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
+{
+  auto results = prepareResultsStruct(handleVector.size());
+
+  for (int handleIndex = 0; handleIndex < handleVector.size(); handleIndex++) {
+    auto* data = createPerformData(handleIndex, results, ASYNCHRONOUS_WITH_CALLBACK);
+    data->cbFun = func;
+    data->cbData = arg;
+    setHandleOptions(handleVector[handleIndex], data);
+    mHandlesToBeAdded.push_back(handleVector[handleIndex]);
+  }
+  checkHandleQueue();
+  return results;
+}
+
 
 std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
 {

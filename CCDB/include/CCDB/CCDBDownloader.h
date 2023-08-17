@@ -265,7 +265,38 @@ class CCDBDownloader
     size_t* requestsLeft;
     RequestType type;
     vector<bool>::iterator transferFinished; // vector<bool> positions must be handled via iterators
+    void (*cbFun)(void*);
+    void* cbData;
   } PerformData;
+
+  // TODO comment
+  typedef struct CallbackData {
+    void (*cbFun)(void*);
+    void* cbData;
+    shared_ptr<bool> callbackFinished;
+  } CallbackData;
+
+  /* TODO double check
+   * Schedules the callback function to run via uv_work.
+   *
+   * @param data Data describing the function and arguments which will be used to perform callback.
+   */
+  void uvCallbackWrapper(CallbackData* data);
+
+  /** TODO double check
+   * Is called a short time after uvWorkWrapper finished executing.
+   *
+   * @param workHandle Work handle which was used to perform the callback.
+   * @param status Not used but required by template. Its value would be set as UV_ECANCELED if the callback was cancelled.
+   */
+  static void afterWorkCleanup(uv_work_t* req, int status);
+
+  /** TODO double check
+   * Wrapper which calls the uv_queue_work. Used in asynchronous callbacks.
+   *
+   * @param workHandle Work handle that will be used to perform the callback.
+   */
+  static void uvWorkWrapper(uv_work_t* workHandle);
 
   /**
    * PerformData is stored within a CURL handle and is used to retrieve and modify information about the batch it belongs to.
