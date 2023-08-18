@@ -328,7 +328,6 @@ void CCDBDownloader::uvWorkWrapper(uv_work_t* workHandle)
 {
   auto data = (CallbackData*)workHandle->data;
   data->cbFun(data->cbData);
-  *data->callbackFinished = true;
 }
 
 void CCDBDownloader::uvCallbackWrapper(CallbackData* data)
@@ -388,7 +387,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         auto CBData = new CallbackData();
         CBData->cbFun = data->cbFun;
         CBData->cbData = data->cbData;
-        CBData->callbackFinished = data->callbackFinished;
         uvCallbackWrapper(CBData);
         break;
     }
@@ -537,7 +535,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchAsynchPerform(std::vector<
   return results;
 }
 
-CCDBDownloader::TransferResults CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
+CCDBDownloader::TransferResults* CCDBDownloader::batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg)
 {
   auto results = prepareResultsStruct(handleVector.size());
 
@@ -551,7 +549,6 @@ CCDBDownloader::TransferResults CCDBDownloader::batchAsynchWithCallback(std::vec
   checkHandleQueue();
   return results;
 }
-
 
 std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
 {

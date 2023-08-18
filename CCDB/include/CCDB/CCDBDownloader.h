@@ -131,13 +131,6 @@ class CCDBDownloader
   CURLcode perform(CURL* handle);
 
   /**
-   * Perform on a batch of handles in a blocking manner. Has the same effect as calling curl_easy_perform() on all handles in the vector.
-   *
-   * @param handleVector Handles to be performed on.
-   */
-  std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
-
-  /**
    * Structure created for a batch of requests. Holds the information about current state of transfers from that batch.
    */
   typedef struct {
@@ -147,11 +140,27 @@ class CCDBDownloader
   } TransferResults;
 
   /**
+   * Perform on a batch of handles in a blocking manner. Has the same effect as calling curl_easy_perform() on all handles in the vector.
+   *
+   * @param handleVector Handles to be performed on.
+   */
+  std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
+
+  /**
    * Schedules performing on a batch of handles. To perform run the mUVLoop or use getAll().
    *
    * @param handleVector Handles to be performed on.
    */
   TransferResults* batchAsynchPerform(std::vector<CURL*> const& handleVector);
+
+  /**
+   * Schedules performing on a batch of handles. To perform run the mUVLoop. After all callbacks finish it will execute `func(arg)`
+   *
+   * @param handleVector Handles to be performed on.
+   * @param func Function to be called as callback.
+   * @param arg Argument to be passed to func.
+   */
+  TransferResults* batchAsynchWithCallback(std::vector<CURL*> const& handleVector, void func(void*), void* arg);
 
   /**
    * Performs on a batch of handles, identified via transfer results. It's the equivalent of using future.get()

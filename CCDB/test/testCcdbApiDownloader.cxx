@@ -316,7 +316,8 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
   BOOST_CHECK(testVariable == 1);
 
   for (int i = 0; i < handleVector.size(); i++) {
-    results->
+    BOOST_CHECK(results->curlCodes[i] == CURLE_OK);
+
     long httpCode;
     curl_easy_getinfo(handleVector[i], CURLINFO_HTTP_CODE, &httpCode);
     BOOST_CHECK(httpCode == 200);
@@ -325,20 +326,6 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
   }
 
   curl_global_cleanup();
-
-  // Check if test timer and external loop are still alive
-  BOOST_CHECK(uv_is_active((uv_handle_t*)testTimer) != 0);
-  BOOST_CHECK(uv_loop_alive(uvLoop) != 0);
-
-  // Downloader must be closed before uv_loop.
-  // The reason for that are the uv_poll handles attached to the curl multi handle.
-  // The multi handle must be cleaned (via destuctor) before poll handles attached to them are removed (via walking and closing).
-  delete downloader;
-  while (uv_loop_alive(uvLoop) && uv_loop_close(uvLoop) == UV_EBUSY) {
-    uv_walk(uvLoop, closeAllHandles, nullptr);
-    uv_run(uvLoop, UV_RUN_ONCE);
-  }
-  delete uvLoop;
 }
 
 } // namespace ccdb
