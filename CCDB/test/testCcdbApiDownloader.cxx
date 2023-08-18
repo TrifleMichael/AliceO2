@@ -306,9 +306,9 @@ BOOST_AUTO_TEST_CASE(asynchronous_callback_test)
 
   // testVariable will be modified in the callback
   int testVariable = 0;
-  auto results = downloader->batchAsynchWithCallback(handleVector, testCallback, &testVariable);
+  auto results = downloader.batchAsynchWithCallback(handleVector, testCallback, &testVariable);
 
-  getAll(results);
+  downloader.getAll(results);
 
   sleep(1); // Wait some time for the callback to execute
 

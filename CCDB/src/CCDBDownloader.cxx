@@ -375,8 +375,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
   *data->codeDestination = curlCode;
   *data->transferFinished = true;
-  --(*data->requestsLeft);
-
   if (--(*data->requestsLeft) == 0) {
     switch (data->type) {
       case BLOCKING:
