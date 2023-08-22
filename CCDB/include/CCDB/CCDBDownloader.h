@@ -21,6 +21,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <unordered_map>
+#include <map> // TODO maybe switch to unordered?
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
@@ -152,6 +153,9 @@ class CCDBDownloader
    */
   TransferResults* batchAsynchPerform(std::vector<CURL*> const& handleVector);
 
+  // TODO comment
+  TransferResults* batchRequestPerform(std::vector<CURL*> const& handleVector);
+
   /**
    * Performs on a batch of handles, identified via transfer results. It's the equivalent of using future.get()
    *
@@ -201,8 +205,14 @@ class CCDBDownloader
    */
   void runLoop(bool noWait);
 
+  TransferResults* batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector); // TODO comment
+
+  void scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
+
  private:
   std::string mUserAgentId = "CCDBDownloader";
+
+  std::vector<std::string> hosts; // TODO Check fix remove
   /**
    * Sets up internal UV loop.
    */
@@ -234,7 +244,8 @@ class CCDBDownloader
   enum RequestType {
     BLOCKING,
     ASYNCHRONOUS,
-    ASYNCHRONOUS_WITH_CALLBACK
+    ASYNCHRONOUS_WITH_CALLBACK,
+    REQUEST // TODO does that make sense?
   };
 
   /**
@@ -264,6 +275,9 @@ class CCDBDownloader
     size_t* requestsLeft;
     RequestType type;
     vector<bool>::iterator transferFinished; // vector<bool> positions must be handled via iterators
+
+    map<CURL*, vector<string>*>* locationsMap;
+    int currentLocationIndex = -1;
   } PerformData;
 
   /**

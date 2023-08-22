@@ -352,10 +352,28 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   curlEasyErrorCheck(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &data));
 
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
-  *data->codeDestination = curlCode;
-  *data->transferFinished = true;
-  --(*data->requestsLeft);
-  delete data;
+
+  if (data->type != REQUEST) {
+    *data->codeDestination = curlCode;
+    *data->transferFinished = true;
+    --(*data->requestsLeft);
+    delete data;
+  } else {
+    long httpCode;
+    curl_easy_getinfo(easy_handle, CURLINFO_HTTP_CODE, &httpCode);
+    if (300 <= httpCode && httpCode < 400) {
+      // Follow redirect
+      std::vector<std::string>* locationVector = (*data->locationsMap)[easy_handle];
+      std::string nextLocation = (*locationVector)[++data->currentLocationIndex];
+      std::cout << "Redirect for request: " << nextLocation << "\n";
+
+      *data->codeDestination = curlCode;
+      *data->transferFinished = true;
+      --(*data->requestsLeft);
+      delete data;
+    }
+
+  }
 
   checkHandleQueue();
 
@@ -430,11 +448,38 @@ void CCDBDownloader::runLoop(bool noWait)
   uv_run(mUVLoop, noWait ? UV_RUN_NOWAIT : UV_RUN_ONCE);
 }
 
+size_t WriteHeaderCallback(void* contents, size_t size, size_t nmemb, void* userdata) { // TODO Remove or change
+  size_t totalSize = size * nmemb;
+  std::string header(reinterpret_cast<char*>(contents), totalSize);
+  
+  auto headers = (std::vector<std::string>*)userdata;
+  if (header.find("Content-Location") != std::string::npos) {
+    headers->push_back(header);
+  }
+    
+  return totalSize;
+}
+
 CURLcode CCDBDownloader::perform(CURL* handle)
 {
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
-  return batchBlockingPerform(handleVector).back();
+
+  auto code = batchBlockingPerform(handleVector).back();
+
+  // std::vector<std::string> locations;
+  // for(int i = 0; i < headers.size(); i++) {
+  //   if (headers[i].find("Content-Location") != std::string::npos) {
+  //     locations.push_back(headers[i].substr(18));
+  //   }
+  // }
+
+  // for(int i = 0; i < locations.size(); i++) {
+  //   std::cout << "Location: " << locations[i];
+  // }
+
+
+  return code;
 }
 
 CCDBDownloader::TransferResults* CCDBDownloader::prepareResultsStruct(size_t numberOfHandles)
@@ -497,12 +542,59 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchAsynchPerform(std::vector<
   return results;
 }
 
+CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector)
+{
+  auto results = prepareResultsStruct(handleVector.size());
+  std::map<CURL*, std::vector<std::string>*> locationsMap;
+
+  for (int handleIndex = 0; handleIndex < handleVector.size(); handleIndex++) {
+    auto* data = createPerformData(handleIndex, results, REQUEST);
+
+    CURL* handle = handleVector[handleIndex];
+    curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, WriteHeaderCallback);
+    locationsMap[handle] = new std::vector<std::string>();
+    curl_easy_setopt(handle, CURLOPT_HEADERDATA, locationsMap[handle]);
+    data->locationsMap = &locationsMap;
+
+    setHandleOptions(handleVector[handleIndex], data);
+    mHandlesToBeAdded.push_back(handleVector[handleIndex]);
+  }
+  checkHandleQueue();
+  while (results->requestsLeft > 0) {
+    uv_run(mUVLoop, UV_RUN_ONCE);
+  }
+  // TODO Free map
+  return results;
+}
+
 std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
 {
   while (results->requestsLeft > 0) {
     runLoop(false);
   }
   return results->curlCodes.begin();
+}
+
+void CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*))
+{
+  CURL* handle = curl_easy_init();
+  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
+  curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
+  curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
+  auto userAgent = uniqueAgentID();
+  curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
+
+  std::vector<CURL*> handleVector;
+  handleVector.push_back(handle);
+  TransferResults* results = batchRequestPerform(host, handleVector);
+
+  std::cout << "Curl code " << results->curlCodes[0] << "\n";
+  long httpCode;
+  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+  std::cout << "Http code " << httpCode << "\n";
+
+  delete results;
+  curl_easy_cleanup(handle);
 }
 
 } // namespace o2
