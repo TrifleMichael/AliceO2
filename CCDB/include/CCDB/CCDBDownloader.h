@@ -369,7 +369,7 @@ class CCDBDownloader
    */
   void transferFinished(CURL* handle, CURLcode curlCode);
 
-  void deletePerformData(PerformData* data); // TODO comment
+  void deletePerformData(PerformData* data, CURLcode code); // TODO comment
 
   /**
    * Check message queue inside curl multi handle.
