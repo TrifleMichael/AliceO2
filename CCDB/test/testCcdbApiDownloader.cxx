@@ -16,6 +16,7 @@
 #include "CommonUtils/StringUtils.h"
 #include "CCDB/CCDBTimeStampUtils.h"
 #include <CCDB/CCDBDownloader.h>
+#include <CCDB/CcdbApi.h>
 #include <curl/curl.h>
 #include <chrono>
 #include <iostream>
@@ -89,6 +90,8 @@ CURL* createTestHandle(std::string* dst)
 
 BOOST_AUTO_TEST_CASE(perform_test)
 {
+  CcdbApi api;
+
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -100,7 +103,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
   // std::string host = "http://ccdb-test.cern.ch:8080";
   std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
 
-  downloader.scheduleFromRequest(host, url, &dst, CurlWrite_CallbackFunc_StdString2);
+  downloader.scheduleFromRequest(&api, host, url, &dst, CurlWrite_CallbackFunc_StdString2);
   curl_global_cleanup();
   // auto file = downloader.getFromPromise(promise);
 

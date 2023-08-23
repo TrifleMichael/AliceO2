@@ -207,7 +207,7 @@ class CCDBDownloader
 
   TransferResults* batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector); // TODO comment
 
-  void scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
+  void scheduleFromRequest(CcdbApi api, std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
 
  private:
   std::string mUserAgentId = "CCDBDownloader";
