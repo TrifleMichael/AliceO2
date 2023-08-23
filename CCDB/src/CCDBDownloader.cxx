@@ -377,7 +377,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           std::cout << "Found link to alien " << nextLocation << "\n";
         } else {
           std::cout << "'Starting' (not really) new download for " << nextLocation << "\n";
-          curl_easy_setopt(easy_handle, CURLOPT_URL, nextLocation.c_str);
+          curl_easy_setopt(easy_handle, CURLOPT_URL, nextLocation.c_str());
           // TODO actually start the download
         }
       }
