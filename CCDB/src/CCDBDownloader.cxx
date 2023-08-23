@@ -379,13 +379,17 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           std::cout << "'Starting' (not really) new download for " << nextLocation << "\n";
           curl_easy_setopt(easy_handle, CURLOPT_URL, nextLocation.c_str());
           // TODO actually start the download
+          curl_multi_add_handle(mCurlMultiHandle, easy_handle);
+          nextDownloadScheduled = true;
         }
       }
 
-      *data->codeDestination = curlCode;
-      *data->transferFinished = true;
-      --(*data->requestsLeft);
-      delete data;
+      if (!nextDownloadScheduled) {
+        *data->codeDestination = curlCode;
+        *data->transferFinished = true;
+        --(*data->requestsLeft);
+        delete data;
+      }
     }
 
   }
