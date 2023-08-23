@@ -390,8 +390,13 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         --(*data->requestsLeft);
         delete data;
       }
-    }
+    } else {
+        *data->codeDestination = curlCode;
+        *data->transferFinished = true;
+        --(*data->requestsLeft);
+        delete data;
 
+    }
   }
 
   checkHandleQueue();
