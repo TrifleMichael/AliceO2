@@ -22,6 +22,7 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <map> // TODO maybe switch to unordered?
+#include "CCDB/CcdbApi.h"
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
