@@ -345,6 +345,14 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
   uv_close((uv_handle_t*)context->poll_handle, curlCloseCB);
 }
 
+void deletePerformData(CCDBDownloader::PerformData* data)
+{
+  *data->codeDestination = curlCode;
+  *data->transferFinished = true;
+  --(*data->requestsLeft);
+  delete data;
+}
+
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
   mHandlesInUse--;
@@ -354,10 +362,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
 
   if (data->type != REQUEST) {
-    *data->codeDestination = curlCode;
-    *data->transferFinished = true;
-    --(*data->requestsLeft);
-    delete data;
+    deletePerformData(data);
   } else {
     long httpCode;
     curl_easy_getinfo(easy_handle, CURLINFO_HTTP_CODE, &httpCode);
@@ -377,7 +382,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           std::cout << "Found link to alien " << nextLocation << "\n";
         } else {
           std::cout << "'Starting' (not really) new download for " << nextLocation << "\n";
-          curl_easy_setopt(easy_handle, CURLOPT_URL, nextLocation.c_str());
+          curl_easy_setopt(easy_handle, CURLOPT_URL, (hostUrl + nextLocation).c_str());
           // TODO actually start the download
           curl_multi_add_handle(mCurlMultiHandle, easy_handle);
           nextDownloadScheduled = true;
@@ -385,16 +390,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       }
 
       if (!nextDownloadScheduled) {
-        *data->codeDestination = curlCode;
-        *data->transferFinished = true;
-        --(*data->requestsLeft);
-        delete data;
+        deletePerformData(data);
       }
     } else {
-      *data->codeDestination = curlCode;
-      *data->transferFinished = true;
-      --(*data->requestsLeft);
-      delete data;
+      deletePerformData(data);
     }
   }
 
@@ -578,6 +577,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string
     locationsMap[handle] = new std::vector<std::string>();
     curl_easy_setopt(handle, CURLOPT_HEADERDATA, locationsMap[handle]);
     data->locationsMap = &locationsMap;
+    data->hostUrl = host;
 
     setHandleOptions(handleVector[handleIndex], data);
     mHandlesToBeAdded.push_back(handleVector[handleIndex]);

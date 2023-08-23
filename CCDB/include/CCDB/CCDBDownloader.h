@@ -278,6 +278,7 @@ class CCDBDownloader
 
     map<CURL*, vector<string>*>* locationsMap;
     int currentLocationIndex = -1;
+    string hostUrl;
   } PerformData;
 
   /**
@@ -367,6 +368,8 @@ class CCDBDownloader
    * @param curlCode The code produced for the handle by the transfer
    */
   void transferFinished(CURL* handle, CURLcode curlCode);
+
+  void deletePerformData(PerformData* data); // TODO comment
 
   /**
    * Check message queue inside curl multi handle.
