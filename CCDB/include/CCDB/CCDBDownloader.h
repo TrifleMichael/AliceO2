@@ -22,7 +22,6 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <map> // TODO maybe switch to unordered?
-#include "CCDB/CcdbApi.h"
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
@@ -208,7 +207,7 @@ class CCDBDownloader
 
   TransferResults* batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector); // TODO comment
 
-  void scheduleFromRequest(CcdbApi api, std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
+  void scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
 
  private:
   std::string mUserAgentId = "CCDBDownloader";

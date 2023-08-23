@@ -364,16 +364,22 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
     if (300 <= httpCode && httpCode < 400) {
       // Follow redirect
       std::vector<std::string>* locationVector = (*data->locationsMap)[easy_handle];
-      std::string nextLocation = (*locationVector)[++data->currentLocationIndex]; // TODO check if not going too far
-      std::cout << "Redirect for request: " << nextLocation << "\n";
 
-      if (nextLocation.find("file:/", 0) != std::string::npos) {
-        nextLocation = (*locationVector)[++data->currentLocationIndex];
-        std::cout << "Skipped location, now at " << nextLocation << "\n";
-      }
+      bool nextDownloadScheduled = false;
+      while (++data->currentLocationIndex < locationVector->size()) {
+        std::string nextLocation = (*locationVector)[data->currentLocationIndex];
+        std::cout << "Redirect for request: " << nextLocation << "\n";
 
-      if (nextLocation.find("alien:/", 0) != std::string::npos) {
-        std::cout << "Found link to alien " << nextLocation << "\n";
+        if (nextLocation.find("file:/", 0) != std::string::npos) {
+          nextLocation = (*locationVector)[data->currentLocationIndex];
+          std::cout << "Skipped location at " << nextLocation << "\n";
+        } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
+          std::cout << "Found link to alien " << nextLocation << "\n";
+        } else {
+          std::cout << "'Starting' (not really) new download for " << nextLocation << "\n";
+          curl_easy_setopt(easy_handle, CURLOPT_URL, nextLocation.c_str);
+          // TODO actually start the download
+        }
       }
 
       *data->codeDestination = curlCode;
@@ -584,7 +590,7 @@ std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
   return results->curlCodes.begin();
 }
 
-void CCDBDownloader::scheduleFromRequest(CcdbApi* api, std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*))
+void CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*))
 {
   CURL* handle = curl_easy_init();
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
