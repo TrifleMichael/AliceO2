@@ -366,7 +366,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   char* effectiveUrl;
   curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, effectiveUrl);
   std::cout << "Transfer finished for " << effectiveUrl << "\n";
-  delete effectiveUrl;
+  // delete effectiveUrl;
 
   if (data->type != REQUEST) {
     deletePerformData(data, curlCode);
