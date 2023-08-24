@@ -361,6 +361,12 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   curlEasyErrorCheck(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &data));
 
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
+  
+
+  char* effectiveUrl;
+  curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, effectiveUrl);
+  std::cout << "Transfer finished for " << effectiveUrl << "\n";
+  delete effectiveUrl;
 
   if (data->type != REQUEST) {
     deletePerformData(data, curlCode);
@@ -384,8 +390,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         } else {
           std::cout << "'Starting' (not really) new download for " << nextLocation << "\n";
           curl_easy_setopt(easy_handle, CURLOPT_URL, (data->hostUrl + nextLocation).c_str());
-          // TODO actually start the download
-          curl_multi_add_handle(mCurlMultiHandle, easy_handle);
+          
+          std::cout << "Actually scheduling the download\n";
+          // curl_multi_add_handle(mCurlMultiHandle, easy_handle);
+          mHandlesToBeAdded.push_back(easy_handle);
           nextDownloadScheduled = true;
         }
       }
