@@ -25,10 +25,14 @@
 
 #include <memory>
 #include <TObject.h>
+#include <TFile.h>
+#include <TTree.h>
+#include <TH1F.h>
 #include <TMessage.h>
 #include "CCDB/CcdbObjectInfo.h"
 #include <CommonUtils/ConfigurableParam.h>
 #include <type_traits>
+#include <TMemFile.h>
 
 
 
@@ -235,6 +239,8 @@ class CCDBDownloader
   mutable TGrid* mAlienInstance = nullptr; // TODO comment
 
   std::string mUserAgentId = "CCDBDownloader"; // TODO comment
+  
+  static bool checkAlienToken(); // TODO Comment
 
   void* downloadAlienContent(std::string const& url, std::type_info const& tinfo) const; // TODO comment
 

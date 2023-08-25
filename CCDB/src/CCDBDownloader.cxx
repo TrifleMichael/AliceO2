@@ -717,4 +717,23 @@ bool CCDBDownloader::initTGrid() const
   return mAlienInstance != nullptr;
 }
 
+bool CCDBDownloader::checkAlienToken()
+{
+#ifdef __APPLE__
+  LOG(debug) << "On macOS we simply rely on TGrid::Connect(\"alien\").";
+  return true;
+#endif
+  if (getenv("ALICEO2_CCDB_NOTOKENCHECK") && atoi(getenv("ALICEO2_CCDB_NOTOKENCHECK"))) {
+    return true;
+  }
+  if (getenv("JALIEN_TOKEN_CERT")) {
+    return true;
+  }
+  auto returncode = system("LD_PRELOAD= alien-token-info &> /dev/null");
+  if (returncode == -1) {
+    LOG(error) << "...";
+  }
+  return returncode == 0;
+}
+
 } // namespace o2
