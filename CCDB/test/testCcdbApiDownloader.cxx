@@ -18,7 +18,6 @@
 #include "CommonUtils/StringUtils.h"
 #include "CCDB/CCDBTimeStampUtils.h"
 #include <CCDB/CCDBDownloader.h>
-#include <CCDB/CcdbApi.h>
 #include <curl/curl.h>
 #include <chrono>
 #include <iostream>
