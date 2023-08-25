@@ -29,6 +29,7 @@
 #include <TTree.h>
 #include <TH1F.h>
 #include <TMessage.h>
+#include <TGrid.h>
 #include "CCDB/CcdbObjectInfo.h"
 #include <CommonUtils/ConfigurableParam.h>
 #include <type_traits>
@@ -246,7 +247,7 @@ class CCDBDownloader
 
   TClass* tinfo2TClass(std::type_info const& tinfo); // TODO comment
 
-  void* extractFromTFile(TFile& file, TClass const* cl, const char* what); // TODO comment
+  void* extractFromTFile(TFile& file, TClass const* cl, const char* what = CCDBOBJECT_ENTRY); // TODO comment
 
   std::vector<std::string> hosts; // TODO Check fix remove
 
