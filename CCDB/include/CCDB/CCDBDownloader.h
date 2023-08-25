@@ -23,6 +23,15 @@
 #include <unordered_map>
 #include <map> // TODO maybe switch to unordered?
 
+#include <memory>
+#include <TObject.h>
+#include <TMessage.h>
+#include "CCDB/CcdbObjectInfo.h"
+#include <CommonUtils/ConfigurableParam.h>
+#include <type_traits>
+
+
+
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
 typedef struct uv_poll_s uv_poll_t;
