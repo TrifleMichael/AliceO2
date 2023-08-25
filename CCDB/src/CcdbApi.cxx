@@ -831,11 +831,13 @@ void* CcdbApi::extractFromLocalFile(std::string const& filename, std::type_info 
 
 bool CcdbApi::initTGrid() const
 {
+  std::cout << "Init to grid commencing\n";
   if (mNeedAlienToken && !mAlienInstance) {
     static bool allowNoToken = getenv("ALICEO2_CCDB_NOTOKENCHECK") && atoi(getenv("ALICEO2_CCDB_NOTOKENCHECK"));
     if (!allowNoToken && !checkAlienToken()) {
       LOG(fatal) << "Alien Token Check failed - Please get an alien token before running with https CCDB endpoint, or alice-ccdb.cern.ch!";
     }
+    std::cout << "Connecting to grid\n";
     mAlienInstance = TGrid::Connect("alien");
     static bool errorShown = false;
     if (!mAlienInstance && errorShown == false) {
@@ -847,12 +849,14 @@ bool CcdbApi::initTGrid() const
       errorShown = true;
     }
   }
+  std::cout << "mAlienInstance works? " << (mAlienInstance != nullptr) << "\n";
   return mAlienInstance != nullptr;
 }
 
 void* CcdbApi::downloadAlienContent(std::string const& url, std::type_info const& tinfo) const
 {
   if (!initTGrid()) {
+    std::cout << "Grid not init\n";
     return nullptr;
   }
   std::lock_guard<std::mutex> guard(gIOMutex);
