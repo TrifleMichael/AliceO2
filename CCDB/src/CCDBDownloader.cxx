@@ -377,14 +377,17 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       std::vector<std::string>* locationVector = (*data->locationsMap)[easy_handle];
 
       bool nextDownloadScheduled = false;
-      while (++data->currentLocationIndex < locationVector->size()) {
+      bool resultRetrieved = false;
+      while (++data->currentLocationIndex < locationVector->size() && !resultRetrieved) {
         std::string nextLocation = (*locationVector)[data->currentLocationIndex];
         // std::cout << "Redirect to: " << nextLocation << "\n";
 
         if (nextLocation.find("file:/", 0) != std::string::npos) {
 
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
-
+          std::cout << "Retrieving content from alien at " << nextLocation << "\n";
+          void* item = downloadAlienContent(nextLocation, typeid(TObject));
+          resultRetrieved = true;
         } else {
           curl_easy_setopt(easy_handle, CURLOPT_URL, (data->hostUrl + nextLocation).c_str());
           mHandlesToBeAdded.push_back(easy_handle);
@@ -624,8 +627,91 @@ void CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std:
   curl_easy_cleanup(handle);
 }
 
-// void CCDBDownloader::test(o2::ccdb::CcdbApi api) {
-//   std::cout << "It worked!\n";
-// }
+void* CCDBDownloader::downloadAlienContent(std::string const& url, std::type_info const& tinfo) const
+{
+  if (!initTGrid()) {
+    return nullptr;
+  }
+  // std::lock_guard<std::mutex> guard(gIOMutex);
+  auto memfile = TMemFile::Open(url.c_str(), "OPEN");
+  if (memfile) {
+    auto cl = tinfo2TClass(tinfo);
+    auto content = extractFromTFile(*memfile, cl);
+    delete memfile;
+    return content;
+  }
+  return nullptr;
+}
+
+TClass* CCDBDownloader::tinfo2TClass(std::type_info const& tinfo)
+{
+  TClass* cl = TClass::GetClass(tinfo);
+  if (!cl) {
+    throw std::runtime_error(fmt::format("Could not retrieve ROOT dictionary for type {}, aborting", tinfo.name()));
+    return nullptr;
+  }
+  return cl;
+}
+
+void* CCDBDownloader::extractFromTFile(TFile& file, TClass const* cl, const char* what)
+{
+  if (!cl) {
+    return nullptr;
+  }
+  auto object = file.GetObjectChecked(what, cl);
+  if (!object) {
+    // it could be that object was stored with previous convention
+    // where the classname was taken as key
+    std::string objectName(cl->GetName());
+    o2::utils::Str::trim(objectName);
+    object = file.GetObjectChecked(objectName.c_str(), cl);
+    LOG(warn) << "Did not find object under expected name " << what;
+    if (!object) {
+      return nullptr;
+    }
+    LOG(warn) << "Found object under deprecated name " << cl->GetName();
+  }
+  auto result = object;
+  // We need to handle some specific cases as ROOT ties them deeply
+  // to the file they are contained in
+  if (cl->InheritsFrom("TObject")) {
+    // make a clone
+    // detach from the file
+    auto tree = dynamic_cast<TTree*>((TObject*)object);
+    if (tree) {
+      tree->LoadBaskets(0x1L << 32); // make tree memory based
+      tree->SetDirectory(nullptr);
+      result = tree;
+    } else {
+      auto h = dynamic_cast<TH1*>((TObject*)object);
+      if (h) {
+        h->SetDirectory(nullptr);
+        result = h;
+      }
+    }
+  }
+  return result;
+}
+
+bool CCDBDownloader::initTGrid() const
+{
+  if (mNeedAlienToken && !mAlienInstance) {
+    static bool allowNoToken = getenv("ALICEO2_CCDB_NOTOKENCHECK") && atoi(getenv("ALICEO2_CCDB_NOTOKENCHECK"));
+    if (!allowNoToken && !checkAlienToken()) {
+      LOG(fatal) << "Alien Token Check failed - Please get an alien token before running with https CCDB endpoint, or alice-ccdb.cern.ch!";
+    }
+    mAlienInstance = TGrid::Connect("alien");
+    static bool errorShown = false;
+    if (!mAlienInstance && errorShown == false) {
+      if (allowNoToken) {
+        LOG(error) << "TGrid::Connect returned nullptr. May be due to missing alien token";
+      } else {
+        LOG(fatal) << "TGrid::Connect returned nullptr. May be due to missing alien token";
+      }
+      errorShown = true;
+    }
+  }
+  return mAlienInstance != nullptr;
+}
 
 } // namespace o2

@@ -11,8 +11,6 @@
 #ifndef O2_CCDBDOWNLOADER_H_
 #define O2_CCDBDOWNLOADER_H_
 
-// #include "CCDB/CcdbApi.h"
-
 #include <cstdio>
 #include <cstdlib>
 #include <curl/curl.h>
@@ -76,7 +74,6 @@ void onUVClose(uv_handle_t* handle);
 class CCDBDownloader
 {
  public:
-  // void test(o2::ccdb::CcdbApi api);
 
   /**
    * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
@@ -214,9 +211,22 @@ class CCDBDownloader
   void scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
 
  private:
-  std::string mUserAgentId = "CCDBDownloader";
+  bool mNeedAlienToken = true;
+
+  mutable TGrid* mAlienInstance = nullptr; // TODO comment
+
+  std::string mUserAgentId = "CCDBDownloader"; // TODO comment
+
+  void* downloadAlienContent(std::string const& url, std::type_info const& tinfo) const; // TODO comment
+
+  TClass* tinfo2TClass(std::type_info const& tinfo); // TODO comment
+
+  void* extractFromTFile(TFile& file, TClass const* cl, const char* what); // TODO comment
 
   std::vector<std::string> hosts; // TODO Check fix remove
+
+  bool initTGrid() const; // TODO comment
+
   /**
    * Sets up internal UV loop.
    */
