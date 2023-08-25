@@ -11,7 +11,7 @@
 #ifndef O2_CCDBDOWNLOADER_H_
 #define O2_CCDBDOWNLOADER_H_
 
-#include <CCDB/CcdbApi.h>
+#include "CCDB/CcdbApi.h"
 
 #include <cstdio>
 #include <cstdlib>
