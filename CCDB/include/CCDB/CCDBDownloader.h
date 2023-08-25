@@ -76,7 +76,7 @@ void onUVClose(uv_handle_t* handle);
 class CCDBDownloader
 {
  public:
-  void test(o2::ccdb::CcdbApi api);
+  // void test(o2::ccdb::CcdbApi api);
 
   /**
    * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.

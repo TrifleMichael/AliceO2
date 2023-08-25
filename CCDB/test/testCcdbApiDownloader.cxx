@@ -105,8 +105,8 @@ BOOST_AUTO_TEST_CASE(perform_test)
   downloader.scheduleFromRequest(host, url, &dst, CurlWrite_CallbackFunc_StdString2);
   curl_global_cleanup();
 
-  CcdbApi api;
-  downloader.test(api);
+  // o2::ccdb::CcdbApi api;
+  // downloader.test(api);
 
   BOOST_CHECK(1 == 2);
   // auto file = downloader.getFromPromise(promise);
