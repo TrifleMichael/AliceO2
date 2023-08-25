@@ -362,17 +362,16 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
   
-
   char* effectiveUrl;
-  curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, effectiveUrl);
-  std::cout << "Transfer finished for " << effectiveUrl << "\n";
-  // delete effectiveUrl;
+  curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &effectiveUrl);
+  long httpCode;
+  curl_easy_getinfo(easy_handle, CURLINFO_HTTP_CODE, &httpCode);
+
+  std::cout << "Transfer finished for " << effectiveUrl << " with http code " << httpCode <<"\n";
 
   if (data->type != REQUEST) {
     deletePerformData(data, curlCode);
   } else {
-    long httpCode;
-    curl_easy_getinfo(easy_handle, CURLINFO_HTTP_CODE, &httpCode);
     if (300 <= httpCode && httpCode < 400) {
       // Follow redirect
       std::vector<std::string>* locationVector = (*data->locationsMap)[easy_handle];
@@ -380,19 +379,14 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       bool nextDownloadScheduled = false;
       while (++data->currentLocationIndex < locationVector->size()) {
         std::string nextLocation = (*locationVector)[data->currentLocationIndex];
-        std::cout << "Redirect for request: " << nextLocation << "\n";
+        // std::cout << "Redirect to: " << nextLocation << "\n";
 
         if (nextLocation.find("file:/", 0) != std::string::npos) {
-          nextLocation = (*locationVector)[data->currentLocationIndex];
-          std::cout << "Skipped location at " << nextLocation << "\n";
+
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
-          std::cout << "Found link to alien " << nextLocation << "\n";
+
         } else {
-          std::cout << "'Starting' (not really) new download for " << nextLocation << "\n";
           curl_easy_setopt(easy_handle, CURLOPT_URL, (data->hostUrl + nextLocation).c_str());
-          
-          std::cout << "Actually scheduling the download\n";
-          // curl_multi_add_handle(mCurlMultiHandle, easy_handle);
           mHandlesToBeAdded.push_back(easy_handle);
           nextDownloadScheduled = true;
         }
@@ -485,7 +479,8 @@ size_t WriteHeaderCallback(void* contents, size_t size, size_t nmemb, void* user
   
   auto headers = (std::vector<std::string>*)userdata;
   if (header.find("Content-Location") != std::string::npos) {
-    headers->push_back(header);
+    std::string redirect = header.substr(18, header.size()-20);
+    headers->push_back(redirect);
   }
     
   return totalSize;
