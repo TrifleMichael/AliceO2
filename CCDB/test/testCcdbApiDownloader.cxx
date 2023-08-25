@@ -13,6 +13,8 @@
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_DYN_LINK
 
+#include <CCDB/CcdbApi.h>
+
 #include "CommonUtils/StringUtils.h"
 #include "CCDB/CCDBTimeStampUtils.h"
 #include <CCDB/CCDBDownloader.h>
@@ -103,6 +105,10 @@ BOOST_AUTO_TEST_CASE(perform_test)
 
   downloader.scheduleFromRequest(host, url, &dst, CurlWrite_CallbackFunc_StdString2);
   curl_global_cleanup();
+
+  CcdbApi api;
+  downloader.test(api);
+
   BOOST_CHECK(1 == 2);
   // auto file = downloader.getFromPromise(promise);
 

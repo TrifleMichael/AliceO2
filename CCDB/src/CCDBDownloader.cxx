@@ -623,5 +623,8 @@ void CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std:
   delete results;
   curl_easy_cleanup(handle);
 }
+void CCDBDownloader::test(CcdbApi api) {
+  std::cout << "It worked!\n";
+}
 
 } // namespace o2

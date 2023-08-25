@@ -11,6 +11,8 @@
 #ifndef O2_CCDBDOWNLOADER_H_
 #define O2_CCDBDOWNLOADER_H_
 
+#include <CCDB/CcdbApi.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <curl/curl.h>
@@ -74,6 +76,8 @@ void onUVClose(uv_handle_t* handle);
 class CCDBDownloader
 {
  public:
+  void test(CcdbApi api);
+
   /**
    * Timer starts for each socket when its respective transfer finishes, and is stopped when another transfer starts for that handle.
    * When the timer runs out it closes the socket. The period for which socket stays open is defined by socketTimeoutMS.
