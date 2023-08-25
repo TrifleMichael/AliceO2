@@ -861,6 +861,7 @@ void* CcdbApi::downloadAlienContent(std::string const& url, std::type_info const
     auto cl = tinfo2TClass(tinfo);
     auto content = extractFromTFile(*memfile, cl);
     delete memfile;
+    std::cout << "Downloading from alien worked\n";
     return content;
   }
   return nullptr;
@@ -895,6 +896,7 @@ void* CcdbApi::navigateURLsAndRetrieveContent(CURL* curl_handle, std::string con
 
   // let's see first of all if the url is something specific that curl cannot handle
   if (url.find("alien:/", 0) != std::string::npos) {
+    std::cout << "Retrieving alien content\n";
     return downloadAlienContent(url, tinfo);
   }
   // add other final cases here
