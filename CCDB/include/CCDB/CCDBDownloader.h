@@ -247,9 +247,9 @@ class CCDBDownloader
 
   void* downloadAlienContent(std::string const& url, std::type_info const& tinfo) const; // TODO comment
 
-  TClass* tinfo2TClass(std::type_info const& tinfo); // TODO comment
+  static TClass* tinfo2TClass(std::type_info const& tinfo); // TODO comment
 
-  void* extractFromTFile(TFile& file, TClass const* cl, const char* what = CCDBOBJECT_ENTRY); // TODO comment
+  static void* extractFromTFile(TFile& file, TClass const* cl, const char* what = CCDBOBJECT_ENTRY); // TODO comment
 
   std::vector<std::string> hosts; // TODO Check fix remove
 
