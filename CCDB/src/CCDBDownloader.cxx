@@ -387,7 +387,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
           std::cout << "Retrieving content from alien at " << nextLocation << "\n";
           void* item = downloadAlienContent(nextLocation, typeid(TObject));
-          resultRetrieved = true;
+          if (item) {
+            resultRetrieved = true;
+            std::cout << "Succesfully retrieved\n";
+          }
         } else {
           curl_easy_setopt(easy_handle, CURLOPT_URL, (data->hostUrl + nextLocation).c_str());
           mHandlesToBeAdded.push_back(easy_handle);

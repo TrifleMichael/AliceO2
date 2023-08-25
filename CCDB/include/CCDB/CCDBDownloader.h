@@ -30,6 +30,16 @@ typedef struct uv_signal_s uv_signal_t;
 typedef struct uv_async_s uv_async_t;
 typedef struct uv_handle_s uv_handle_t;
 
+#if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
+#include "MemoryResources/MemoryResources.h"
+#include <TJAlienCredentials.h>
+#else
+class TJAlienCredentials;
+#endif
+
+class TFile;
+class TGrid;
+
 using namespace std;
 
 namespace o2::ccdb
