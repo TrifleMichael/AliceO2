@@ -730,6 +730,8 @@ bool CCDBDownloader::checkAlienToken()
   if (getenv("JALIEN_TOKEN_CERT")) {
     std::cout << "Certificate found\n";
     return true;
+  } else {
+    std::cout << "Alien token not found\n";
   }
   auto returncode = system("LD_PRELOAD= alien-token-info &> /dev/null");
   if (returncode == -1) {
