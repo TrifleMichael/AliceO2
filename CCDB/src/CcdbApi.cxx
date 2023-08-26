@@ -94,6 +94,7 @@ void CcdbApi::setUniqueAgentID()
 
 bool CcdbApi::checkAlienToken()
 {
+  std::cout << "Checking alien token\n";
 #ifdef __APPLE__
   LOG(debug) << "On macOS we simply rely on TGrid::Connect(\"alien\").";
   return true;
@@ -102,7 +103,10 @@ bool CcdbApi::checkAlienToken()
     return true;
   }
   if (getenv("JALIEN_TOKEN_CERT")) {
+    std::cout << "Jalien token cert present\n";
     return true;
+  } else {
+    std::cout << "Token not present\n";
   }
   auto returncode = system("LD_PRELOAD= alien-token-info &> /dev/null");
   if (returncode == -1) {
