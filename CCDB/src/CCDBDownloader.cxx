@@ -703,6 +703,7 @@ bool CCDBDownloader::initTGrid() const
     if (!allowNoToken && !checkAlienToken()) {
       LOG(fatal) << "Alien Token Check failed - Please get an alien token before running with https CCDB endpoint, or alice-ccdb.cern.ch!";
     }
+    std::cout << "Connecting to grid\n";
     mAlienInstance = TGrid::Connect("alien");
     static bool errorShown = false;
     if (!mAlienInstance && errorShown == false) {
@@ -727,6 +728,7 @@ bool CCDBDownloader::checkAlienToken()
     return true;
   }
   if (getenv("JALIEN_TOKEN_CERT")) {
+    std::cout << "Certificate found\n";
     return true;
   }
   auto returncode = system("LD_PRELOAD= alien-token-info &> /dev/null");
