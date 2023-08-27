@@ -611,7 +611,7 @@ std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
   return results->curlCodes.begin();
 }
 
-void CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*))
+CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*))
 {
   CURL* handle = curl_easy_init();
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
@@ -629,8 +629,8 @@ void CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std:
   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
   std::cout << "Http code " << httpCode << "\n";
 
-  delete results;
   curl_easy_cleanup(handle);
+  return results;
 }
 
 void* CCDBDownloader::downloadAlienContent(std::string const& url, std::type_info const& tinfo) const

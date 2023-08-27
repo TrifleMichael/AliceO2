@@ -234,7 +234,7 @@ class CCDBDownloader
 
   TransferResults* batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector); // TODO comment
 
-  void scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
+  TransferResults* scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
 
  private:
   constexpr static const char* CCDBOBJECT_ENTRY = "ccdb_object"; // TODO comment
