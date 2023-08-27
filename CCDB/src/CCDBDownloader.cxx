@@ -387,6 +387,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
           std::cout << "Retrieving content from alien at " << nextLocation << "\n";
           void* item = downloadAlienContent(nextLocation, typeid(TObject));
+          *data->objectPtr = item;
           if (item) {
             resultRetrieved = true;
             std::cout << "Succesfully retrieved\n";
@@ -581,6 +582,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string
 
   for (int handleIndex = 0; handleIndex < handleVector.size(); handleIndex++) {
     auto* data = createPerformData(handleIndex, results, REQUEST);
+    data->objectPtr = &results->objectPtr; // TODO Multiple objects !
 
     CURL* handle = handleVector[handleIndex];
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, WriteHeaderCallback);
@@ -596,6 +598,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string
   while (results->requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
   }
+  results.objectPtr = objectPtr;
   // TODO Free map
   return results;
 }
@@ -639,7 +642,7 @@ void* CCDBDownloader::downloadAlienContent(std::string const& url, std::type_inf
   auto memfile = TMemFile::Open(url.c_str(), "OPEN");
   if (memfile) {
     auto cl = tinfo2TClass(tinfo);
-    auto content = extractFromTFile(*memfile, cl);
+    auto content = extractFromTFile(*memfile, cl, "MatLayerCylSet"); // TODO REMOVE
     delete memfile;
     return content;
   }

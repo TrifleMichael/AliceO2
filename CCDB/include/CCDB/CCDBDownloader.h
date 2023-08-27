@@ -169,6 +169,8 @@ class CCDBDownloader
     std::vector<CURLcode> curlCodes;
     std::vector<bool> transferFinishedFlags;
     size_t requestsLeft;
+
+    void* objectPtr;
   } TransferResults;
 
   /**
@@ -321,6 +323,7 @@ class CCDBDownloader
     map<CURL*, vector<string>*>* locationsMap;
     int currentLocationIndex = -1;
     string hostUrl;
+    void** objectPtr;
   } PerformData;
 
   /**
