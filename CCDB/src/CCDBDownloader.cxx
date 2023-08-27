@@ -598,7 +598,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string
   while (results->requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
   }
-  results.objectPtr = objectPtr;
+  results->objectPtr = objectPtr;
   // TODO Free map
   return results;
 }
