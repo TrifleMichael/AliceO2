@@ -86,6 +86,30 @@ CURL* createTestHandle(std::string* dst)
   return handle;
 }
 
+size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr) {
+  auto& ho = *static_cast<CCDBDownloader::HeaderObjectPair_t*>(chunkptr);
+  auto& chunk = *ho.object;
+  size_t realsize = size * nmemb, sz = 0;
+  ho.counter++;
+  try {
+    if (chunk.capacity() < chunk.size() + realsize) {
+      auto cl = ho.header.find("Content-Length");
+      if (cl != ho.header.end()) {
+        sz = std::max(chunk.size() + realsize, (size_t)std::stol(cl->second));
+      } else {
+        sz = chunk.size() + realsize;
+        LOGP(debug, "SIZE IS NOT IN HEADER, allocate {}", sz);
+      }
+      chunk.reserve(sz);
+    }
+    char* contC = (char*)contents;
+    chunk.insert(chunk.end(), contC, contC + realsize);
+  } catch (std::exception e) {
+    LOGP(alarm, "failed to reserve {} bytes in CURL write callback (realsize = {}): {}", sz, realsize, e.what());
+    realsize = 0;
+  }
+  return realsize;
+}
 
 BOOST_AUTO_TEST_CASE(perform_test)
 {
@@ -95,14 +119,14 @@ BOOST_AUTO_TEST_CASE(perform_test)
   }
 
   CCDBDownloader downloader;
-  std::string dst = "";
+  o2::pmr::vector<char> dst;
   // std::string host = "http://mdesk.cern.ch:8080";
   // std::string host = "http://alice-ccdb.cern.ch";
   std::string host = "http://ccdb-test.cern.ch:8080";
   // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
   std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
 
-  auto results = downloader.scheduleFromRequest(host, url, &dst, CurlWrite_CallbackFunc_StdString2);
+  auto results = downloader.scheduleFromRequest(host, url, dst, writeCallBack);
   curl_global_cleanup();
 
   // std::cout << "Are results nullptr? " << (results->objectPtr == nullptr) << "\n"; // TODO eeeee

@@ -610,32 +610,39 @@ std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
   return results->curlCodes.begin();
 }
 
-CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*))
+CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
 {
-  if (url.substr(0, 7).compare("file://") == 0) {
+  // if (url.substr(0, 7).compare("file://") == 0) {
     // o2::pmr::vector<char> dst;
     // loadFileToMemory()
-    return new TransferResults(); // TODO change from mock to serious
-  } else {
-    CURL* handle = curl_easy_init();
-    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
-    curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
-    auto userAgent = uniqueAgentID();
-    curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
+    // return new TransferResults(); // TODO change from mock to serious
+  // } else {
 
-    std::vector<CURL*> handleVector;
-    handleVector.push_back(handle);
-    TransferResults* results = batchRequestPerform(host, handleVector);
+  CURL* handle = curl_easy_init();
+  HeaderObjectPair_t hoPair{{}, &dst, 0};
+  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
+  curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)&hoPair);
 
-    std::cout << "Curl code " << results->curlCodes[0] << "\n";
-    long httpCode;
-    curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-    std::cout << "Http code " << httpCode << "\n";
+    
+  // curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
+  // curl_easy_setopt(handle, CURLOPT_WRITEDATA, &dst);
+  curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
+  auto userAgent = uniqueAgentID();
+  curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
 
-    curl_easy_cleanup(handle);
-    return results;
-  }
+  std::vector<CURL*> handleVector;
+  handleVector.push_back(handle);
+  TransferResults* results = batchRequestPerform(host, handleVector);
+
+  std::cout << "Curl code " << results->curlCodes[0] << "\n";
+  long httpCode;
+  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+  std::cout << "Http code " << httpCode << "\n";
+
+  std::cout << "Vector size " << dst.size() << "\n";
+
+  curl_easy_cleanup(handle);
+  return results;
 }
 
 void* CCDBDownloader::downloadAlienContent(std::string const& url, std::type_info const& tinfo) const

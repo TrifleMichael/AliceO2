@@ -34,6 +34,7 @@
 #include <CommonUtils/ConfigurableParam.h>
 #include <type_traits>
 #include <TMemFile.h>
+#include "MemoryResources/MemoryResources.h" // TODO check if that has a reason to be moved
 
 
 
@@ -45,7 +46,6 @@ typedef struct uv_async_s uv_async_t;
 typedef struct uv_handle_s uv_handle_t;
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
-#include "MemoryResources/MemoryResources.h"
 #include <TJAlienCredentials.h>
 #else
 class TJAlienCredentials;
@@ -234,10 +234,18 @@ class CCDBDownloader
 
   TransferResults* batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector); // TODO comment
 
-  TransferResults* scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
+  struct HeaderObjectPair_t { // TODO move
+    std::map<std::string, std::string> header;
+    o2::pmr::vector<char>* object = nullptr;
+    int counter = 0;
+  };
+
+  TransferResults* scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr)); // TODO comment
 
  private:
-  void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders) const; // TODO comment
+  constexpr static const char* CCDBMETA_ENTRY = "ccdb_meta"; // TODO comment
+
+  void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders, bool mInSnapshotMode, bool mPreferSnapshotCache) const; // TODO comment
 
   constexpr static const char* CCDBOBJECT_ENTRY = "ccdb_object"; // TODO comment
 
