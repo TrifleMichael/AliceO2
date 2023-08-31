@@ -618,7 +618,8 @@ CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string
     // std::cout << "Starting snapshot retrieval for " << fileUrl << "\n";
     o2::pmr::vector<char> dst;
     // loadFileToMemory(dst, fileUrl, nullptr, true, true); // TODO remove hardcoded address
-    loadFileToMemory(dst, "/home/mtrzebun/alice/LOCAL_CACHE/Analysis/ALICE3/Centrality/snapshot.root", nullptr, true, true); // TODO remove hardcoded address
+    // loadFileToMemory(dst, "/home/mtrzebun/alice/LOCAL_CACHE/Analysis/ALICE3/Centrality/snapshot.root", nullptr, true, true); // TODO remove hardcoded address
+    loadFileToMemory(dst, getSnapshotFile(mSnapshotTopPath, url), nullptr, true, true); // TODO remove hardcoded address
     std::cout << "Vector size " << dst.size() << "\n";
     return new TransferResults(); // TODO change from mock to serious
   } else {
@@ -626,10 +627,6 @@ CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string
     HeaderObjectPair_t hoPair{{}, &dst, 0};
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)&hoPair);
-
-      
-    // curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
-    // curl_easy_setopt(handle, CURLOPT_WRITEDATA, &dst);
     curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
     auto userAgent = uniqueAgentID();
     curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
@@ -655,11 +652,11 @@ void* CCDBDownloader::downloadAlienContent(std::string const& url, std::type_inf
   if (!initTGrid()) {
     return nullptr;
   }
-  // std::lock_guard<std::mutex> guard(gIOMutex);
+  // std::lock_guard<std::mutex> guard(gIOMutex); // TODO double check
   auto memfile = TMemFile::Open(url.c_str(), "OPEN");
   if (memfile) {
     auto cl = tinfo2TClass(tinfo);
-    auto content = extractFromTFile(*memfile, cl, "ccdb_object"); // TODO REMOVE
+    auto content = extractFromTFile(*memfile, cl, "ccdb_object"); // TODO REMOVE "ccdb_object"
     delete memfile;
     return content;
   }

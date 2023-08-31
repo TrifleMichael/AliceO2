@@ -243,6 +243,15 @@ class CCDBDownloader
   TransferResults* scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr)); // TODO comment
 
  private:
+  std::string mSnapshotTopPath{}; // todo
+  std::string mSnapshotCachePath{}; // todo
+
+  std::string getSnapshotDir(const std::string& topdir, const std::string& path) const { return topdir + "/" + path; } // todo
+  std::string getSnapshotFile(const std::string& topdir, const std::string& path, const std::string& sfile = "snapshot.root") const // todo
+  {
+    return getSnapshotDir(topdir, path) + '/' + sfile;
+  }
+
   constexpr static const char* CCDBMETA_ENTRY = "ccdb_meta"; // TODO comment
 
   void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders, bool mInSnapshotMode, bool mPreferSnapshotCache) const; // TODO comment

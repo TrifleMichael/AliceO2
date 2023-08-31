@@ -130,10 +130,6 @@ BOOST_AUTO_TEST_CASE(perform_test)
   auto results = downloader.scheduleFromRequest(host, url, dst, writeCallBack);
   curl_global_cleanup();
 
-  // std::cout << "Are results nullptr? " << (results->objectPtr == nullptr) << "\n"; // TODO eeeee
-  // o2::ccdb::CcdbApi api;
-  // downloader.test(api);
-
   BOOST_CHECK(1 == 2);
   // auto file = downloader.getFromPromise(promise);
 
@@ -161,7 +157,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
 //   curl_easy_cleanup(handle);
 //   curl_global_cleanup();
 // }
-
+// kurczak, tadoori, bułki, mleko, tabasco, wino, spread kanapkowy, 
 // BOOST_AUTO_TEST_CASE(blocking_batch_test)
 // {
 //   if (curl_global_init(CURL_GLOBAL_ALL)) {

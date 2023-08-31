@@ -120,9 +120,9 @@ BOOST_AUTO_TEST_CASE(test2)
 {
   setenv("ALICEO2_CCDB_LOCALCACHE", "LOCAL_CACHE", 0);
   CcdbApi api;
-  //string ccdbUrl = "http://mdesk.cern.ch:8080";
+  // string ccdbUrl = "http://mdesk.cern.ch:8080";
   // string ccdbUrl = "http://ccdb-test.cern.ch:8080";
-  //string ccdbUrl = "https://alice-ccdb.cern.ch/";
+  // string ccdbUrl = "https://alice-ccdb.cern.ch/";
   string ccdbUrl = "file://LOCAL_CACHE";
   api.init(ccdbUrl);
 
