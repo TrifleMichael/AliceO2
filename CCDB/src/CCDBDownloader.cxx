@@ -641,7 +641,7 @@ void* CCDBDownloader::downloadAlienContent(std::string const& url, std::type_inf
   auto memfile = TMemFile::Open(url.c_str(), "OPEN");
   if (memfile) {
     auto cl = tinfo2TClass(tinfo);
-    auto content = extractFromTFile(*memfile, cl, "o2::base::MatLayerCylSet"); // TODO REMOVE
+    auto content = extractFromTFile(*memfile, cl, "ccdb_object"); // TODO REMOVE
     delete memfile;
     return content;
   }

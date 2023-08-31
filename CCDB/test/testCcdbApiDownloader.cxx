@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
   std::string host = "http://alice-ccdb.cern.ch";
   // std::string host = "http://ccdb-test.cern.ch:8080";
   // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
-  std::string url = "/ACO/Align";
+  std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
 
   auto results = downloader.scheduleFromRequest(host, url, &dst, CurlWrite_CallbackFunc_StdString2);
   curl_global_cleanup();
