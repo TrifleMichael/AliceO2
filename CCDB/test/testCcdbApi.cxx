@@ -118,7 +118,14 @@ struct test_fixture {
 
 BOOST_AUTO_TEST_CASE(test2)
 {
-  test_fixture f;
+  setenv("ALICEO2_CCDB_LOCALCACHE", "1", 0);
+  CcdbApi api;
+  //string ccdbUrl = "http://mdesk.cern.ch:8080";
+  // string ccdbUrl = "http://ccdb-test.cern.ch:8080";
+  //string ccdbUrl = "https://alice-ccdb.cern.ch/";
+  string ccdbUrl = "file://1";
+  api.init(ccdbUrl);
+
   map<string, string> metadata;
   map<string, string> headers;
   o2::pmr::vector<char> v;
@@ -127,8 +134,11 @@ BOOST_AUTO_TEST_CASE(test2)
   string etag = "";
   string createdNotBefore = "";
   string createdNotAfter = "";
-  f.api.loadFileToMemory(v, url, metadata, 1645780010602, &headers, etag, createdNotBefore, createdNotAfter);
+  api.loadFileToMemory(v, url, metadata, 1645780010602, &headers, etag, createdNotBefore, createdNotAfter);
   cout << "Size of vector " << v.size() << "\n";
+  o2::pmr::vector<char> v2;
+  cout << "Imma do it a second time\n";
+  api.loadFileToMemory(v2, url, metadata, 1645780010602, &headers, etag, createdNotBefore, createdNotAfter);
   BOOST_CHECK(1 == 2);
 }
 

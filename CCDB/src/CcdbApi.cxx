@@ -1514,6 +1514,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   };
 
   if (createSnapshot) { // create named semaphore
+    cout << "createSnapshot\n";
     std::hash<std::string> hasher;
     semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
     try {
@@ -1533,15 +1534,18 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   }
 
   if (mInSnapshotMode) { // file must be there, otherwise a fatal will be produced
+    cout << "inSnapshotMode\n";
     loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), headers);
     fromSnapshot = 1;
   } else if (mPreferSnapshotCache && std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path))) {
+    cout << "mPreferedSnapshotCache && std::filesystem::exists...\n";
     // if file is available, use it, otherwise cache it below from the server. Do this only when etag is empty since otherwise the object was already fetched and cached
     if (etag.empty()) {
       loadFileToMemory(dest, snapshotpath, headers);
     }
     fromSnapshot = 2;
   } else { // look on the server
+    cout << "just downloading here\n";
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
     string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
@@ -1568,8 +1572,11 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 
   // are we asked to create a snapshot ?
   if (createSnapshot && fromSnapshot != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
+    cout << "Storing in snapshot I guess\n";
     auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
+    cout << "Snapshot dir " << snapshotdir << "\n";
     snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
+    cout << "snapshotpath " << snapshotpath << "\n";
     o2::utils::createDirectoriesIfAbsent(snapshotdir);
     if (logStream->is_open()) {
       *logStream.get() << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
@@ -1577,6 +1584,8 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
     { // dump image to a file
       LOGP(debug, "creating snapshot {} -> {}", path, snapshotpath);
       CCDBQuery querysummary(path, metadata, timestamp);
+      cout << "Query summary\n";
+      querysummary.print();
       {
         std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
         std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
