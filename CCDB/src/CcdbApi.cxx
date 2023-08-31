@@ -1498,6 +1498,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
   // this would mean that the object was is already fetched and in this mode we don't to validity checks!
   bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
+  cout << "considerSnapshot: " << considerSnapshot << " !mSnapshotCachePath.empty(): " << !mSnapshotCachePath.empty() << "\n";
   int fromSnapshot = 0;
   boost::interprocess::named_semaphore* sem = nullptr;
   std::string semhashedstring{}, snapshotpath{}, logfile{};

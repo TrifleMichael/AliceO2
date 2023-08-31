@@ -57,7 +57,8 @@ struct Fixture {
   {
     CcdbApi api;
     // ccdbUrl = "http://mdesk.cern.ch:8080";
-    ccdbUrl = "https://alice-ccdb.cern.ch/";
+    ccdbUrl = "http://ccdb-test.cern.ch:8080";
+    // ccdbUrl = "https://alice-ccdb.cern.ch/";
     api.init(ccdbUrl);
     cout << "ccdb url: " << ccdbUrl << endl;
     hostReachable = api.isHostReachable();
@@ -108,11 +109,27 @@ struct test_fixture {
   map<string, string> metadata;
 };
 
-BOOST_AUTO_TEST_CASE(test)
+// BOOST_AUTO_TEST_CASE(test1)
+// {
+//   test_fixture f;
+//   map<string, string> metadata;
+//   auto x = f.api.retrieveFromTFileAny<TObject>("/GLO/Param/MatLUT", metadata);
+// }
+
+BOOST_AUTO_TEST_CASE(test2)
 {
   test_fixture f;
   map<string, string> metadata;
-  auto x = f.api.retrieveFromTFileAny<TObject>("/GLO/Param/MatLUT", metadata);
+  map<string, string> headers;
+  o2::pmr::vector<char> v;
+  // string url = "http://ccdb-test.cern.ch:8080/Analysis/ALICE3/Centrality";
+  string url = "Analysis/ALICE3/Centrality";
+  string etag = "";
+  string createdNotBefore = "";
+  string createdNotAfter = "";
+  f.api.loadFileToMemory(v, url, metadata, 1645780010602, &headers, etag, createdNotBefore, createdNotAfter);
+  cout << "Size of vector " << v.size() << "\n";
+  BOOST_CHECK(1 == 2);
 }
 
 // BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))
