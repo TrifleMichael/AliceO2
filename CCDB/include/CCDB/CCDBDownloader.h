@@ -237,6 +237,8 @@ class CCDBDownloader
   TransferResults* scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*)); // TODO comment
 
  private:
+  void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders) const; // TODO comment
+
   constexpr static const char* CCDBOBJECT_ENTRY = "ccdb_object"; // TODO comment
 
   bool mNeedAlienToken = true; // TODO comment

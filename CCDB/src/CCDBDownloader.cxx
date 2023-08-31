@@ -612,24 +612,30 @@ std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
 
 CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string host, std::string url, std::string* dst, size_t (*writeCallback)(void*, size_t, size_t, std::string*))
 {
-  CURL* handle = curl_easy_init();
-  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
-  curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
-  auto userAgent = uniqueAgentID();
-  curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
+  if (url.substr(0, 7).compare("file://") == 0) {
+    // o2::pmr::vector<char> dst;
+    // loadFileToMemory()
+    return new TransferResults(); // TODO change from mock to serious
+  } else {
+    CURL* handle = curl_easy_init();
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, dst);
+    curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
+    auto userAgent = uniqueAgentID();
+    curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
 
-  std::vector<CURL*> handleVector;
-  handleVector.push_back(handle);
-  TransferResults* results = batchRequestPerform(host, handleVector);
+    std::vector<CURL*> handleVector;
+    handleVector.push_back(handle);
+    TransferResults* results = batchRequestPerform(host, handleVector);
 
-  std::cout << "Curl code " << results->curlCodes[0] << "\n";
-  long httpCode;
-  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  std::cout << "Http code " << httpCode << "\n";
+    std::cout << "Curl code " << results->curlCodes[0] << "\n";
+    long httpCode;
+    curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+    std::cout << "Http code " << httpCode << "\n";
 
-  curl_easy_cleanup(handle);
-  return results;
+    curl_easy_cleanup(handle);
+    return results;
+  }
 }
 
 void* CCDBDownloader::downloadAlienContent(std::string const& url, std::type_info const& tinfo) const
@@ -740,6 +746,69 @@ bool CCDBDownloader::checkAlienToken()
     LOG(error) << "...";
   }
   return returncode == 0;
+}
+
+// TODO convert mInSnapshotMode and mPreferSnapshotCache to member fields
+void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders, bool mInSnapshotMode, bool mPreferSnapshotCache) const
+{
+  // Read file to memory as vector. For special case of the locally cached file retriev metadata stored directly in the file
+  constexpr size_t MaxCopySize = 0x1L << 25;
+  auto signalError = [&dest, localHeaders]() {
+    dest.clear();
+    dest.reserve(1);
+    if (localHeaders) { // indicate that an error occurred ---> used by caching layers (such as CCDBManager)
+      (*localHeaders)["Error"] = "An error occurred during retrieval";
+    }
+  };
+  if (path.find("alien:/") == 0 && !initTGrid()) {
+    signalError();
+    return;
+  }
+  std::string fname(path);
+  if (fname.find("?filetype=raw") == std::string::npos) {
+    fname += "?filetype=raw";
+  }
+  std::unique_ptr<TFile> sfile{TFile::Open(fname.c_str())};
+  if (!sfile || sfile->IsZombie()) {
+    LOG(error) << "Failed to open file " << fname;
+    signalError();
+    return;
+  }
+  size_t totalread = 0, fsize = sfile->GetSize(), b00 = sfile->GetBytesRead();
+  dest.resize(fsize);
+  char* dptr = dest.data();
+  sfile->Seek(0);
+  long nread = 0;
+  do {
+    size_t b0 = sfile->GetBytesRead(), b1 = b0 - b00;
+    size_t readsize = fsize - b1 > MaxCopySize ? MaxCopySize : fsize - b1;
+    if (readsize == 0) {
+      break;
+    }
+    sfile->Seek(totalread, TFile::kBeg);
+    bool failed = sfile->ReadBuffer(dptr, (Int_t)readsize);
+    nread = sfile->GetBytesRead() - b0;
+    if (failed || nread < 0) {
+      LOG(error) << "failed to copy file " << fname << " to memory buffer";
+      signalError();
+      return;
+    }
+    dptr += nread;
+    totalread += nread;
+  } while (nread == (long)MaxCopySize);
+
+  if (localHeaders) {
+    TMemFile memFile("name", const_cast<char*>(dest.data()), dest.size(), "READ");
+    auto storedmeta = (std::map<std::string, std::string>*)extractFromTFile(memFile, TClass::GetClass("std::map<std::string, std::string>"), CCDBMETA_ENTRY);
+    if (storedmeta) {
+      *localHeaders = *storedmeta; // do a simple deep copy
+      delete storedmeta;
+    }
+    if ((mInSnapshotMode || mPreferSnapshotCache) && localHeaders->find("ETag") == localHeaders->end()) { // generate dummy ETag to profit from the caching
+      (*localHeaders)["ETag"] = path;
+    }
+  }
+  return;
 }
 
 } // namespace o2

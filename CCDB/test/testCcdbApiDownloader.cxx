@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
   auto results = downloader.scheduleFromRequest(host, url, &dst, CurlWrite_CallbackFunc_StdString2);
   curl_global_cleanup();
 
-  std::cout << "Are results nullptr? " << (results->objectPtr == nullptr) << "\n"; // TODO eeeee
+  // std::cout << "Are results nullptr? " << (results->objectPtr == nullptr) << "\n"; // TODO eeeee
   // o2::ccdb::CcdbApi api;
   // downloader.test(api);
 
