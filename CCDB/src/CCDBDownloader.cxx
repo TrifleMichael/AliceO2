@@ -718,7 +718,6 @@ bool CCDBDownloader::initTGrid() const
     if (!allowNoToken && !checkAlienToken()) {
       LOG(fatal) << "Alien Token Check failed - Please get an alien token before running with https CCDB endpoint, or alice-ccdb.cern.ch!";
     }
-    std::cout << "Connecting to grid\n";
     mAlienInstance = TGrid::Connect("alien");
     static bool errorShown = false;
     if (!mAlienInstance && errorShown == false) {
