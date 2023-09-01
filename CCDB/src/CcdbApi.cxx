@@ -52,7 +52,7 @@ namespace o2::ccdb
 
 using namespace std;
 
-std::mutex gIOMutex; // to protect TMemFile IO operations
+std::mutex gIOMutex; // to protect TMemFile IO operations // TODO
 unique_ptr<TJAlienCredentials> CcdbApi::mJAlienCredentials = nullptr;
 
 CcdbApi::CcdbApi()

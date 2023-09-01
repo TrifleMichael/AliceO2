@@ -61,6 +61,8 @@ using namespace std;
 namespace o2::ccdb
 {
 
+// std::mutex gIOMutex; // to protect TMemFile IO operations // TODO here is good?
+
 /*
  Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.
  Because non-static functions are used in the functions below, they must be non-member.
@@ -182,9 +184,6 @@ class CCDBDownloader
    */
   TransferResults* batchAsynchPerform(std::vector<CURL*> const& handleVector);
 
-  // TODO comment
-  TransferResults* batchRequestPerform(std::vector<CURL*> const& handleVector);
-
   /**
    * Performs on a batch of handles, identified via transfer results. It's the equivalent of using future.get()
    *
@@ -244,9 +243,17 @@ class CCDBDownloader
 
   TransferResults* scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr)); // TODO comment
 
-  bool mInSnapshotMode;
+  bool mInSnapshotMode = false;
+  void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
+                        std::map<std::string, std::string> const& metadata, long timestamp,
+                        std::map<std::string, std::string>* headers, std::string const& etag,
+                        const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot,
+                        size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
 
- private:  
+  void init(std::vector<std::string> hosts);
+
+ private:
+  TransferResults* scheduleFromRequest2(CURL* handle, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
   std::string mUrl;
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity
   static bool isMemoryFileInvalid(const o2::pmr::vector<char>& v) { return v.size() == 0 && v.capacity() > 0; }
@@ -279,10 +286,7 @@ class CCDBDownloader
 
    /// initialize HTTPS header information for the CURL handle. Needs to be given an existing curl_slist* pointer to work with (may be nullptr), which needs to be free by the caller.
   void initCurlHTTPHeaderOptionsForRetrieve(CURL* curlHandle, curl_slist*& option_list, long timestamp, std::map<std::string, std::string>* headers, std::string const& etag, const std::string& createdNotAfter, const std::string& createdNotBefore) const;
-  void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
-                        std::map<std::string, std::string> const& metadata, long timestamp,
-                        std::map<std::string, std::string>* headers, std::string const& etag,
-                        const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
+
 
   bool mPreferSnapshotCache;
   std::string snapshotReport;
@@ -298,7 +302,7 @@ class CCDBDownloader
   constexpr static const char* CCDBMETA_ENTRY = "ccdb_meta"; // TODO comment
   constexpr static const char* CCDBQUERY_ENTRY = "ccdb_query";
 
-  void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders) const; // TODO comment
+  void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders); // TODO comment
 
   constexpr static const char* CCDBOBJECT_ENTRY = "ccdb_object"; // TODO comment
 

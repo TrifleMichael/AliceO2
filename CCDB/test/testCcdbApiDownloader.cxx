@@ -111,6 +111,31 @@ size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr) 
   return realsize;
 }
 
+// BOOST_AUTO_TEST_CASE(perform_test)
+// {
+//   if (curl_global_init(CURL_GLOBAL_ALL)) {
+//     fprintf(stderr, "Could not init curl\n");
+//     return;
+//   }
+
+//   CCDBDownloader downloader;
+//   o2::pmr::vector<char> dst;
+//   // std::string host = "http://mdesk.cern.ch:8080";
+//   // std::string host = "http://alice-ccdb.cern.ch";
+//   std::string host = "http://ccdb-test.cern.ch:8080";
+
+//   // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
+//   std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
+//   // std::string url = "file://Analysis/ALICE3/Centrality/1646729604010";
+
+//   auto results = downloader.scheduleFromRequest(host, url, dst, writeCallBack);
+//   curl_global_cleanup();
+
+//   BOOST_CHECK(1 == 2);
+//   // auto file = downloader.getFromPromise(promise);
+
+// }
+
 BOOST_AUTO_TEST_CASE(perform_test)
 {
   if (curl_global_init(CURL_GLOBAL_ALL)) {
@@ -118,16 +143,21 @@ BOOST_AUTO_TEST_CASE(perform_test)
     return;
   }
 
+  std::vector<std::string> hosts;
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
+
   CCDBDownloader downloader;
+  downloader.init(hosts);
   o2::pmr::vector<char> dst;
   // std::string host = "http://mdesk.cern.ch:8080";
   // std::string host = "http://alice-ccdb.cern.ch";
-  std::string host = "http://ccdb-test.cern.ch:8080";
-  // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
-  // std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
 
-  std::string url = "file://Analysis/ALICE3/Centrality/1646729604010";
-  auto results = downloader.scheduleFromRequest(host, url, dst, writeCallBack);
+  // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
+  std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
+  // std::string url = "file://Analysis/ALICE3/Centrality/1646729604010";
+
+  map<string, string> metadata;
+  downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
   curl_global_cleanup();
 
   BOOST_CHECK(1 == 2);
