@@ -628,7 +628,6 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string
     mHandlesToBeAdded.push_back(handleVector[handleIndex]);
   }
   checkHandleQueue();
-  std::cout << "About to run uvloop\n";
   while (results->requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
   }
@@ -1063,10 +1062,8 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUserAgentId.c_str());
     string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
-    std::cout << "A\n";
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-    std::cout << "B\n";
     scheduleFromRequest2(curl_handle, fullUrl, dest, writeCallBack);
 
     std::cout << "---- VECTOR SIZE " << dest.size() << "----\n"; 
