@@ -11,6 +11,8 @@
 #ifndef O2_CCDBDOWNLOADER_H_
 #define O2_CCDBDOWNLOADER_H_
 
+#include "CCDB/CCDBQuery.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <curl/curl.h>
@@ -242,7 +244,48 @@ class CCDBDownloader
 
   TransferResults* scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr)); // TODO comment
 
- private:
+  bool mInSnapshotMode;
+
+ private:  
+  std::string mUrl;
+  // the failure to load the file to memory is signaled by 0 size and non-0 capacity
+  static bool isMemoryFileInvalid(const o2::pmr::vector<char>& v) { return v.size() == 0 && v.capacity() > 0; }
+  // internal helper function to update a CCDB file with meta information
+  static void updateMetaInformationInLocalFile(std::string const& filename, std::map<std::string, std::string> const* headers, CCDBQuery const* querysummary = nullptr);
+  // report what file is read and for which purpose
+  void logReading(const std::string& path, long ts, const std::map<std::string, std::string>* headers, const std::string& comment) const;
+  std::string getHostUrl(int hostIndex) const;
+  std::vector<std::string> hostsPool{};
+
+  /**
+   * Transform and return a string representation of the given timestamp.
+   *
+   * @param timestamp
+   * @return a string representation of the given timestamp.
+   */
+  std::string getTimestampString(long timestamp) const;
+
+
+   /**
+   * Build the full url to store an object.
+   * @param path The path where the object is going to be found.
+   * @param metadata Key-values representing the metadata for this object.
+   * @param timestamp When the object we retrieve must be valid. If omitted or negative, the current timestamp is used.
+   * @return The full url to store an object (url / startValidity / endValidity / [metadata &]* )
+   */
+  std::string getFullUrlForRetrieval(CURL* curl, const std::string& path, const std::map<std::string, std::string>& metadata,
+                                     long timestamp = -1, int hostIndex = 0) const;
+
+
+   /// initialize HTTPS header information for the CURL handle. Needs to be given an existing curl_slist* pointer to work with (may be nullptr), which needs to be free by the caller.
+  void initCurlHTTPHeaderOptionsForRetrieve(CURL* curlHandle, curl_slist*& option_list, long timestamp, std::map<std::string, std::string>* headers, std::string const& etag, const std::string& createdNotAfter, const std::string& createdNotBefore) const;
+  void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
+                        std::map<std::string, std::string> const& metadata, long timestamp,
+                        std::map<std::string, std::string>* headers, std::string const& etag,
+                        const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
+
+  bool mPreferSnapshotCache;
+  std::string snapshotReport;
   std::string mSnapshotTopPath{}; // todo
   std::string mSnapshotCachePath{}; // todo
 
@@ -253,8 +296,9 @@ class CCDBDownloader
   }
 
   constexpr static const char* CCDBMETA_ENTRY = "ccdb_meta"; // TODO comment
+  constexpr static const char* CCDBQUERY_ENTRY = "ccdb_query";
 
-  void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders, bool mInSnapshotMode, bool mPreferSnapshotCache) const; // TODO comment
+  void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders) const; // TODO comment
 
   constexpr static const char* CCDBOBJECT_ENTRY = "ccdb_object"; // TODO comment
 
