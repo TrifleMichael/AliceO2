@@ -233,7 +233,7 @@ class CCDBDownloader
    */
   void runLoop(bool noWait);
 
-  TransferResults* batchRequestPerform(std::vector<CURL*> const& handleVector, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst); // TODO comment
+  TransferResults* batchRequestPerform(CURL* const& handleVector, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst); // TODO comment
 
   struct HeaderObjectPair_t { // TODO move
     std::map<std::string, std::string> header;
