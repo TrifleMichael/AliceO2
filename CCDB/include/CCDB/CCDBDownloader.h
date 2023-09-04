@@ -233,7 +233,7 @@ class CCDBDownloader
    */
   void runLoop(bool noWait);
 
-  TransferResults* batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector); // TODO comment
+  TransferResults* batchRequestPerform(std::vector<CURL*> const& handleVector, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst); // TODO comment
 
   struct HeaderObjectPair_t { // TODO move
     std::map<std::string, std::string> header;
@@ -255,7 +255,7 @@ class CCDBDownloader
   void initInSnapshotMode(std::string const& snapshotpath);
 
  private:
-  TransferResults* scheduleFromRequest2(std::string host, CURL* handle, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
+  TransferResults* scheduleFromRequest2(CURL* handle, uint hostInd, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
   std::string mUrl;
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity
   static bool isMemoryFileInvalid(const o2::pmr::vector<char>& v) { return v.size() == 0 && v.capacity() > 0; }
@@ -393,6 +393,13 @@ class CCDBDownloader
     int currentLocationIndex = -1;
     std::string host;
     void** objectPtr;
+  
+    uint hostInd;
+    const std::map<std::string, std::string> *metadata;
+    std::string path;
+    long timestamp;
+    o2::pmr::vector<char>* dst;
+
   } PerformData;
 
   /**

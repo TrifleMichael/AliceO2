@@ -432,7 +432,15 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       }
 
       if (!nextDownloadScheduled) {
+        // No more redirects to follow
         deletePerformData(data, curlCode);
+      }
+    } else if (data->dst->size() == 0) { // TODO recheck the condition
+      if (++data->hostInd < hostsPool.size()) {
+        string fullUrl = getFullUrlForRetrieval(easy_handle, data->path, *data->metadata, data->timestamp, data->hostInd);
+        std::cout << "Pointing to next host " << fullUrl << "\n";
+        curl_easy_setopt(easy_handle, CURLOPT_URL, fullUrl.c_str());
+        mHandlesToBeAdded.push_back(easy_handle);
       }
     } else {
       deletePerformData(data, curlCode);
@@ -595,24 +603,28 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchAsynchPerform(std::vector<
   return results;
 }
 
-CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string host, std::vector<CURL*> const& handleVector)
+CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::vector<CURL*> const& handleVector, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst)
 {
   auto results = prepareResultsStruct(handleVector.size());
   std::map<CURL*, std::vector<std::string>*> locationsMap;
 
   for (int handleIndex = 0; handleIndex < handleVector.size(); handleIndex++) {
     auto* data = createPerformData(handleIndex, results, REQUEST);
+    data->hostInd = 0;
+    data->path = path;
+    data->metadata = &metadata;
+    data->timestamp = timestamp;
     data->objectPtr = &results->objectPtr; // TODO Multiple objects !
+    data->dst = &dst;
 
     CURL* handle = handleVector[handleIndex];
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, WriteHeaderCallback);
     locationsMap[handle] = new std::vector<std::string>();
     curl_easy_setopt(handle, CURLOPT_HEADERDATA, locationsMap[handle]);
     data->locationsMap = &locationsMap;
-    data->host = host;
 
     setHandleOptions(handleVector[handleIndex], data);
-    std::cout << "Starting transfer for host " << host << "\n";
+    std::cout << "Starting transfer for host " << hostsPool.at(0) + path << "\n";
     mHandlesToBeAdded.push_back(handleVector[handleIndex]);
   }
   checkHandleQueue();
@@ -671,18 +683,19 @@ void CCDBDownloader::init(std::vector<std::string> hosts) {
   hostsPool = hosts;
 }
 
-CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(std::string host, CURL* handle, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
+CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(CURL* handle, uint hostInd, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
 {
   HeaderObjectPair_t hoPair{{}, &dst, 0};
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)&hoPair);
-  curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
+  string fullUrl = getFullUrlForRetrieval(handle, path, metadata, timestamp, hostInd);
+  curl_easy_setopt(handle, CURLOPT_URL, fullUrl.c_str());
   auto userAgent = uniqueAgentID();
   curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
 
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
-  TransferResults* results = batchRequestPerform(host, handleVector);
+  TransferResults* results = batchRequestPerform(handleVector, path, metadata, timestamp, dst);
 
   std::cout << "Curl code " << results->curlCodes[0] << "\n";
   long httpCode;
@@ -1049,15 +1062,15 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
   } else { // look on the server
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUserAgentId.c_str());
-    string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
+    // string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-    scheduleFromRequest2(hostsPool.at(0), curl_handle, fullUrl, dest, writeCallBack);
+    scheduleFromRequest2(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
 
-    for (size_t hostIndex = 1; hostIndex < hostsPool.size() && (isMemoryFileInvalid(dest) || dest.size() == 0); hostIndex++) {
-      fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
-      scheduleFromRequest2(hostsPool.at(hostIndex), curl_handle, fullUrl, dest, writeCallBack);
-    }
+    // for (size_t hostIndex = 1; hostIndex < hostsPool.size() && (isMemoryFileInvalid(dest) || dest.size() == 0); hostIndex++) {
+    //   fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
+    //   scheduleFromRequest2(hostsPool.at(hostIndex), curl_handle, fullUrl, dest, writeCallBack);
+    // }
     curl_slist_free_all(options_list);
     curl_easy_cleanup(curl_handle);
   }
