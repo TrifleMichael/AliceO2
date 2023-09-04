@@ -251,6 +251,7 @@ class CCDBDownloader
                         size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
 
   void init(std::vector<std::string> hosts);
+  void initInSnapshotMode(std::string const& snapshotpath);
 
  private:
   TransferResults* scheduleFromRequest2(CURL* handle, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));

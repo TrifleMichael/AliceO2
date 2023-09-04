@@ -1002,12 +1002,19 @@ string CCDBDownloader::getFullUrlForRetrieval(CURL* curl, const string& path, co
   return fullUrl;
 }
 
+void CCDBDownloader::initInSnapshotMode(std::string const& snapshotpath)
+{
+  mSnapshotTopPath = snapshotpath.empty() ? "." : snapshotpath;
+  mInSnapshotMode = true;
+}
+
 void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
                                std::map<std::string, std::string> const& metadata, long timestamp,
                                std::map<std::string, std::string>* headers, std::string const& etag,
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot,
                                size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
 {
+  std::cout << "PATH " << path << "\n";
   LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
 
   // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
@@ -1047,7 +1054,9 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
   }
 
   if (mInSnapshotMode) { // file must be there, otherwise a fatal will be produced
-    std::cout << "Snapshot cache 1\n";
+    std::cout << "Entering here, getSnapshotFile " << getSnapshotFile(mSnapshotTopPath, path) << "\n";
+    std::cout << "path " << path << "\n";
+    std::cout << "mSnapshotTopPath " << mSnapshotTopPath << "\n";
     loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), headers);
     fromSnapshot = 1;
   } else if (mPreferSnapshotCache && std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path))) {
