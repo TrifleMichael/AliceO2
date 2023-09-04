@@ -605,7 +605,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchAsynchPerform(std::vector<
   return results;
 }
 
-CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(CURL* const& handle, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst)
+CCDBDownloader::TransferResults* CCDBDownloader::performRequest(CURL* const& handle, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst)
 {
   auto results = prepareResultsStruct(1); // TODO remove this vector?
   std::map<CURL*, std::vector<std::string>*> locationsMap;
@@ -646,7 +646,7 @@ void CCDBDownloader::init(std::vector<std::string> hosts) {
   hostsPool = hosts;
 }
 
-CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(CURL* handle, uint hostInd, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
+CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(CURL* handle, uint hostInd, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
 {
   HeaderObjectPair_t hoPair{{}, &dst, 0};
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
@@ -657,7 +657,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(CURL* hand
   curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
 
   std::cout << "Starting transfer for " << fullUrl << "\n";
-  TransferResults* results = batchRequestPerform(handle, path, metadata, timestamp, dst);
+  TransferResults* results = performRequest(handle, path, metadata, timestamp, dst);
 
   std::cout << "Curl code " << results->curlCodes[0] << "\n";
   long httpCode;
@@ -1034,7 +1034,7 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
 
-    scheduleFromRequest2(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
+    scheduleFromRequest(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
 
     curl_slist_free_all(options_list);
     curl_easy_cleanup(curl_handle);
