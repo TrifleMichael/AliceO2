@@ -388,7 +388,6 @@ void CCDBDownloader::deletePerformData(CCDBDownloader::PerformData* data, CURLco
 
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
-  std::cout << "Transfer finished\n";
   mHandlesInUse--;
   PerformData* data;
   curlEasyErrorCheck(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &data));
@@ -413,17 +412,14 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       bool resultRetrieved = false;
       while (++data->currentLocationIndex < locationVector->size() && !resultRetrieved) {
         std::string nextLocation = (*locationVector)[data->currentLocationIndex];
-        // std::cout << "Redirect to: " << nextLocation << "\n";
 
         if (nextLocation.find("file:/", 0) != std::string::npos) {
 
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
-          std::cout << "Retrieving content from alien at " << nextLocation << "\n";
           void* item = downloadAlienContent(nextLocation, typeid(TObject));
           *data->objectPtr = item;
           if (item) {
             resultRetrieved = true;
-            std::cout << "Succesfully retrieved\n";
           }
         } else {
           curl_easy_setopt(easy_handle, CURLOPT_URL, (data->hostUrl + nextLocation).c_str());
@@ -533,18 +529,6 @@ CURLcode CCDBDownloader::perform(CURL* handle)
 
   auto code = batchBlockingPerform(handleVector).back();
 
-  // std::vector<std::string> locations;
-  // for(int i = 0; i < headers.size(); i++) {
-  //   if (headers[i].find("Content-Location") != std::string::npos) {
-  //     locations.push_back(headers[i].substr(18));
-  //   }
-  // }
-
-  // for(int i = 0; i < locations.size(); i++) {
-  //   std::cout << "Location: " << locations[i];
-  // }
-
-
   return code;
 }
 
@@ -644,40 +628,41 @@ std::vector<CURLcode>::iterator CCDBDownloader::getAll(TransferResults* results)
 }
 
 // TODO : what if starting url is alien
-CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
-{
-  // if (url.substr(0, 7).compare("file://") == 0) {
-  //   // std::string fileUrl = "/home/mtrzebun/alice/LOCAL_CACHE" + url.substr(6);
-  //   // std::cout << "Starting snapshot retrieval for " << fileUrl << "\n";
-  //   o2::pmr::vector<char> dst;
-  //   // loadFileToMemory(dst, fileUrl, nullptr, true, true); // TODO remove hardcoded address
-  //   // loadFileToMemory(dst, "/home/mtrzebun/alice/LOCAL_CACHE/Analysis/ALICE3/Centrality/snapshot.root", nullptr, true, true); // TODO remove hardcoded address
-  //   loadFileToMemory(dst, getSnapshotFile(mSnapshotTopPath, url), nullptr); // TODO remove hardcoded address
-  //   std::cout << "Vector size " << dst.size() << "\n";
-  //   return new TransferResults(); // TODO change from mock to serious
-  // } else {
-  CURL* handle = curl_easy_init();
-  HeaderObjectPair_t hoPair{{}, &dst, 0};
-  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)&hoPair);
-  curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
-  auto userAgent = uniqueAgentID();
-  curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
+// CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
+// {
+//   // if (url.substr(0, 7).compare("file://") == 0) {
+//   //   // std::string fileUrl = "/home/mtrzebun/alice/LOCAL_CACHE" + url.substr(6);
+//   //   // std::cout << "Starting snapshot retrieval for " << fileUrl << "\n";
+//   //   o2::pmr::vector<char> dst;
+//   //   // loadFileToMemory(dst, fileUrl, nullptr, true, true); // TODO remove hardcoded address
+//   //   // loadFileToMemory(dst, "/home/mtrzebun/alice/LOCAL_CACHE/Analysis/ALICE3/Centrality/snapshot.root", nullptr, true, true); // TODO remove hardcoded address
+//   //   loadFileToMemory(dst, getSnapshotFile(mSnapshotTopPath, url), nullptr); // TODO remove hardcoded address
+//   //   std::cout << "Vector size " << dst.size() << "\n";
+//   //   return new TransferResults(); // TODO change from mock to serious
+//   // } else {
+//   CURL* handle = curl_easy_init();
+//   HeaderObjectPair_t hoPair{{}, &dst, 0};
+//   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
+//   curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)&hoPair);
+//   curl_easy_setopt(handle, CURLOPT_URL, (host + url).c_str());
+//   auto userAgent = uniqueAgentID();
+//   curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
 
-  std::vector<CURL*> handleVector;
-  handleVector.push_back(handle);
-  TransferResults* results = batchRequestPerform(host, handleVector);
+//   std::vector<CURL*> handleVector;
+//   handleVector.push_back(handle);
+//   TransferResults* results = batchRequestPerform(host, handleVector);
 
-  std::cout << "Curl code " << results->curlCodes[0] << "\n";
-  long httpCode;
-  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  std::cout << "Http code " << httpCode << "\n";
+//   std::cout << "Curl code " << results->curlCodes[0] << "\n";
+//   long httpCode;
+//   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+//   std::cout << "Http code " << httpCode << "\n";
 
-  std::cout << "Vector size " << dst.size() << "\n";
+//   std::cout << "Vector size " << dst.size() << "\n";
 
-  curl_easy_cleanup(handle);
-  return results;
-}
+//   curl_easy_cleanup(handle);
+//   return results;
+// }
+
 void CCDBDownloader::init(std::vector<std::string> hosts) {
   hostsPool = hosts;
 }
@@ -803,10 +788,7 @@ bool CCDBDownloader::checkAlienToken()
     return true;
   }
   if (getenv("JALIEN_TOKEN_CERT")) {
-    std::cout << "Certificate found\n";
     return true;
-  } else {
-    std::cout << "Alien token not found\n";
   }
   auto returncode = system("LD_PRELOAD= alien-token-info &> /dev/null");
   if (returncode == -1) {
@@ -1014,7 +996,6 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot,
                                size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
 {
-  std::cout << "PATH " << path << "\n";
   LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
 
   // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
@@ -1054,30 +1035,21 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
   }
 
   if (mInSnapshotMode) { // file must be there, otherwise a fatal will be produced
-    std::cout << "Entering here, getSnapshotFile " << getSnapshotFile(mSnapshotTopPath, path) << "\n";
-    std::cout << "path " << path << "\n";
-    std::cout << "mSnapshotTopPath " << mSnapshotTopPath << "\n";
     loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), headers);
     fromSnapshot = 1;
   } else if (mPreferSnapshotCache && std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path))) {
-    std::cout << "Snapshot cache 2\n";
     // if file is available, use it, otherwise cache it below from the server. Do this only when etag is empty since otherwise the object was already fetched and cached
     if (etag.empty()) {
       loadFileToMemory(dest, snapshotpath, headers);
     }
     fromSnapshot = 2;
   } else { // look on the server
-    std::cout << "Looking at the server\n";
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUserAgentId.c_str());
     string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
     scheduleFromRequest2(curl_handle, fullUrl, dest, writeCallBack);
-
-    std::cout << "---- VECTOR SIZE " << dest.size() << "----\n"; 
-
-    // navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers);
 
     for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
       fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);

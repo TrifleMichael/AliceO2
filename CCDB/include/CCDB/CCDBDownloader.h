@@ -241,7 +241,8 @@ class CCDBDownloader
     int counter = 0;
   };
 
-  TransferResults* scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr)); // TODO comment
+  // TODO probably remove
+  // TransferResults* scheduleFromRequest(std::string host, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr)); // TODO comment
 
   bool mInSnapshotMode = false;
   void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
