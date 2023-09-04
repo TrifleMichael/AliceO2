@@ -414,15 +414,18 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         std::string nextLocation = (*locationVector)[data->currentLocationIndex];
 
         if (nextLocation.find("file:/", 0) != std::string::npos) {
-
+          std::cout << "Found local file " << nextLocation << "\n";
+          // TODO react to local redirect
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
+          std::cout << "Pointed to alien "  << nextLocation << "\n";
           void* item = downloadAlienContent(nextLocation, typeid(TObject));
           *data->objectPtr = item;
           if (item) {
             resultRetrieved = true;
           }
         } else {
-          curl_easy_setopt(easy_handle, CURLOPT_URL, (data->hostUrl + nextLocation).c_str());
+          std::cout << "Setting up redirect to " << (data->host + nextLocation) << "\n";
+          curl_easy_setopt(easy_handle, CURLOPT_URL, (data->host + nextLocation).c_str());
           mHandlesToBeAdded.push_back(easy_handle);
           nextDownloadScheduled = true;
         }
@@ -606,9 +609,10 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::string
     locationsMap[handle] = new std::vector<std::string>();
     curl_easy_setopt(handle, CURLOPT_HEADERDATA, locationsMap[handle]);
     data->locationsMap = &locationsMap;
-    data->hostUrl = host;
+    data->host = host;
 
     setHandleOptions(handleVector[handleIndex], data);
+    std::cout << "Starting transfer for host " << host << "\n";
     mHandlesToBeAdded.push_back(handleVector[handleIndex]);
   }
   checkHandleQueue();
@@ -667,7 +671,7 @@ void CCDBDownloader::init(std::vector<std::string> hosts) {
   hostsPool = hosts;
 }
 
-CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(CURL* handle, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
+CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(std::string host, CURL* handle, std::string url, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
 {
   HeaderObjectPair_t hoPair{{}, &dst, 0};
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
@@ -678,8 +682,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(CURL* hand
 
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
-  std::string fakeHost = "FAKE_HOST";
-  TransferResults* results = batchRequestPerform(fakeHost, handleVector); // TODO unfake
+  TransferResults* results = batchRequestPerform(host, handleVector);
 
   std::cout << "Curl code " << results->curlCodes[0] << "\n";
   long httpCode;
@@ -1049,11 +1052,11 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
     string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-    scheduleFromRequest2(curl_handle, fullUrl, dest, writeCallBack);
+    scheduleFromRequest2(hostsPool.at(0), curl_handle, fullUrl, dest, writeCallBack);
 
-    for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
+    for (size_t hostIndex = 1; hostIndex < hostsPool.size() && (isMemoryFileInvalid(dest) || dest.size() == 0); hostIndex++) {
       fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
-      loadFileToMemory(dest, fullUrl, headers); // headers loaded from the file in case of the snapshot reading only
+      scheduleFromRequest2(hostsPool.at(hostIndex), curl_handle, fullUrl, dest, writeCallBack);
     }
     curl_slist_free_all(options_list);
     curl_easy_cleanup(curl_handle);
