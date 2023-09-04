@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
   // std::string host = "http://alice-ccdb.cern.ch";
 
   // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
-  std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
+  std::string url = "Analysis/ALICE3/Centrality";
   // std::string url = "file://Analysis/ALICE3/Centrality/1646729604010";
 
   map<string, string> metadata;
@@ -138,6 +138,10 @@ BOOST_AUTO_TEST_CASE(perform_test)
   curl_global_cleanup();
 
   BOOST_CHECK(dst.size() != 0);
+  for (int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
   // auto file = downloader.getFromPromise(promise);
 }
 
@@ -157,13 +161,17 @@ BOOST_AUTO_TEST_CASE(multiple_host_test)
   downloader.init(hosts);
   o2::pmr::vector<char> dst;
 
-  std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
+  std::string url = "Analysis/ALICE3/Centrality";
 
   map<string, string> metadata;
   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
   curl_global_cleanup();
 
   BOOST_CHECK(dst.size() != 0);
+  for (int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
 }
 
 bool prepare_cache()
@@ -173,7 +181,7 @@ bool prepare_cache()
   CCDBDownloader downloader;
   downloader.init(hosts);
   o2::pmr::vector<char> dst;
-  std::string url = "/Analysis/ALICE3/Centrality";
+  std::string url = "Analysis/ALICE3/Centrality";
   map<string, string> metadata;
   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
   if (dst.size() == 0) {
@@ -203,13 +211,17 @@ BOOST_AUTO_TEST_CASE(local_caching_test)
   downloader.init(hosts);
   o2::pmr::vector<char> dst;
 
-  std::string url = "/Analysis/ALICE3/Centrality";
+  std::string url = "Analysis/ALICE3/Centrality";
 
   map<string, string> metadata;
   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
   curl_global_cleanup();
 
   BOOST_CHECK(dst.size() != 0);
+  for (int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
 
   // TODO retrieve non trivial content
 }
