@@ -418,11 +418,13 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           // TODO react to local redirect
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
           std::cout << "Pointed to alien "  << nextLocation << "\n";
-          void* item = downloadAlienContent(nextLocation, typeid(TObject));
-          *data->objectPtr = item;
-          if (item) {
+          loadFileToMemory(*data->dst, nextLocation, nullptr); // TODO Double check whether no local headers ok
+          if (data->dst->size() != 0) {
             resultRetrieved = true;
+          } else {
+            std::cout << "PossibleError: loadFileToMemory could not retrieve object from " << nextLocation << "\n";
           }
+          // *data->objectPtr = item; // TODO What about object pointer?
         } else {
           std::cout << "Setting up redirect to " << (data->host + nextLocation) << "\n";
           curl_easy_setopt(easy_handle, CURLOPT_URL, (data->host + nextLocation).c_str());
@@ -1062,15 +1064,11 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
   } else { // look on the server
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUserAgentId.c_str());
-    // string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+
     scheduleFromRequest2(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
 
-    // for (size_t hostIndex = 1; hostIndex < hostsPool.size() && (isMemoryFileInvalid(dest) || dest.size() == 0); hostIndex++) {
-    //   fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
-    //   scheduleFromRequest2(hostsPool.at(hostIndex), curl_handle, fullUrl, dest, writeCallBack);
-    // }
     curl_slist_free_all(options_list);
     curl_easy_cleanup(curl_handle);
   }

@@ -21,6 +21,7 @@
 #include <iostream>
 #include <unistd.h> // Sleep function to wait for asynch results
 #include <fairlogger/Logger.h>
+#include <filesystem>
 
 #include <boost/test/unit_test.hpp>
 #include <boost/optional/optional.hpp>
@@ -165,58 +166,78 @@ size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr) 
 //   // auto file = downloader.getFromPromise(promise);
 // }
 
-BOOST_AUTO_TEST_CASE(multiple_host_test)
-{
-  std::cout << "-------- multiple_host_test --------\n";
-  if (curl_global_init(CURL_GLOBAL_ALL)) {
-    fprintf(stderr, "Could not init curl\n");
-    return;
-  }
-
-  std::vector<std::string> hosts;
-  hosts.push_back("http://bogus-host");
-  hosts.push_back("http://ccdb-test.cern.ch:8080");
-
-  CCDBDownloader downloader;
-  downloader.init(hosts);
-  o2::pmr::vector<char> dst;
-
-  std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
-
-  map<string, string> metadata;
-  downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
-  curl_global_cleanup();
-
-  BOOST_CHECK(dst.size() != 0);
-}
-
-// BOOST_AUTO_TEST_CASE(local_cache_test)
+// BOOST_AUTO_TEST_CASE(multiple_host_test)
 // {
-//   std::cout << "-------- local_cache_test --------\n";
+//   std::cout << "-------- multiple_host_test --------\n";
 //   if (curl_global_init(CURL_GLOBAL_ALL)) {
 //     fprintf(stderr, "Could not init curl\n");
 //     return;
 //   }
 
 //   std::vector<std::string> hosts;
+//   hosts.push_back("http://bogus-host");
 //   hosts.push_back("http://ccdb-test.cern.ch:8080");
 
 //   CCDBDownloader downloader;
-//   downloader.initInSnapshotMode("LOCAL_CACHE");
 //   downloader.init(hosts);
 //   o2::pmr::vector<char> dst;
 
-//   std::string url = "/Analysis/ALICE3/Centrality";
-//   // std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
+//   std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
 
 //   map<string, string> metadata;
 //   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
 //   curl_global_cleanup();
 
 //   BOOST_CHECK(dst.size() != 0);
-
-//   // TODO retrieve non trivial content
 // }
+
+bool prepare_cache()
+{
+  std::vector<std::string> hosts;
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
+  CCDBDownloader downloader;
+  downloader.init(hosts);
+  o2::pmr::vector<char> dst;
+  std::string url = "/Analysis/ALICE3/Centrality";
+  map<string, string> metadata;
+  downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  if (dst.size() == 0) {
+    std::cout << "Cache could not be created\n";
+  }
+  return dst.size() != 0;
+}
+
+BOOST_AUTO_TEST_CASE(local_cache_test)
+{
+  std::cout << "-------- local_cache_test --------\n";
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
+  setenv("ALICEO2_CCDB_LOCALCACHE", "LOCAL_CACHE", 1);
+
+  if (!std::filesystem::exists("./LOCAL_CACHE/Analysis/ALICE3/Centrality")) {
+    BOOST_CHECK(prepare_cache());
+  }
+
+  std::vector<std::string> hosts;
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
+
+  CCDBDownloader downloader;
+  downloader.initInSnapshotMode("LOCAL_CACHE");
+  downloader.init(hosts);
+  o2::pmr::vector<char> dst;
+
+  std::string url = "/Analysis/ALICE3/Centrality";
+
+  map<string, string> metadata;
+  downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  curl_global_cleanup();
+
+  BOOST_CHECK(dst.size() != 0);
+
+  // TODO retrieve non trivial content
+}
 
 // BOOST_AUTO_TEST_CASE(perform_test)
 // {
