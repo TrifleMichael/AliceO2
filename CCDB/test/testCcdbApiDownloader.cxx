@@ -112,84 +112,59 @@ size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr) 
   return realsize;
 }
 
-// BOOST_AUTO_TEST_CASE(perform_test)
-// {
-//   if (curl_global_init(CURL_GLOBAL_ALL)) {
-//     fprintf(stderr, "Could not init curl\n");
-//     return;
-//   }
+BOOST_AUTO_TEST_CASE(perform_test)
+{
+  std::cout << "-------- perform_test --------\n";
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
 
-//   CCDBDownloader downloader;
-//   o2::pmr::vector<char> dst;
-//   // std::string host = "http://mdesk.cern.ch:8080";
-//   // std::string host = "http://alice-ccdb.cern.ch";
-//   std::string host = "http://ccdb-test.cern.ch:8080";
+  std::vector<std::string> hosts;
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
 
-//   // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
-//   std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
-//   // std::string url = "file://Analysis/ALICE3/Centrality/1646729604010";
+  CCDBDownloader downloader;
+  downloader.init(hosts);
+  o2::pmr::vector<char> dst;
+  // std::string host = "http://mdesk.cern.ch:8080";
+  // std::string host = "http://alice-ccdb.cern.ch";
 
-//   auto results = downloader.scheduleFromRequest(host, url, dst, writeCallBack);
-//   curl_global_cleanup();
+  // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
+  std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
+  // std::string url = "file://Analysis/ALICE3/Centrality/1646729604010";
 
-//   BOOST_CHECK(1 == 2);
-//   // auto file = downloader.getFromPromise(promise);
+  map<string, string> metadata;
+  downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  curl_global_cleanup();
 
-// }
+  BOOST_CHECK(dst.size() != 0);
+  // auto file = downloader.getFromPromise(promise);
+}
 
-// BOOST_AUTO_TEST_CASE(perform_test)
-// {
-//   std::cout << "-------- perform_test --------\n";
-//   if (curl_global_init(CURL_GLOBAL_ALL)) {
-//     fprintf(stderr, "Could not init curl\n");
-//     return;
-//   }
+BOOST_AUTO_TEST_CASE(multiple_host_test)
+{
+  std::cout << "-------- multiple_host_test --------\n";
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
 
-//   std::vector<std::string> hosts;
-//   hosts.push_back("http://ccdb-test.cern.ch:8080");
+  std::vector<std::string> hosts;
+  hosts.push_back("http://bogus-host");
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
 
-//   CCDBDownloader downloader;
-//   downloader.init(hosts);
-//   o2::pmr::vector<char> dst;
-//   // std::string host = "http://mdesk.cern.ch:8080";
-//   // std::string host = "http://alice-ccdb.cern.ch";
+  CCDBDownloader downloader;
+  downloader.init(hosts);
+  o2::pmr::vector<char> dst;
 
-//   // std::string url = "/GLO/Param/MatLUT/1672531199000/dc383ced-0608-11ee-b4d8-200114580202";
-//   std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
-//   // std::string url = "file://Analysis/ALICE3/Centrality/1646729604010";
+  std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
 
-//   map<string, string> metadata;
-//   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
-//   curl_global_cleanup();
+  map<string, string> metadata;
+  downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  curl_global_cleanup();
 
-//   BOOST_CHECK(dst.size() != 0);
-//   // auto file = downloader.getFromPromise(promise);
-// }
-
-// BOOST_AUTO_TEST_CASE(multiple_host_test)
-// {
-//   std::cout << "-------- multiple_host_test --------\n";
-//   if (curl_global_init(CURL_GLOBAL_ALL)) {
-//     fprintf(stderr, "Could not init curl\n");
-//     return;
-//   }
-
-//   std::vector<std::string> hosts;
-//   hosts.push_back("http://bogus-host");
-//   hosts.push_back("http://ccdb-test.cern.ch:8080");
-
-//   CCDBDownloader downloader;
-//   downloader.init(hosts);
-//   o2::pmr::vector<char> dst;
-
-//   std::string url = "/Analysis/ALICE3/Centrality/1646729604010";
-
-//   map<string, string> metadata;
-//   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
-//   curl_global_cleanup();
-
-//   BOOST_CHECK(dst.size() != 0);
-// }
+  BOOST_CHECK(dst.size() != 0);
+}
 
 bool prepare_cache()
 {
@@ -207,7 +182,7 @@ bool prepare_cache()
   return dst.size() != 0;
 }
 
-BOOST_AUTO_TEST_CASE(local_cache_test)
+BOOST_AUTO_TEST_CASE(local_caching_test)
 {
   std::cout << "-------- local_cache_test --------\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
@@ -238,6 +213,31 @@ BOOST_AUTO_TEST_CASE(local_cache_test)
 
   // TODO retrieve non trivial content
 }
+
+// BOOST_AUTO_TEST_CASE(alien_test) // GOOD TEST SCENARIO BUT WONT WORK HERE BECAUSE OF LACK OF TOKEN
+// {
+//   std::cout << "-------- alien_test --------\n";
+//   if (curl_global_init(CURL_GLOBAL_ALL)) {
+//     fprintf(stderr, "Could not init curl\n");
+//     return;
+//   }
+
+//   CCDBDownloader downloader;
+//   std::vector<std::string> hosts;
+//   hosts.push_back("http://ccdb-test.cern.ch:8080");
+//   downloader.init(hosts);
+//   o2::pmr::vector<char> dst;
+
+//   std::string url = "xTPC/Calib/IDC_DELTA_A";
+
+//   map<string, string> metadata;
+//   downloader.loadFileToMemory(dst, url, metadata, 1234, nullptr, "", "", "", true, writeCallBack);
+//   curl_global_cleanup();
+
+//   BOOST_CHECK(dst.size() != 0);
+
+//   // TODO retrieve non trivial content
+// }
 
 // BOOST_AUTO_TEST_CASE(perform_test)
 // {

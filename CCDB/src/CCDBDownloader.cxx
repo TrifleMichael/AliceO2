@@ -626,7 +626,6 @@ CCDBDownloader::TransferResults* CCDBDownloader::batchRequestPerform(std::vector
     data->locationsMap = &locationsMap;
 
     setHandleOptions(handleVector[handleIndex], data);
-    std::cout << "Starting transfer for host " << hostsPool.at(0) + path << "\n";
     mHandlesToBeAdded.push_back(handleVector[handleIndex]);
   }
   checkHandleQueue();
@@ -697,6 +696,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest2(CURL* hand
 
   std::vector<CURL*> handleVector;
   handleVector.push_back(handle);
+  std::cout << "Starting transfer for " << fullUrl << "\n";
   TransferResults* results = batchRequestPerform(handleVector, path, metadata, timestamp, dst);
 
   std::cout << "Curl code " << results->curlCodes[0] << "\n";
@@ -1061,7 +1061,14 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
       loadFileToMemory(dest, snapshotpath, headers);
     }
     fromSnapshot = 2;
-  } else { // look on the server
+  } else {
+    if (path.find("alien:/", 0) != std::string::npos) {
+      std::cout << "Retrieving from alien\n";
+      loadFileToMemory(dest, path, headers);
+    } else if (path.find("file:/", 0) != std::string::npos) {
+      std::cout << "Retrieving from local file\n";
+      loadFileToMemory(dest, path, headers);
+    }
     CURL* curl_handle = curl_easy_init();
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUserAgentId.c_str());
     curl_slist* options_list = nullptr;
