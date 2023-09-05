@@ -1580,7 +1580,8 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 void CcdbApi::navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const
 {
   // let's see first of all if the url is something specific that curl cannot handle
-  if (url.find("alien:/", 0) != std::string::npos) {
+  if ((url.find("alien:/", 0) != std::string::npos) || (url.find("file:/", 0) != std::string::npos)) {
+    std::cout << "Loading file to memory " << url << "\n";
     return loadFileToMemory(dest, url, nullptr); // headers loaded from the file in case of the snapshot reading only
   }
   // otherwise make an HTTP/CURL request
