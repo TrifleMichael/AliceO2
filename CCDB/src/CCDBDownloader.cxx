@@ -418,7 +418,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           // TODO react to local redirect
         } else if (nextLocation.find("alien:/", 0) != std::string::npos) {
           std::cout << "Pointed to alien "  << nextLocation << "\n";
-          loadFileToMemory(*data->dst, nextLocation, nullptr); // TODO Double check whether no local headers ok
+          loadFileToMemory(*data->dst, nextLocation, nullptr); // TODO Double check whether no local headers ok, ALSO check if downloadAlienContent shouldnt be put here instead
           if (data->dst->size() != 0) {
             resultRetrieved = true;
           } else {
@@ -1034,11 +1034,14 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
 
+    // free sem, return function with the temporary data
     scheduleFromRequest(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
 
     curl_slist_free_all(options_list);
     curl_easy_cleanup(curl_handle);
   }
+
+  // block sem again
 
   if (dest.empty()) {
     sem_release();
