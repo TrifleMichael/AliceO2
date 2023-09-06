@@ -109,15 +109,16 @@ struct test_fixture {
 
 BOOST_AUTO_TEST_CASE(test)
 {
-    setenv("ALICEO2_CCDB_LOCALCACHE", "LOCAL_CACHE", 1);
+    // setenv("ALICEO2_CCDB_LOCALCACHE", "LOCAL_CACHE", 1);
     CcdbApi api;
-    // ccdbUrl = "http://ccdb-test.cern.ch:8080";
-    ccdbUrl = "file://LOCAL_CACHE";
+    // ccdbUrl = "http://alice-ccdb.cern.ch";
+    ccdbUrl = "http://ccdb-test.cern.ch:8080";
+    // ccdbUrl = "file://LOCAL_CACHE"; // works
     api.init(ccdbUrl);
     o2::pmr::vector<char> dest;
     std::map<std::string, std::string> metadata;
-    api.loadFileToMemory(dest, "Analysis/ALICE3/Centrality", metadata, 1645780010602, nullptr, "", "", "");
-    // api.loadFileToMemory(dest, "file://LOCAL_CACHE/Analysis/ALICE3/Centrality/snapshot.root", metadata, 1645780010602, nullptr, "", "", "");
+    api.loadFileToMemory(dest, "Analysis/ALICE3/Centrality", metadata, 1645780010602, nullptr, "", "", ""); // test or local
+    // api.loadFileToMemory(dest, "Analysis/ALICE3/Centrality", metadata, 1646729604010, nullptr, "", "", ""); // prod
     std::cout << "dest size " << dest.size() << "\n";
     for(int i = 0; i < 50 && i < dest.size(); i++) {
       std::cout << dest[i];

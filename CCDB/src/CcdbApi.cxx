@@ -562,6 +562,7 @@ size_t header_map_callback(char* buffer, size_t size, size_t nitems, void* userd
   if (index != std::string::npos) {
     const auto key = boost::algorithm::trim_copy(header.substr(0, index));
     const auto value = boost::algorithm::trim_copy(header.substr(index + 1));
+    // headers->insert(std::make_pair("Location:", "file:///fakeCvmfs/file.root")); // TODO remove hack
     headers->insert(std::make_pair(key, value));
   }
   return size * nitems;
@@ -1477,12 +1478,14 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
+bool hackingDone = false;
 void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
                                std::map<std::string, std::string> const& metadata, long timestamp,
                                std::map<std::string, std::string>* headers, std::string const& etag,
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
 {
   LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
+  std::cout << "Load file to memory\n";
 
   // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
   // this would mean that the object was is already fetched and in this mode we don't to validity checks!
@@ -1520,6 +1523,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
     }
   }
 
+  std::cout << "A\n";
   if (mInSnapshotMode) { // file must be there, otherwise a fatal will be produced
     loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), headers);
     fromSnapshot = 1;
@@ -1537,6 +1541,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
 
+    std::cout << "Navigating as it should be\n";
     navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers);
 
     for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
@@ -1579,8 +1584,18 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 // navigate sequence of URLs until TFile content is found; object is extracted and returned
 void CcdbApi::navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const
 {
+  std::cout << "Navigating to " << url << "\n";
+  if ((url.find("file:/", 0) != std::string::npos)) {
+    std::string path = url.substr(7);
+    if (std::filesystem::exists(path)) {
+      std::cout << "File exists for path " << path << "\n";
+      return loadFileToMemory(dest, path, nullptr);
+    } else {
+      std::cout << "File does not exist for " << path << "\n";
+    }
+  }
   // let's see first of all if the url is something specific that curl cannot handle
-  if ((url.find("alien:/", 0) != std::string::npos) || (url.find("file:/", 0) != std::string::npos)) {
+  if ((url.find("alien:/", 0) != std::string::npos)) {
     std::cout << "Loading file to memory " << url << "\n";
     return loadFileToMemory(dest, url, nullptr); // headers loaded from the file in case of the snapshot reading only
   }
@@ -1633,6 +1648,9 @@ void CcdbApi::navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL*
   auto res = CURL_perform(curl_handle);
   long response_code = -1;
   if (res == CURLE_OK && curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &response_code) == CURLE_OK) {
+    if (!hackingDone) {
+      response_code = 303; // TODO remove hack
+    }
     if (headers) {
       for (auto& p : hoPair.header) {
         (*headers)[p.first] = p.second;
@@ -1672,6 +1690,17 @@ void CcdbApi::navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL*
           }
         }
       }
+      
+      if (!hackingDone) {
+        hackingDone = true;
+        if (locs.size() == 0) {
+          locs.push_back("file:///fakeCvmfs/file.root");
+        } else {
+          locs[0] = "file:///fakeCvmfs/file.root";
+        }
+      }
+
+      std::cout << "ABOUT TO ITERATE OVER " << locs.size() << " LOCS\n";
       for (auto& l : locs) {
         if (l.size() > 0) {
           LOG(debug) << "Trying content location " << l;
