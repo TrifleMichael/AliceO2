@@ -176,6 +176,7 @@ BOOST_AUTO_TEST_CASE(multiple_host_test)
 
 bool prepare_cache()
 {
+  std::cout << "Perparing local cache...";
   std::vector<std::string> hosts;
   hosts.push_back("http://ccdb-test.cern.ch:8080");
   CCDBDownloader downloader;
@@ -186,6 +187,8 @@ bool prepare_cache()
   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
   if (dst.size() == 0) {
     std::cout << "Cache could not be created\n";
+  } else {
+    std::cout << "Done!\n";
   }
   return dst.size() != 0;
 }
