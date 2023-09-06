@@ -1602,6 +1602,14 @@ void CcdbApi::navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL*
     std::cout << "Loading file to memory " << url << "\n";
     return loadFileToMemory(dest, url, nullptr); // headers loaded from the file in case of the snapshot reading only
   }
+  if ((url.find("file:/", 0) != std::string::npos)) {
+    std::string path = url.substr(7);
+    if (std::filesystem::exists(path)) {
+      return loadFileToMemory(dest, path, nullptr);
+    } else {
+      return;
+    }
+  }
   // otherwise make an HTTP/CURL request
   struct HeaderObjectPair_t {
     std::map<std::string, std::string> header;
