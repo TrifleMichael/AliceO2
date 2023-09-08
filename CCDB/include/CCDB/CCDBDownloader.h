@@ -37,6 +37,7 @@
 #include <type_traits>
 #include <TMemFile.h>
 #include "MemoryResources/MemoryResources.h" // TODO check if that has a reason to be moved
+#include <boost/interprocess/sync/named_semaphore.hpp>
 
 
 
@@ -242,14 +243,29 @@ class CCDBDownloader
   };
 
   bool mInSnapshotMode = false;
-  void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
+
+  void init(std::vector<std::string> hosts);
+  void initInSnapshotMode(std::string const& snapshotpath);
+  typedef struct {
+    boost::interprocess::named_semaphore* sem;
+    o2::pmr::vector<char>* dest;
+    bool createSnapshot;
+    std::string path;
+    std::string semhashedstring;
+    std::string snapshotpath;
+    long timestamp;
+    std::map<std::string, std::string>* headers;
+    std::map<std::string, std::string> metadata;
+    bool considerSnapshot;
+    int fromSnapshot;
+  } LoadFileToMemoryStruct;
+
+  LoadFileToMemoryStruct* loadFileToMemory1(o2::pmr::vector<char>& dest, std::string const& path,
                         std::map<std::string, std::string> const& metadata, long timestamp,
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot,
                         size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
-
-  void init(std::vector<std::string> hosts);
-  void initInSnapshotMode(std::string const& snapshotpath);
+  void loadFileToMemory2(LoadFileToMemoryStruct* LFM);
 
  private:
   TransferResults* scheduleFromRequest(CURL* handle, uint hostInd, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));

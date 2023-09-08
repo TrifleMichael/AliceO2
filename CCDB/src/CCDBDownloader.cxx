@@ -31,7 +31,6 @@
 #include <fairlogger/Logger.h>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/interprocess/sync/named_semaphore.hpp>
 
 // TODO check what const and what not
 
@@ -627,9 +626,6 @@ CCDBDownloader::TransferResults* CCDBDownloader::performRequest(CURL* const& han
   mHandlesToBeAdded.push_back(handle);
 
   checkHandleQueue();
-  while (results->requestsLeft > 0) {
-    uv_run(mUVLoop, UV_RUN_ONCE);
-  }
   // TODO Free map
   return results;
 }
@@ -648,9 +644,9 @@ void CCDBDownloader::init(std::vector<std::string> hosts) {
 
 CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(CURL* handle, uint hostInd, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr))
 {
-  HeaderObjectPair_t hoPair{{}, &dst, 0};
+  HeaderObjectPair_t* hoPair = new HeaderObjectPair_t{{}, &dst, 0}; // TODO delete after using
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallBack);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)&hoPair);
+  curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)hoPair);
   string fullUrl = getFullUrlForRetrieval(handle, path, metadata, timestamp, hostInd);
   curl_easy_setopt(handle, CURLOPT_URL, fullUrl.c_str());
   auto userAgent = uniqueAgentID();
@@ -658,13 +654,6 @@ CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(CURL* handl
 
   std::cout << "Starting transfer for " << fullUrl << "\n";
   TransferResults* results = performRequest(handle, path, metadata, timestamp, dst);
-
-  std::cout << "Curl code " << results->curlCodes[0] << "\n";
-  long httpCode;
-  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  std::cout << "Http code " << httpCode << "\n";
-
-  std::cout << "Vector size " << dst.size() << "\n";
 
   return results;
 }
@@ -968,7 +957,7 @@ void CCDBDownloader::initInSnapshotMode(std::string const& snapshotpath)
   mInSnapshotMode = true;
 }
 
-void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
+CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pmr::vector<char>& dest, std::string const& path,
                                std::map<std::string, std::string> const& metadata, long timestamp,
                                std::map<std::string, std::string>* headers, std::string const& etag,
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot,
@@ -1034,16 +1023,74 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
     curl_slist* options_list = nullptr;
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
 
-    // free sem, return function with the temporary data
-    scheduleFromRequest(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
+    auto results = scheduleFromRequest(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
+
+    while (results->requestsLeft > 0) {
+      uv_run(mUVLoop, UV_RUN_ONCE);
+    }
+
+    std::cout << "Curl code " << results->curlCodes[0] << "\n";
+    long httpCode;
+    curl_easy_getinfo(curl_handle, CURLINFO_HTTP_CODE, &httpCode);
+    std::cout << "Http code " << httpCode << "\n";
+
+    std::cout << "Vector size " << dest.size() << "\n";
 
     curl_slist_free_all(options_list);
     curl_easy_cleanup(curl_handle);
   }
+  sem_release();
 
-  // block sem again
+  LoadFileToMemoryStruct* LFM = new LoadFileToMemoryStruct();
+  LFM->sem = sem;
+  LFM->dest = &dest;
+  LFM->createSnapshot = createSnapshot;
+  LFM->path = path;
+  LFM->semhashedstring = semhashedstring;
+  LFM->timestamp = timestamp;
+  LFM->headers = headers;
+  LFM->metadata = metadata;
+  LFM->considerSnapshot = considerSnapshot;
+  LFM->fromSnapshot = fromSnapshot;
+  LFM->snapshotpath = snapshotpath;
+  return LFM;
+}
 
-  if (dest.empty()) {
+void CCDBDownloader::loadFileToMemory2(CCDBDownloader::LoadFileToMemoryStruct* LFM)
+{
+  auto dest = LFM->dest;
+  auto sem = LFM->sem;
+  auto createSnapshot = LFM->createSnapshot;
+  auto path = LFM->path;
+  auto semhashedstring = LFM->semhashedstring;
+  auto timestamp = LFM->timestamp;
+  auto headers = LFM->headers;
+  auto metadata = LFM->metadata; // maybe ptr?
+  auto considerSnapshot = LFM->considerSnapshot;
+  auto fromSnapshot = LFM->fromSnapshot;
+  auto snapshotpath = LFM->snapshotpath;
+
+  // todo only if createSnapshot
+  std::string logfile = mSnapshotCachePath + "/log";
+  auto logStream = std::make_unique<std::fstream>(logfile, ios_base::out | ios_base::app);
+  if (logStream->is_open()) {
+    *logStream.get() << "CCDB-access[" << getpid() << "] of " << mUserAgentId << " to " << path << " timestamp " << timestamp << " for load to memory\n"; // TODO check if the following is ok changed mUniqueAgent to mUserAgent
+  }
+
+  auto sem_release = [&sem, &semhashedstring, path, this]() {
+    if (sem) {
+      sem->post();
+      if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
+        sem->post();
+        boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
+      }
+    }
+  };
+
+  if (sem) {
+      sem->wait(); // wait until we can enter (no one else there)
+    }
+  if (dest->empty()) {
     sem_release();
     return; // nothing was fetched: either cached value is good or error was produced
   }
@@ -1063,7 +1110,7 @@ void CCDBDownloader::loadFileToMemory(o2::pmr::vector<char>& dest, std::string c
       CCDBQuery querysummary(path, metadata, timestamp);
       {
         std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
-        std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
+        std::copy(dest->begin(), dest->end(), std::ostreambuf_iterator<char>(objFile));
       }
       // now open the same file as root file and store metadata
       updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
