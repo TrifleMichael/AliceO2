@@ -1028,10 +1028,6 @@ CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pm
     auto results = scheduleFromRequest(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
     LFM->transferResults = results;
 
-    // while (results->requestsLeft > 0) {
-    //   uv_run(mUVLoop, UV_RUN_ONCE);
-    // }
-
     // std::cout << "Curl code " << results->curlCodes[0] << "\n";
     // long httpCode;
     // curl_easy_getinfo(curl_handle, CURLINFO_HTTP_CODE, &httpCode);

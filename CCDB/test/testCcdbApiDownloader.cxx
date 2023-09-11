@@ -135,15 +135,9 @@ BOOST_AUTO_TEST_CASE(perform_test)
 
   map<string, string> metadata;
   auto results = downloader.loadFileToMemory1(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
-  int prevReq = results->transferResults->requestsLeft;
   while (results->transferResults->requestsLeft > 0) {
     downloader.runLoop(0);
-    // std::cout << "Running, requests left " << results->transferResults->requestsLeft << "\n";
   }
-
-  // while (results->transferResults->requestsLeft > 0) {
-  //   uv_run(downloader.mUVLoop, UV_RUN_ONCE);
-  // }
   downloader.loadFileToMemory2(results);
   curl_global_cleanup();
 
@@ -155,89 +149,102 @@ BOOST_AUTO_TEST_CASE(perform_test)
   // auto file = downloader.getFromPromise(promise);
 }
 
-// BOOST_AUTO_TEST_CASE(multiple_host_test)
-// {
-//   std::cout << "-------- multiple_host_test --------\n";
-//   if (curl_global_init(CURL_GLOBAL_ALL)) {
-//     fprintf(stderr, "Could not init curl\n");
-//     return;
-//   }
+BOOST_AUTO_TEST_CASE(multiple_host_test)
+{
+  std::cout << "-------- multiple_host_test --------\n";
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
 
-//   std::vector<std::string> hosts;
-//   hosts.push_back("http://bogus-host");
-//   hosts.push_back("http://ccdb-test.cern.ch:8080");
+  std::vector<std::string> hosts;
+  hosts.push_back("http://bogus-host");
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
 
-//   CCDBDownloader downloader;
-//   downloader.init(hosts);
-//   o2::pmr::vector<char> dst;
+  CCDBDownloader downloader;
+  downloader.init(hosts);
+  o2::pmr::vector<char> dst;
 
-//   std::string url = "Analysis/ALICE3/Centrality";
+  std::string url = "Analysis/ALICE3/Centrality";
 
-//   map<string, string> metadata;
-//   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
-//   curl_global_cleanup();
+  map<string, string> metadata;
+  auto results = downloader.loadFileToMemory1(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  while (results->transferResults->requestsLeft > 0) {
+    downloader.runLoop(0);
+  }
+  downloader.loadFileToMemory2(results);
+  curl_global_cleanup();
 
-//   BOOST_CHECK(dst.size() != 0);
-//   for (int i = 0; i < 50 && i < dst.size(); i++) {
-//     std::cout << dst[i];
-//   }
-//   std::cout << "\n";
-// }
+  BOOST_CHECK(dst.size() != 0);
+  for (int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
+}
 
-// bool prepare_cache()
-// {
-//   std::cout << "Perparing local cache...";
-//   std::vector<std::string> hosts;
-//   hosts.push_back("http://ccdb-test.cern.ch:8080");
-//   CCDBDownloader downloader;
-//   downloader.init(hosts);
-//   o2::pmr::vector<char> dst;
-//   std::string url = "Analysis/ALICE3/Centrality";
-//   map<string, string> metadata;
-//   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
-//   if (dst.size() == 0) {
-//     std::cout << "Cache could not be created\n";
-//   } else {
-//     std::cout << "Done!\n";
-//   }
-//   return dst.size() != 0;
-// }
+bool prepare_cache()
+{
+  std::cout << "Perparing local cache...";
+  std::vector<std::string> hosts;
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
+  CCDBDownloader downloader;
+  downloader.init(hosts);
+  o2::pmr::vector<char> dst;
+  std::string url = "Analysis/ALICE3/Centrality";
+  map<string, string> metadata;
+  auto results = downloader.loadFileToMemory1(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  while (results->transferResults->requestsLeft > 0) {
+    downloader.runLoop(0);
+  }
+  downloader.loadFileToMemory2(results);
+  if (dst.size() == 0) {
+    std::cout << "Cache could not be created\n";
+  } else {
+    std::cout << "Done!\n";
+  }
+  return dst.size() != 0;
+}
 
-// BOOST_AUTO_TEST_CASE(local_caching_test)
-// {
-//   std::cout << "-------- local_cache_test --------\n";
-//   if (curl_global_init(CURL_GLOBAL_ALL)) {
-//     fprintf(stderr, "Could not init curl\n");
-//     return;
-//   }
-//   setenv("ALICEO2_CCDB_LOCALCACHE", "LOCAL_CACHE", 1);
+BOOST_AUTO_TEST_CASE(local_caching_test)
+{
+  std::cout << "-------- local_cache_test --------\n";
+  if (curl_global_init(CURL_GLOBAL_ALL)) {
+    fprintf(stderr, "Could not init curl\n");
+    return;
+  }
+  setenv("ALICEO2_CCDB_LOCALCACHE", "LOCAL_CACHE", 1);
 
-//   if (!std::filesystem::exists("./LOCAL_CACHE/Analysis/ALICE3/Centrality")) {
-//     BOOST_CHECK(prepare_cache());
-//   }
+  if (!std::filesystem::exists("./LOCAL_CACHE/Analysis/ALICE3/Centrality")) {
+    BOOST_CHECK(prepare_cache());
+  }
 
-//   std::vector<std::string> hosts;
-//   hosts.push_back("http://ccdb-test.cern.ch:8080");
+  std::cout << "Starting proper test\n";
+  std::vector<std::string> hosts;
+  hosts.push_back("http://ccdb-test.cern.ch:8080");
 
-//   CCDBDownloader downloader;
-//   downloader.initInSnapshotMode("LOCAL_CACHE");
-//   downloader.init(hosts);
-//   o2::pmr::vector<char> dst;
+  CCDBDownloader downloader;
+  downloader.initInSnapshotMode("LOCAL_CACHE");
+  downloader.init(hosts);
+  o2::pmr::vector<char> dst;
 
-//   std::string url = "Analysis/ALICE3/Centrality";
+  std::string url = "Analysis/ALICE3/Centrality";
 
-//   map<string, string> metadata;
-//   downloader.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
-//   curl_global_cleanup();
+  map<string, string> metadata;
+  auto results = downloader.loadFileToMemory1(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  while (results->transferResults && results->transferResults->requestsLeft > 0) {
+    downloader.runLoop(0);
+  }
+  downloader.loadFileToMemory2(results);
+  curl_global_cleanup();
 
-//   BOOST_CHECK(dst.size() != 0);
-//   for (int i = 0; i < 50 && i < dst.size(); i++) {
-//     std::cout << dst[i];
-//   }
-//   std::cout << "\n";
+  BOOST_CHECK(dst.size() != 0);
+  for (int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
 
-//   // TODO retrieve non trivial content
-// }
+  // TODO retrieve non trivial content
+}
 
 // BOOST_AUTO_TEST_CASE(alien_test) // GOOD TEST SCENARIO BUT WONT WORK HERE BECAUSE OF LACK OF TOKEN
 // {
