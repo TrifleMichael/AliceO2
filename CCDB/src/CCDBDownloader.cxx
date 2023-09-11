@@ -1001,6 +1001,8 @@ CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pm
     }
   }
 
+  LoadFileToMemoryStruct* LFM = new LoadFileToMemoryStruct();
+
   if (mInSnapshotMode) { // file must be there, otherwise a fatal will be produced
     loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), headers);
     fromSnapshot = 1;
@@ -1024,24 +1026,24 @@ CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pm
     initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
 
     auto results = scheduleFromRequest(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
+    LFM->transferResults = results;
 
-    while (results->requestsLeft > 0) {
-      uv_run(mUVLoop, UV_RUN_ONCE);
-    }
+    // while (results->requestsLeft > 0) {
+    //   uv_run(mUVLoop, UV_RUN_ONCE);
+    // }
 
-    std::cout << "Curl code " << results->curlCodes[0] << "\n";
-    long httpCode;
-    curl_easy_getinfo(curl_handle, CURLINFO_HTTP_CODE, &httpCode);
-    std::cout << "Http code " << httpCode << "\n";
+    // std::cout << "Curl code " << results->curlCodes[0] << "\n";
+    // long httpCode;
+    // curl_easy_getinfo(curl_handle, CURLINFO_HTTP_CODE, &httpCode);
+    // std::cout << "Http code " << httpCode << "\n";
 
-    std::cout << "Vector size " << dest.size() << "\n";
+    // std::cout << "Vector size " << dest.size() << "\n";
 
-    curl_slist_free_all(options_list);
-    curl_easy_cleanup(curl_handle);
+    // curl_slist_free_all(options_list);
+    // curl_easy_cleanup(curl_handle);
   }
   sem_release();
 
-  LoadFileToMemoryStruct* LFM = new LoadFileToMemoryStruct();
   LFM->sem = sem;
   LFM->dest = &dest;
   LFM->createSnapshot = createSnapshot;
@@ -1053,7 +1055,7 @@ CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pm
   LFM->considerSnapshot = considerSnapshot;
   LFM->fromSnapshot = fromSnapshot;
   LFM->snapshotpath = snapshotpath;
-  return LFM;
+  return LFM; // TODO cleanup handle and do slist_free
 }
 
 void CCDBDownloader::loadFileToMemory2(CCDBDownloader::LoadFileToMemoryStruct* LFM)

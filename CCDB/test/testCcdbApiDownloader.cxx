@@ -135,6 +135,15 @@ BOOST_AUTO_TEST_CASE(perform_test)
 
   map<string, string> metadata;
   auto results = downloader.loadFileToMemory1(dst, url, metadata, 1645780010602, nullptr, "", "", "", true, writeCallBack);
+  int prevReq = results->transferResults->requestsLeft;
+  while (results->transferResults->requestsLeft > 0) {
+    downloader.runLoop(0);
+    // std::cout << "Running, requests left " << results->transferResults->requestsLeft << "\n";
+  }
+
+  // while (results->transferResults->requestsLeft > 0) {
+  //   uv_run(downloader.mUVLoop, UV_RUN_ONCE);
+  // }
   downloader.loadFileToMemory2(results);
   curl_global_cleanup();
 

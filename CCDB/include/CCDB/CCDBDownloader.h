@@ -258,6 +258,7 @@ class CCDBDownloader
     std::map<std::string, std::string> metadata;
     bool considerSnapshot;
     int fromSnapshot;
+    TransferResults* transferResults;
   } LoadFileToMemoryStruct;
 
   LoadFileToMemoryStruct* loadFileToMemory1(o2::pmr::vector<char>& dest, std::string const& path,
