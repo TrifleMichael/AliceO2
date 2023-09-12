@@ -269,6 +269,7 @@ class CCDBDownloader
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot,
                         size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
   void loadFileToMemory2(LoadFileToMemoryStruct* LFM);
+  static void* extractFromTFile(TFile& file, TClass const* cl, const char* what = CCDBOBJECT_ENTRY); // TODO comment
 
  private:
   TransferResults* scheduleFromRequest(CURL* handle, uint hostInd, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst, size_t writeCallBack(void* contents, size_t size, size_t nmemb, void* chunkptr));
@@ -335,8 +336,6 @@ class CCDBDownloader
   void* downloadAlienContent(std::string const& url, std::type_info const& tinfo) const; // TODO comment
 
   static TClass* tinfo2TClass(std::type_info const& tinfo); // TODO comment
-
-  static void* extractFromTFile(TFile& file, TClass const* cl, const char* what = CCDBOBJECT_ENTRY); // TODO comment
 
   std::vector<std::string> hosts; // TODO Check fix remove
 

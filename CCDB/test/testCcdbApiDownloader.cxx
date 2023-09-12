@@ -142,11 +142,13 @@ BOOST_AUTO_TEST_CASE(perform_test)
   curl_global_cleanup();
 
   BOOST_CHECK(dst.size() != 0);
-  for (int i = 0; i < 50 && i < dst.size(); i++) {
-    std::cout << dst[i];
-  }
-  std::cout << "\n";
-  // auto file = downloader.getFromPromise(promise);
+
+  TMemFile memFile("name", const_cast<char*>(dst.data()), dst.size(), "READ");
+  TClass* tcl = TClass::GetClass(typeid(TObject));
+  // TClass* tcl = TClass::GetClass(typeid(std::vector<Long64_t>));
+  void* result = downloader.extractFromTFile(memFile, tcl);
+  BOOST_CHECK(result);
+  memFile.Close();
 }
 
 BOOST_AUTO_TEST_CASE(multiple_host_test)
@@ -176,10 +178,12 @@ BOOST_AUTO_TEST_CASE(multiple_host_test)
   curl_global_cleanup();
 
   BOOST_CHECK(dst.size() != 0);
-  for (int i = 0; i < 50 && i < dst.size(); i++) {
-    std::cout << dst[i];
-  }
-  std::cout << "\n";
+
+  TMemFile memFile("name", const_cast<char*>(dst.data()), dst.size(), "READ");
+  TClass* tcl = TClass::GetClass(typeid(TObject));
+  void* result = downloader.extractFromTFile(memFile, tcl);
+  BOOST_CHECK(result);
+  memFile.Close();
 }
 
 bool prepare_cache()
@@ -197,11 +201,19 @@ bool prepare_cache()
     downloader.runLoop(0);
   }
   downloader.loadFileToMemory2(results);
-  if (dst.size() == 0) {
-    std::cout << "Cache could not be created\n";
+
+  TMemFile memFile("name", const_cast<char*>(dst.data()), dst.size(), "READ");
+  TClass* tcl = TClass::GetClass(typeid(TObject));
+  void* result = downloader.extractFromTFile(memFile, tcl);
+
+  if (dst.size() == 0 || !result) {
+    std::cout << "Cache could not be created.\n";
+    std::cout << (dst.size() == 0) ? "Output vector empty\n" : "";
+    std::cout << (!result) ? "Result not present\n" : "";
   } else {
     std::cout << "Done!\n";
   }
+  memFile.Close();
   return dst.size() != 0;
 }
 
@@ -240,10 +252,12 @@ BOOST_AUTO_TEST_CASE(local_caching_test)
   curl_global_cleanup();
 
   BOOST_CHECK(dst.size() != 0);
-  for (int i = 0; i < 50 && i < dst.size(); i++) {
-    std::cout << dst[i];
-  }
-  std::cout << "\n";
+
+  TMemFile memFile("name", const_cast<char*>(dst.data()), dst.size(), "READ");
+  TClass* tcl = TClass::GetClass(typeid(TObject));
+  void* result = downloader.extractFromTFile(memFile, tcl);
+  BOOST_CHECK(result);
+  memFile.Close();
 
   // TODO retrieve non trivial content
 }
