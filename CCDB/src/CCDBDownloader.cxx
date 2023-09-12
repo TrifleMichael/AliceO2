@@ -654,6 +654,7 @@ CCDBDownloader::TransferResults* CCDBDownloader::scheduleFromRequest(CURL* handl
 
   std::cout << "Starting transfer for " << fullUrl << "\n";
   TransferResults* results = performRequest(handle, path, metadata, timestamp, dst);
+  results->hoPair = hoPair;
 
   return results;
 }
@@ -1027,21 +1028,13 @@ CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pm
 
     auto results = scheduleFromRequest(curl_handle, 0, path, metadata, timestamp, dest, writeCallBack);
     LFM->transferResults = results;
-
-    // std::cout << "Curl code " << results->curlCodes[0] << "\n";
-    // long httpCode;
-    // curl_easy_getinfo(curl_handle, CURLINFO_HTTP_CODE, &httpCode);
-    // std::cout << "Http code " << httpCode << "\n";
-
-    // std::cout << "Vector size " << dest.size() << "\n";
-
-    // curl_slist_free_all(options_list);
-    // curl_easy_cleanup(curl_handle);
+    LFM->curl_handle = curl_handle;
+    LFM->options_list = options_list;
   }
   sem_release();
 
-  LFM->sem = sem;
   LFM->dest = &dest;
+  LFM->sem = sem;
   LFM->createSnapshot = createSnapshot;
   LFM->path = path;
   LFM->semhashedstring = semhashedstring;
@@ -1051,11 +1044,16 @@ CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pm
   LFM->considerSnapshot = considerSnapshot;
   LFM->fromSnapshot = fromSnapshot;
   LFM->snapshotpath = snapshotpath;
-  return LFM; // TODO cleanup handle and do slist_free
+  return LFM;
 }
 
 void CCDBDownloader::loadFileToMemory2(CCDBDownloader::LoadFileToMemoryStruct* LFM)
 {
+  if (LFM->curl_handle) {
+    curl_slist_free_all(LFM->options_list);
+    curl_easy_cleanup(LFM->curl_handle);
+  }
+  delete LFM->transferResults->hoPair;
   auto dest = LFM->dest;
   auto sem = LFM->sem;
   auto createSnapshot = LFM->createSnapshot;
@@ -1068,11 +1066,12 @@ void CCDBDownloader::loadFileToMemory2(CCDBDownloader::LoadFileToMemoryStruct* L
   auto fromSnapshot = LFM->fromSnapshot;
   auto snapshotpath = LFM->snapshotpath;
 
-  // todo only if createSnapshot
   std::string logfile = mSnapshotCachePath + "/log";
   auto logStream = std::make_unique<std::fstream>(logfile, ios_base::out | ios_base::app);
-  if (logStream->is_open()) {
-    *logStream.get() << "CCDB-access[" << getpid() << "] of " << mUserAgentId << " to " << path << " timestamp " << timestamp << " for load to memory\n"; // TODO check if the following is ok changed mUniqueAgent to mUserAgent
+  if (createSnapshot) {
+    if (logStream->is_open()) {
+      *logStream.get() << "CCDB-access[" << getpid() << "] of " << mUserAgentId << " to " << path << " timestamp " << timestamp << " for load to memory\n"; // TODO check if the following is ok changed mUniqueAgent to mUserAgent
+    }
   }
 
   auto sem_release = [&sem, &semhashedstring, path, this]() {

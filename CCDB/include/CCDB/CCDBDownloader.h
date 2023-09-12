@@ -167,6 +167,12 @@ class CCDBDownloader
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
+  struct HeaderObjectPair_t { // TODO move
+    std::map<std::string, std::string> header;
+    o2::pmr::vector<char>* object = nullptr;
+    int counter = 0;
+  };
+
   /**
    * Structure created for a batch of requests. Holds the information about current state of transfers from that batch.
    */
@@ -174,7 +180,7 @@ class CCDBDownloader
     std::vector<CURLcode> curlCodes;
     std::vector<bool> transferFinishedFlags;
     size_t requestsLeft;
-
+    HeaderObjectPair_t* hoPair;
     void* objectPtr;
   } TransferResults;
 
@@ -236,12 +242,6 @@ class CCDBDownloader
 
   TransferResults* performRequest(CURL* const& handleVector, std::string path, const map<string, string>& metadata, long timestamp, o2::pmr::vector<char>& dst); // TODO comment
 
-  struct HeaderObjectPair_t { // TODO move
-    std::map<std::string, std::string> header;
-    o2::pmr::vector<char>* object = nullptr;
-    int counter = 0;
-  };
-
   bool mInSnapshotMode = false;
 
   void init(std::vector<std::string> hosts);
@@ -259,6 +259,8 @@ class CCDBDownloader
     bool considerSnapshot;
     int fromSnapshot;
     TransferResults* transferResults;
+    CURL* curl_handle;
+    curl_slist* options_list;
   } LoadFileToMemoryStruct;
 
   LoadFileToMemoryStruct* loadFileToMemory1(o2::pmr::vector<char>& dest, std::string const& path,

@@ -216,6 +216,8 @@ BOOST_AUTO_TEST_CASE(local_caching_test)
 
   if (!std::filesystem::exists("./LOCAL_CACHE/Analysis/ALICE3/Centrality")) {
     BOOST_CHECK(prepare_cache());
+  } else {
+    std::cout << "Cache already prepared.\n";
   }
 
   std::cout << "Starting proper test\n";
