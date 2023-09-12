@@ -1049,11 +1049,11 @@ CCDBDownloader::LoadFileToMemoryStruct* CCDBDownloader::loadFileToMemory1(o2::pm
 
 void CCDBDownloader::loadFileToMemory2(CCDBDownloader::LoadFileToMemoryStruct* LFM)
 {
-  if (LFM->curl_handle) {
+  if (LFM->fromSnapshot == 0) {
     curl_slist_free_all(LFM->options_list);
     curl_easy_cleanup(LFM->curl_handle);
+    delete LFM->transferResults->hoPair;
   }
-  delete LFM->transferResults->hoPair;
   auto dest = LFM->dest;
   auto sem = LFM->sem;
   auto createSnapshot = LFM->createSnapshot;
