@@ -28,6 +28,8 @@
 #include <CommonUtils/ConfigurableParam.h>
 #include <type_traits>
 #include <vector>
+#include <boost/interprocess/sync/named_semaphore.hpp>
+#include "MemoryResources/MemoryResources.h"
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
 #include "MemoryResources/MemoryResources.h"
@@ -343,6 +345,15 @@ class CcdbApi //: public DatabaseInterface
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
+void getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
+                          std::map<std::string, std::string> const& metadata, long timestamp,
+                          std::map<std::string, std::string>* headers, std::string const& etag,
+                          const std::string& createdNotAfter, const std::string& createdNotBefore) const; // TODO define here?
+void getFromSnapshot(bool createSnapshot, std::string& semhashedstring, std::string const& path, boost::interprocess::named_semaphore* sem,
+                              std::fstream& logStream, std::string& logfile, long timestamp, std::map<std::string, std::string>* headers,
+                              std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
+void saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::string& snapshotpath, std::fstream& logStream, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
+boost::interprocess::named_semaphore* createNamedSempahore(std::string& semhashedstring) const; // TODO create here?
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
   void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders = nullptr) const;
   void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,

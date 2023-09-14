@@ -1481,88 +1481,75 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
-                               std::map<std::string, std::string> const& metadata, long timestamp,
-                               std::map<std::string, std::string>* headers, std::string const& etag,
-                               const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
+void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
+                          std::map<std::string, std::string> const& metadata, long timestamp,
+                          std::map<std::string, std::string>* headers, std::string const& etag,
+                          const std::string& createdNotAfter, const std::string& createdNotBefore) const
 {
-  LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
+  CURL* curl_handle = curl_easy_init();
+  curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
+  string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
 
-  // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
-  // this would mean that the object was is already fetched and in this mode we don't to validity checks!
-  bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
-  int fromSnapshot = 0;
-  boost::interprocess::named_semaphore* sem = nullptr;
-  std::string semhashedstring{}, snapshotpath{}, logfile{};
-  std::unique_ptr<std::fstream> logStream;
-  auto sem_release = [&sem, &semhashedstring, path, this]() {
-    if (sem) {
-      sem->post();
-      if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
-        sem->post();
-        boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
-      }
-    }
-  };
+  curl_slist* options_list = nullptr;
+  initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+  navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers);
+  for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
+    fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
+    navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers); // headers loaded from the file in case of the snapshot reading only
+  }
+  curl_slist_free_all(options_list);
+  curl_easy_cleanup(curl_handle);
+}
 
+boost::interprocess::named_semaphore* CcdbApi::createNamedSempahore(std::string& semhashedstring) const
+{
+  try {
+    return new boost::interprocess::named_semaphore(boost::interprocess::open_or_create_t{}, semhashedstring.c_str(), 1);
+  } catch (std::exception e) {
+    LOG(warn) << "Exception occurred during CCDB (cache) semaphore setup; Continuing without";
+    return nullptr;
+  }
+}
+
+void CcdbApi::getFromSnapshot(bool createSnapshot, std::string& semhashedstring, std::string const& path, boost::interprocess::named_semaphore* sem,
+                              std::fstream& logStream, std::string& logfile, long timestamp, std::map<std::string, std::string>* headers,
+                              std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const
+{
   if (createSnapshot) { // create named semaphore
     std::hash<std::string> hasher;
     semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
-    try {
-      sem = new boost::interprocess::named_semaphore(boost::interprocess::open_or_create_t{}, semhashedstring.c_str(), 1);
-    } catch (std::exception e) {
-      LOG(warn) << "Exception occurred during CCDB (cache) semaphore setup; Continuing without";
-      sem = nullptr;
-    }
+    sem = createNamedSempahore(semhashedstring);
     if (sem) {
       sem->wait(); // wait until we can enter (no one else there)
     }
     logfile = mSnapshotCachePath + "/log";
-    logStream = std::make_unique<std::fstream>(logfile, ios_base::out | ios_base::app);
-    if (logStream->is_open()) {
-      *logStream.get() << "CCDB-access[" << getpid() << "] of " << mUniqueAgentID << " to " << path << " timestamp " << timestamp << " for load to memory\n";
+    logStream = std::fstream(logfile, ios_base::out | ios_base::app);
+    if (logStream.is_open()) {
+      logStream << "CCDB-access[" << getpid() << "] of " << mUniqueAgentID << " to " << path << " timestamp " << timestamp << " for load to memory\n";
     }
   }
 
   if (mInSnapshotMode) { // file must be there, otherwise a fatal will be produced
     loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), headers);
     fromSnapshot = 1;
-  } else if (mPreferSnapshotCache && std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path))) {
+  } else if (mPreferSnapshotCache && std::filesystem::exists(snapshotpath)) {
     // if file is available, use it, otherwise cache it below from the server. Do this only when etag is empty since otherwise the object was already fetched and cached
     if (etag.empty()) {
       loadFileToMemory(dest, snapshotpath, headers);
     }
     fromSnapshot = 2;
-  } else { // look on the server
-    CURL* curl_handle = curl_easy_init();
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
-    string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
-
-    curl_slist* options_list = nullptr;
-    initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-    navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers);
-    for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
-      fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
-      navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers); // headers loaded from the file in case of the snapshot reading only
-    }
-    curl_slist_free_all(options_list);
-    curl_easy_cleanup(curl_handle);
   }
+}
 
-  if (dest.empty()) {
-    sem_release();
-    return; // nothing was fetched: either cached value is good or error was produced
-  }
-  // !considerSnapshot means that the call was made by retrieve for snapshoting reasons
-  logReading(path, timestamp, headers, fmt::format("{}{}", considerSnapshot ? "load to memory" : "retrieve", fromSnapshot ? " from snapshot" : ""));
-
+void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::string& snapshotpath, std::fstream& logStream, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const
+{
   // are we asked to create a snapshot ?
   if (createSnapshot && fromSnapshot != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
     auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
     snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
     o2::utils::createDirectoriesIfAbsent(snapshotdir);
-    if (logStream->is_open()) {
-      *logStream.get() << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
+    if (logStream.is_open()) {
+      logStream << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
     }
     { // dump image to a file
       LOGP(debug, "creating snapshot {} -> {}", path, snapshotpath);
@@ -1575,6 +1562,56 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
       updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
     }
   }
+}
+
+void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
+                               std::map<std::string, std::string> const& metadata, long timestamp,
+                               std::map<std::string, std::string>* headers, std::string const& etag,
+                               const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
+{
+  LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
+
+  std::string semhashedstring{}, snapshotpath{}, logfile{};
+  boost::interprocess::named_semaphore* sem = nullptr;
+  std::fstream logStream;
+  int fromSnapshot = 0;
+  bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
+  auto sem_release = [&sem, &semhashedstring, this]() {
+    if (sem) {
+      sem->post();
+      if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
+        sem->post();
+        boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
+      }
+    }
+  };
+
+  bool trySnapshot = mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path));
+  if (trySnapshot) {
+    // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
+    // this would mean that the object was is already fetched and in this mode we don't to validity checks!
+    getFromSnapshot(createSnapshot, semhashedstring, path, sem, logStream, logfile, timestamp, headers, snapshotpath, dest, fromSnapshot, etag);
+  } else { // look on the server
+    getWithCurl(dest, path, metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+  }
+
+  if (!trySnapshot) {
+    // TODO create semaphore here
+    std::hash<std::string> hasher;
+    semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
+    sem = createNamedSempahore(semhashedstring);
+    if (sem) {
+      sem->wait(); // wait until we can enter (no one else there)
+    }
+  }
+
+  if (dest.empty()) {
+    sem_release();
+    return; // nothing was fetched: either cached value is good or error was produced
+  }
+  // !considerSnapshot means that the call was made by retrieve for snapshoting reasons
+  logReading(path, timestamp, headers, fmt::format("{}{}", considerSnapshot ? "load to memory" : "retrieve", fromSnapshot ? " from snapshot" : ""));
+  saveSnapshot(dest, createSnapshot, fromSnapshot, path, snapshotpath, logStream, metadata, timestamp, headers);
   sem_release();
 }
 

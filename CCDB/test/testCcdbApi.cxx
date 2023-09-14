@@ -107,6 +107,17 @@ struct test_fixture {
   map<string, string> metadata;
 };
 
+// BOOST_AUTO_TEST_CASE(base_test)
+// {
+//   CcdbApi api;
+//   api.init("http://ccdb-test.cern.ch:8080");
+//   std::map<std::string, std::string> metadata;
+//   o2::pmr::vector<char> dst;
+//   std::string url = "Analysis/ALICE3/Centrality";
+//   api.loadFileToMemory(dst, url, metadata, 1645780010602, nullptr, "", "", "", true);
+//   BOOST_CHECK(dst.size() != 0);
+// }
+
 BOOST_AUTO_TEST_CASE(storeTMemFile_test, *utf::precondition(if_reachable()))
 {
   test_fixture f;
