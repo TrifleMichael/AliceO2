@@ -21,6 +21,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <unordered_map>
+#include <map>
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
@@ -30,6 +31,14 @@ typedef struct uv_async_s uv_async_t;
 typedef struct uv_handle_s uv_handle_t;
 
 using namespace std;
+
+
+typedef struct DownloaderRequestData { // TODO move
+  std::multimap<std::string, std::string> *headerMap;
+  std::vector<std::string> hosts;
+  std::string path;
+  long timestamp;
+} DownloaderRequestData;
 
 namespace o2::ccdb
 {
@@ -178,6 +187,7 @@ class CCDBDownloader
   void runLoop(bool noWait);
 
  private:
+  std::vector<std::string> getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const; // Todo commment and stuff
   std::string mUserAgentId = "CCDBDownloader";
   /**
    * Sets up internal UV loop.
@@ -245,6 +255,13 @@ class CCDBDownloader
     void* cbData;
     size_t* requestsLeft;
     RequestType type;
+
+    std::multimap<std::string, std::string>* headerMap;
+    std::vector<std::string>* hostsPool;
+    int hostInd;
+    int locInd;
+    std::string path;
+    long timestamp;
   } PerformData;
 
   /**

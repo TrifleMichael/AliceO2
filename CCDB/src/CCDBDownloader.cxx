@@ -357,6 +357,31 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   if (--(*data->requestsLeft) == 0) {
     switch (data->type) {
       case BLOCKING:
+        {
+          long httpCode;
+          curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
+          char* url;
+          curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
+          std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n";
+          auto locations = getLocations(data->hostsPool->at(data->hostInd), data->headerMap);
+          if (locations.size() < data->locInd) {
+            std::cout << "Next location: " <<  locations.at(data->locInd++) << "\n";
+          } else {
+            std::cout << "No next location found\n";
+            // Reschedule with next host
+            // data->headerMap->clear(); // TODO is this safe?
+            
+            // set url
+            if (data->hostsPool->size() < data->hostInd) {
+              std::string newUrl = data->hostsPool->at(data->hostInd++) + data->path + std::to_string(data->timestamp);
+              std::cout << "Rescheduling for " << newUrl << "\n";
+              curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+              // mHandlesToBeAdded.push_back(easy_handle); // TODO actually add that
+            } else {
+              std::cout << "No more hosts available\n";
+            }
+          }          
+        }
         break;
       case ASYNCHRONOUS:
         // Temporary change before asynchronous calls are reintroduced
@@ -450,10 +475,42 @@ CURLcode CCDBDownloader::perform(CURL* handle)
   return batchBlockingPerform(handleVector).back();
 }
 
+std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const
+{
+  std::vector<std::string> locs;
+  auto iter = headerMap->find("Location");
+  if (iter != headerMap->end()) {
+    locs.push_back(baseUrl + iter->second); // complement_Location(iter->second)
+  }
+  // add alternative locations (not yet included)
+  auto iter2 = headerMap->find("Content-Location");
+  if (iter2 != headerMap->end()) {
+    auto range = headerMap->equal_range("Content-Location");
+    for (auto it = range.first; it != range.second; ++it) {
+      if (std::find(locs.begin(), locs.end(), it->second) == locs.end()) {
+        locs.push_back(baseUrl + it->second); // complement_Location(iter->second)
+      }
+    }
+  }
+  return locs;
+}
+
 std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> const& handleVector)
 {
   std::vector<CURLcode> codeVector(handleVector.size());
   size_t requestsLeft = handleVector.size();
+
+  DownloaderRequestData* requestData;
+  std::multimap<std::string, std::string>* headerMap;
+  std::vector<std::string>* hostsPool;
+  curl_easy_getinfo(handleVector.at(0), CURLINFO_PRIVATE, &requestData);
+  headerMap = requestData->headerMap;
+  hostsPool = &(requestData->hosts);
+
+  std::cout << "First\n";
+  for(auto it = headerMap->begin(); it != headerMap->end(); it++) {
+    std::cout << (*it).first << "\n";
+  }
 
   for (int i = 0; i < handleVector.size(); i++) {
     auto* data = new CCDBDownloader::PerformData();
@@ -462,6 +519,12 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
 
     data->type = BLOCKING;
     data->requestsLeft = &requestsLeft;
+    data->timestamp = requestData->timestamp;
+
+    data->hostInd = 0;
+    data->locInd = 0;
+    data->hostsPool = hostsPool;
+    data->headerMap = headerMap;
 
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);
@@ -470,6 +533,17 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
   while (requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
   }
+
+  std::cout << "Second\n";
+  for(auto it = headerMap->begin(); it != headerMap->end(); it++) {
+    std::cout << (*it).first << "\n";
+  }
+
+  auto locs = getLocations(hostsPool->at(0), headerMap);
+  for(auto it = locs.begin(); it < locs.end(); it++) {
+    std::cout << "LOC: " << (*it) << "\n";
+  }
+
   return codeVector;
 }
 

@@ -69,6 +69,7 @@ CcdbApi::CcdbApi()
     mIsCCDBDownloaderEnabled = atoi(getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI"));
   }
   if (mIsCCDBDownloaderEnabled) {
+    std::cout << "Enabling downloader\n";
     mDownloader = new CCDBDownloader();
   }
 }
@@ -1481,6 +1482,67 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
+void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp) const
+{
+  struct HeaderObjectPair_t {
+    std::multimap<std::string, std::string> header;
+    o2::pmr::vector<char>* object = nullptr;
+    int counter = 0;
+  } hoPair{{}, &dest, 0};
+
+  bool errorflag = false;
+  auto signalError = [&chunk = dest, &errorflag]() {
+    chunk.clear();
+    chunk.reserve(1);
+    errorflag = true;
+  };
+  auto writeCallBack = [](void* contents, size_t size, size_t nmemb, void* chunkptr) {
+    auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
+    auto& chunk = *ho.object;
+    size_t realsize = size * nmemb, sz = 0;
+    ho.counter++;
+    try {
+      if (chunk.capacity() < chunk.size() + realsize) {
+        auto cl = ho.header.find("Content-Length");
+        if (cl != ho.header.end()) {
+          sz = std::max(chunk.size() + realsize, (size_t)std::stol(cl->second));
+        } else {
+          sz = chunk.size() + realsize;
+          LOGP(debug, "SIZE IS NOT IN HEADER, allocate {}", sz);
+        }
+        chunk.reserve(sz);
+      }
+      char* contC = (char*)contents;
+      chunk.insert(chunk.end(), contC, contC + realsize);
+    } catch (std::exception e) {
+      LOGP(alarm, "failed to reserve {} bytes in CURL write callback (realsize = {}): {}", sz, realsize, e.what());
+      realsize = 0;
+    }
+    return realsize;
+  };
+
+  DownloaderRequestData data;
+  data.headerMap = &(hoPair.header);
+  data.hosts = hostsPool;
+  data.path = path;
+  data.timestamp = timestamp;
+
+  data.headerMap->insert({"TESTING", "MORE TESTING"});
+
+  curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
+  initCurlOptionsForRetrieve(curl_handle, (void*)&hoPair, writeCallBack, false);
+  curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair.header)>);
+  // hoPair.header.clear(); // TODO why it was like that?
+  curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&hoPair.header);
+  curl_easy_setopt(curl_handle, CURLOPT_PRIVATE, (void*)&(data));
+  curlSetSSLOptions(curl_handle);
+
+  auto res = CURL_perform(curl_handle);
+  long response_code = -1;
+  curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &response_code);
+  std::cout << "Url finished with code " << response_code << "\n";
+}
+
 void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
                           std::map<std::string, std::string> const& metadata, long timestamp,
                           std::map<std::string, std::string>* headers, std::string const& etag,
@@ -1492,11 +1554,12 @@ void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
 
   curl_slist* options_list = nullptr;
   initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-  navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers);
-  for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
-    fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
-    navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers); // headers loaded from the file in case of the snapshot reading only
-  }
+  navigateURLsWithDownloader(dest, curl_handle, fullUrl, path, timestamp);
+  // navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers);
+  // for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
+  //   fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
+  //   navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers); // headers loaded from the file in case of the snapshot reading only
+  // }
   curl_slist_free_all(options_list);
   curl_easy_cleanup(curl_handle);
 }
@@ -1852,10 +1915,12 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
 CURLcode CcdbApi::CURL_perform(CURL* handle) const
 {
   if (mIsCCDBDownloaderEnabled) {
+    std::cout << "Downloader perform\n";
     return mDownloader->perform(handle);
   }
   CURLcode result;
   for (int i = 1; i <= mCurlRetries && (result = curl_easy_perform(handle)) != CURLE_OK; i++) {
+    std::cout << "Regular perform\n";
     usleep(mCurlDelayRetries * i);
   }
   return result;

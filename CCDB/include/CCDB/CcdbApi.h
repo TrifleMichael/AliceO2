@@ -345,6 +345,7 @@ class CcdbApi //: public DatabaseInterface
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
+void navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp) const; // todo here?
 void getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
                           std::map<std::string, std::string> const& metadata, long timestamp,
                           std::map<std::string, std::string>* headers, std::string const& etag,
