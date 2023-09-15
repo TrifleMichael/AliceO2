@@ -353,6 +353,8 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
   *data->codeDestination = curlCode;
 
+  bool rescheduled = false;
+
   // If no requests left then signal finished based on type of operation
   if (--(*data->requestsLeft) == 0) {
     switch (data->type) {
@@ -363,20 +365,26 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           char* url;
           curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
           std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n";
-          auto locations = getLocations(data->hostsPool->at(data->hostInd), data->headerMap);
-          if (locations.size() < data->locInd) {
-            std::cout << "Next location: " <<  locations.at(data->locInd++) << "\n";
-          } else {
-            std::cout << "No next location found\n";
+          auto locations = getLocations(data->hostsPool->at(data->hostInd), data->headerMap); // todo change to data->hostInd
+
+          if (300 <= httpCode && httpCode < 400 && data->locInd < locations.size()) {
+            std::string newUrl = data->hostsPool->at(data->hostInd) + locations.at(data->locInd++);
+            std::cout << "Next location: " <<  newUrl << "\n";
+          }
+          if (data->locInd == locations.size()) {
             // Reschedule with next host
-            // data->headerMap->clear(); // TODO is this safe?
-            
+
+            std::cout << "Expanded all locations. Maybe another host can help\n";
+
             // set url
-            if (data->hostsPool->size() < data->hostInd) {
-              std::string newUrl = data->hostsPool->at(data->hostInd++) + data->path + std::to_string(data->timestamp);
+            if (++data->hostInd < data->hostsPool->size()) {
+              std::string newUrl = data->hostsPool->at(data->hostInd) + "/" + data->path + "/" + std::to_string(data->timestamp);
               std::cout << "Rescheduling for " << newUrl << "\n";
+              data->headerMap->clear(); // TODO is this safe?
               curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
-              // mHandlesToBeAdded.push_back(easy_handle); // TODO actually add that
+              mHandlesToBeAdded.push_back(easy_handle);
+              (*data->requestsLeft) += 1; // TODO unhack
+              rescheduled = true;
             } else {
               std::cout << "No more hosts available\n";
             }
@@ -393,7 +401,9 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         break;
     }
   }
-  delete data;
+  if (!rescheduled) {
+    delete data;
+  }
 
   checkHandleQueue();
 
@@ -507,10 +517,10 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
   headerMap = requestData->headerMap;
   hostsPool = &(requestData->hosts);
 
-  std::cout << "First\n";
-  for(auto it = headerMap->begin(); it != headerMap->end(); it++) {
-    std::cout << (*it).first << "\n";
-  }
+  // std::cout << "Reading host pool of size " << hostsPool->size() << "\n";
+  // for(int i = 0; i < hostsPool->size(); i++) {
+  //   std::cout << hostsPool->at(i) << "\n";
+  // }
 
   for (int i = 0; i < handleVector.size(); i++) {
     auto* data = new CCDBDownloader::PerformData();
@@ -525,6 +535,7 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
     data->locInd = 0;
     data->hostsPool = hostsPool;
     data->headerMap = headerMap;
+    data->path = requestData->path;
 
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);
@@ -532,11 +543,6 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
   checkHandleQueue();
   while (requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
-  }
-
-  std::cout << "Second\n";
-  for(auto it = headerMap->begin(); it != headerMap->end(); it++) {
-    std::cout << (*it).first << "\n";
   }
 
   auto locs = getLocations(hostsPool->at(0), headerMap);
