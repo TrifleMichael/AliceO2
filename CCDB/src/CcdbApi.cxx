@@ -1521,7 +1521,7 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
     return realsize;
   };
 
-  auto alienContentCallback = [this, &dest](std::string url) {
+  std::function<void(std::string)> alienContentCallback = [this, &dest](std::string url) {
     this->loadFileToMemory(dest, url, nullptr);
   };
 

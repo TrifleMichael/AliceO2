@@ -22,6 +22,7 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <map>
+#include <functional>
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
@@ -39,7 +40,7 @@ typedef struct DownloaderRequestData { // TODO move
   std::string path;
   long timestamp;
 
-  void (*alienContentCallback)(std::string);
+  std::function<void(std::string)> alienContentCallback;
 } DownloaderRequestData;
 
 namespace o2::ccdb
@@ -264,7 +265,7 @@ class CCDBDownloader
     int locInd;
     std::string path;
     long timestamp;
-    void (*alienContentCallback)(std::string);
+    std::function<void(std::string)> alienContentCallback;
   } PerformData;
 
   /**
