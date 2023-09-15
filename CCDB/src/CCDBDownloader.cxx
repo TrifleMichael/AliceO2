@@ -368,12 +368,25 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           auto locations = getLocations(data->hostsPool->at(data->hostInd), data->headerMap); // todo change to data->hostInd
 
           if (300 <= httpCode && httpCode < 400 && data->locInd < locations.size()) {
-            std::string newUrl = data->hostsPool->at(data->hostInd) + locations.at(data->locInd++);
-            std::cout << "Next location: " <<  newUrl << "\n";
-          }
-          if (data->locInd == locations.size()) {
-            // Reschedule with next host
-
+            // REDIRECT
+            std::string newLocation = locations.at(data->locInd++);
+            std::string newUrl;
+            if (newLocation.find("alien", 0) != std::string::npos) {
+              // ALIEN
+              newUrl = newLocation;
+              std::cout << "Redirecting to alien " << newUrl << "\n";
+              data->alienContentCallback(newUrl); // todo, check if alien failed?
+            } else {
+              // HTTP
+              newUrl = data->hostsPool->at(data->hostInd) + newLocation;
+              std::cout << "Redirecting to http " << newUrl << "\n"; // todo clear map or not?
+              curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+              mHandlesToBeAdded.push_back(easy_handle);
+              (*data->requestsLeft) += 1; // TODO unhack
+              rescheduled = true;
+            }
+          } else if (data->locInd == locations.size()) {
+            // NEW HOST
             std::cout << "Expanded all locations. Maybe another host can help\n";
 
             // set url
@@ -490,7 +503,11 @@ std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::
   std::vector<std::string> locs;
   auto iter = headerMap->find("Location");
   if (iter != headerMap->end()) {
-    locs.push_back(baseUrl + iter->second); // complement_Location(iter->second)
+    if (iter->second.find("alien", 0) != std::string::npos) {
+      locs.push_back(iter->second); // complement_Location(iter->second)
+    } else {
+      locs.push_back(baseUrl + iter->second); // complement_Location(iter->second)
+    }
   }
   // add alternative locations (not yet included)
   auto iter2 = headerMap->find("Content-Location");
@@ -498,7 +515,11 @@ std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::
     auto range = headerMap->equal_range("Content-Location");
     for (auto it = range.first; it != range.second; ++it) {
       if (std::find(locs.begin(), locs.end(), it->second) == locs.end()) {
-        locs.push_back(baseUrl + it->second); // complement_Location(iter->second)
+        if (it->second.find("alien", 0) != std::string::npos) {
+          locs.push_back(it->second); // complement_Location(iter->second)
+        } else {
+          locs.push_back(baseUrl + it->second); // complement_Location(iter->second)
+        }
       }
     }
   }
@@ -536,6 +557,7 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
     data->hostsPool = hostsPool;
     data->headerMap = headerMap;
     data->path = requestData->path;
+    data->alienContentCallback = requestData->alienContentCallback;
 
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);

@@ -38,6 +38,8 @@ typedef struct DownloaderRequestData { // TODO move
   std::vector<std::string> hosts;
   std::string path;
   long timestamp;
+
+  void (*alienContentCallback)(std::string);
 } DownloaderRequestData;
 
 namespace o2::ccdb
@@ -262,6 +264,7 @@ class CCDBDownloader
     int locInd;
     std::string path;
     long timestamp;
+    void (*alienContentCallback)(std::string);
   } PerformData;
 
   /**

@@ -1521,13 +1521,18 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
     return realsize;
   };
 
+  auto alienContentCallback = [this, &dest](std::string url) {
+    this->loadFileToMemory(dest, url, nullptr);
+  };
+
   DownloaderRequestData data;
   data.headerMap = &(hoPair.header);
   data.hosts = hostsPool;
   data.path = path;
   data.timestamp = timestamp;
+  data.alienContentCallback = alienContentCallback;
 
-  data.headerMap->insert({"TESTING", "MORE TESTING"});
+  // data.headerMap->insert({"TESTING", "MORE TESTING"});
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   initCurlOptionsForRetrieve(curl_handle, (void*)&hoPair, writeCallBack, false);
