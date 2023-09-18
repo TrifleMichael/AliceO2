@@ -345,11 +345,12 @@ class CcdbApi //: public DatabaseInterface
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
-void navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp) const; // todo here?
+void navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp, size_t* requestCounter) const; // todo here?
+void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
 void getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
                           std::map<std::string, std::string> const& metadata, long timestamp,
                           std::map<std::string, std::string>* headers, std::string const& etag,
-                          const std::string& createdNotAfter, const std::string& createdNotBefore) const; // TODO define here?
+                          const std::string& createdNotAfter, const std::string& createdNotBefore, size_t* requestCounter) const; // TODO define here?
 void getFromSnapshot(bool createSnapshot, std::string& semhashedstring, std::string const& path, boost::interprocess::named_semaphore* sem,
                               std::fstream& logStream, std::string& logfile, long timestamp, std::map<std::string, std::string>* headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?

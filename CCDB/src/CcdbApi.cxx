@@ -1482,7 +1482,7 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp) const
+void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp, size_t* requestCounter) const
 {
   struct HeaderObjectPair_t {
     std::multimap<std::string, std::string> header;
@@ -1497,6 +1497,7 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
     errorflag = true;
   };
   auto writeCallBack = [](void* contents, size_t size, size_t nmemb, void* chunkptr) {
+    std::cout << "Write callback entered\n";
     auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
     auto& chunk = *ho.object;
     size_t realsize = size * nmemb, sz = 0;
@@ -1518,6 +1519,7 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
       LOGP(alarm, "failed to reserve {} bytes in CURL write callback (realsize = {}): {}", sz, realsize, e.what());
       realsize = 0;
     }
+    std::cout << "Write callback finished\n";
     return realsize;
   };
 
@@ -1540,16 +1542,13 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
   curl_easy_setopt(curl_handle, CURLOPT_PRIVATE, (void*)&(data));
   curlSetSSLOptions(curl_handle);
 
-  auto res = CURL_perform(curl_handle);
-  long response_code = -1;
-  curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &response_code);
-  std::cout << "Url finished with code " << response_code << "\n";
+  asynchPerform(curl_handle, requestCounter);
 }
 
 void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
                           std::map<std::string, std::string> const& metadata, long timestamp,
                           std::map<std::string, std::string>* headers, std::string const& etag,
-                          const std::string& createdNotAfter, const std::string& createdNotBefore) const
+                          const std::string& createdNotAfter, const std::string& createdNotBefore, size_t* requestCounter) const
 {
   CURL* curl_handle = curl_easy_init();
   curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
@@ -1557,9 +1556,10 @@ void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
 
   curl_slist* options_list = nullptr;
   initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-  navigateURLsWithDownloader(dest, curl_handle, fullUrl, path, timestamp);
-  curl_slist_free_all(options_list);
-  curl_easy_cleanup(curl_handle);
+  navigateURLsWithDownloader(dest, curl_handle, fullUrl, path, timestamp, requestCounter);
+
+  // curl_slist_free_all(options_list); TODO cleanup later
+  // curl_easy_cleanup(curl_handle);
 }
 
 boost::interprocess::named_semaphore* CcdbApi::createNamedSempahore(std::string& semhashedstring) const
@@ -1707,7 +1707,12 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
     // this would mean that the object was is already fetched and in this mode we don't to validity checks!
     getFromSnapshot(createSnapshot, semhashedstring, path, sem, logStream, logfile, timestamp, headers, snapshotpath, dest, fromSnapshot, etag);
   } else { // look on the server
-    getWithCurl(dest, path, metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+    size_t requestCounter = 0;
+    getWithCurl(dest, path, metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, &requestCounter);
+    std::cout << "Beginnign to run loop\n";
+    while(requestCounter > 0) {
+      mDownloader->runLoop(0);
+    }
   }
 
   if (dest.empty()) {
@@ -1966,6 +1971,12 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   }
   upath.erase(remove(upath.begin(), upath.end(), '\"'), upath.end());
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
+}
+
+void CcdbApi::asynchPerform(CURL* handle, size_t* requestCounter) const
+{
+  // todo (mIsCCDBDownloaderEnabled)
+  mDownloader->asynchSchedule(handle, requestCounter);
 }
 
 CURLcode CcdbApi::CURL_perform(CURL* handle) const
