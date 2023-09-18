@@ -346,7 +346,6 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
 
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
-  std::cout << "D\n";
   mHandlesInUse--;
   PerformData* data;
   curlEasyErrorCheck(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &data));
@@ -355,81 +354,76 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   *data->codeDestination = curlCode;
 
   bool rescheduled = false;
-  std::cout << "Here\n";
 
   // If no requests left then signal finished based on type of operation
-  if (--(*data->requestsLeft) == 0) {
-    switch (data->type) {
-      case BLOCKING:
-        {
-          std::cout << "E\n";
-          long httpCode;
-          curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
-          char* url;
-          curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
-          std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n";
-          auto locations = getLocations(data->hostsPool->at(data->hostInd), data->headerMap); // todo change to data->hostInd
+  // if (--(*data->requestsLeft) == 0) {
+  --(*data->requestsLeft);
+  switch (data->type) {
+    case BLOCKING:
+      {
+        long httpCode;
+        curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
+        char* url;
+        curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
+        std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n";
+        auto locations = getLocations(data->hostsPool->at(data->hostInd), data->headerMap); // todo change to data->hostInd
 
-          if (300 <= httpCode && httpCode < 400 && data->locInd < locations.size()) {
-            // REDIRECT
-            std::string newLocation = locations.at(data->locInd++);
-            std::string newUrl;
-            if (newLocation.find("alien", 0) != std::string::npos) {
-              // ALIEN
-              newUrl = newLocation;
-              std::cout << "Redirecting to alien " << newUrl << "\n";
-              data->alienContentCallback(newUrl); // todo, check if alien failed?
-            } else {
-              // HTTP
-              newUrl = data->hostsPool->at(data->hostInd) + newLocation;
-              std::cout << "Redirecting to http " << newUrl << "\n"; // todo clear map or not?
-              curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
-              mHandlesToBeAdded.push_back(easy_handle);
-              (*data->requestsLeft) += 1; // TODO unhack
-              rescheduled = true;
-            }
-          } else if (data->locInd == locations.size()) {
-            // NEW HOST
-            std::cout << "Expanded all locations. Maybe another host can help\n";
+        if (300 <= httpCode && httpCode < 400 && data->locInd < locations.size()) {
+          // REDIRECT
+          std::string newLocation = locations.at(data->locInd++);
+          std::string newUrl;
+          if (newLocation.find("alien", 0) != std::string::npos) {
+            // ALIEN
+            newUrl = newLocation;
+            std::cout << "Redirecting to alien " << newUrl << "\n";
+            data->alienContentCallback(newUrl); // todo, check if alien failed?
+          } else {
+            // HTTP
+            newUrl = data->hostsPool->at(data->hostInd) + newLocation;
+            std::cout << "Redirecting to http " << newUrl << "\n"; // todo clear map or not?
+            curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+            mHandlesToBeAdded.push_back(easy_handle);
+            (*data->requestsLeft) += 1; // TODO unhack
+            rescheduled = true;
+          }
+        } else if (data->locInd == locations.size()) {
+          // NEW HOST
+          std::cout << "Expanded all locations. Maybe another host can help\n";
 
-            // set url
-            if (++data->hostInd < data->hostsPool->size()) {
-              std::string newUrl = data->hostsPool->at(data->hostInd) + "/" + data->path + "/" + std::to_string(data->timestamp);
-              std::cout << "Rescheduling for " << newUrl << "\n";
-              data->headerMap->clear(); // TODO is this safe?
-              curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
-              mHandlesToBeAdded.push_back(easy_handle);
-              (*data->requestsLeft) += 1; // TODO unhack
-              rescheduled = true;
-            } else {
-              std::cout << "No more hosts available\n";
-            }
-          }          
-        }
-        std::cout << "F\n";
-        break;
-      case ASYNCHRONOUS:
-        // Temporary change before asynchronous calls are reintroduced
-        LOG(error) << "CCDBDownloader: Illegal request type";
-        break;
-      case ASYNCHRONOUS_WITH_CALLBACK:
-        // Temporary change before asynchronous calls will callbacks are reintroduced
-        LOG(error) << "CCDBDownloader: Illegal request type";
-        break;
-    }
+          // set url
+          if (++data->hostInd < data->hostsPool->size()) {
+            std::string newUrl = data->hostsPool->at(data->hostInd) + "/" + data->path + "/" + std::to_string(data->timestamp);
+            std::cout << "Rescheduling for " << newUrl << "\n";
+            data->headerMap->clear(); // TODO is this safe?
+            curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+            mHandlesToBeAdded.push_back(easy_handle);
+            (*data->requestsLeft) += 1; // TODO unhack
+            rescheduled = true;
+          } else {
+            std::cout << "No more hosts available\n";
+          }
+        }          
+      }
+      break;
+    case ASYNCHRONOUS:
+      // Temporary change before asynchronous calls are reintroduced
+      LOG(error) << "CCDBDownloader: Illegal request type";
+      break;
+    case ASYNCHRONOUS_WITH_CALLBACK:
+      // Temporary change before asynchronous calls will callbacks are reintroduced
+      LOG(error) << "CCDBDownloader: Illegal request type";
+      break;
   }
-  std::cout << "X\n";
+  // }
   if (!rescheduled) {
     delete data;
   }
 
   checkHandleQueue();
-  std::cout << "Y\n";
 
   // Calling timeout starts a new download if a new easy_handle was added.
   int running_handles;
   curlMultiErrorCheck(curl_multi_socket_action(mCurlMultiHandle, CURL_SOCKET_TIMEOUT, 0, &running_handles));
-  std::cout << "Z\n";
   checkMultiInfo();
 }
 
@@ -586,31 +580,24 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
 {
   (*requestCounter)++;
 
-  std::cout << "a\n";
   CURLcode* codeVector = new CURLcode(); // todo change
 
-
-  std::cout << "b\n";
   // Get data about request
   DownloaderRequestData* requestData;
   std::multimap<std::string, std::string>* headerMap;
   std::vector<std::string>* hostsPool;
   curl_easy_getinfo(handle, CURLINFO_PRIVATE, &requestData);
-  std::cout << "c\n";
   headerMap = requestData->headerMap;
   hostsPool = &(requestData->hosts);
-  std::cout << "d\n";
 
   // Prepare temporary data about transfer
   auto* data = new CCDBDownloader::PerformData();
   data->codeDestination = codeVector;
   *codeVector = CURLE_FAILED_INIT;
-  std::cout << "e\n";
 
   data->type = BLOCKING; // TODO change that to something that makes sense
   data->requestsLeft = requestCounter;
   data->timestamp = requestData->timestamp;
-  std::cout << "f\n";
 
   data->hostInd = 0;
   data->locInd = 0;
@@ -618,16 +605,12 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   data->headerMap = headerMap;
   data->path = requestData->path;
   data->alienContentCallback = requestData->alienContentCallback;
-  std::cout << "g\n";
 
   // Prepare handle and schedule download
   setHandleOptions(handle, data);
   mHandlesToBeAdded.push_back(handle);
-  std::cout << "h\n";
   
-  std::cout << "i\n";
   checkHandleQueue();
-  std::cout << "j\n";
 
   // return codeVector;
 }
