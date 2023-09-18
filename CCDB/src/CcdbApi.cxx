@@ -1532,8 +1532,6 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
   data.timestamp = timestamp;
   data.alienContentCallback = alienContentCallback;
 
-  // data.headerMap->insert({"TESTING", "MORE TESTING"});
-
   curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   initCurlOptionsForRetrieve(curl_handle, (void*)&hoPair, writeCallBack, false);
   curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair.header)>);
@@ -1611,24 +1609,21 @@ void CcdbApi::getFromSnapshot(bool createSnapshot, std::string& semhashedstring,
 
 void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::string& snapshotpath, std::fstream& logStream, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const
 {
-  // are we asked to create a snapshot ?
-  if (createSnapshot && fromSnapshot != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
-    auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
-    snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
-    o2::utils::createDirectoriesIfAbsent(snapshotdir);
-    if (logStream.is_open()) {
-      logStream << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
+  auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
+  snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
+  o2::utils::createDirectoriesIfAbsent(snapshotdir);
+  if (logStream.is_open()) {
+    logStream << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
+  }
+  { // dump image to a file
+    LOGP(debug, "creating snapshot {} -> {}", path, snapshotpath);
+    CCDBQuery querysummary(path, metadata, timestamp);
+    {
+      std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
+      std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
     }
-    { // dump image to a file
-      LOGP(debug, "creating snapshot {} -> {}", path, snapshotpath);
-      CCDBQuery querysummary(path, metadata, timestamp);
-      {
-        std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
-        std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
-      }
-      // now open the same file as root file and store metadata
-      updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
-    }
+    // now open the same file as root file and store metadata
+    updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
   }
 }
 
@@ -1663,24 +1658,28 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
     getWithCurl(dest, path, metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore);
   }
 
-  if (!trySnapshot) {
-    // TODO create semaphore here
-    std::hash<std::string> hasher;
-    semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
-    sem = createNamedSempahore(semhashedstring);
-    if (sem) {
-      sem->wait(); // wait until we can enter (no one else there)
-    }
-  }
-
   if (dest.empty()) {
     sem_release();
     return; // nothing was fetched: either cached value is good or error was produced
   }
+
   // !considerSnapshot means that the call was made by retrieve for snapshoting reasons
   logReading(path, timestamp, headers, fmt::format("{}{}", considerSnapshot ? "load to memory" : "retrieve", fromSnapshot ? " from snapshot" : ""));
-  saveSnapshot(dest, createSnapshot, fromSnapshot, path, snapshotpath, logStream, metadata, timestamp, headers);
-  sem_release();
+
+  // Consider saving snapshot
+  if (createSnapshot && fromSnapshot != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
+    if (!trySnapshot) {
+      // Create semaphore if it wasn't already as part of the getFromSnapshot function
+      std::hash<std::string> hasher;
+      semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
+      sem = createNamedSempahore(semhashedstring);
+      if (sem) {
+        sem->wait(); // wait until we can enter (no one else there)
+      }
+    }
+    saveSnapshot(dest, createSnapshot, fromSnapshot, path, snapshotpath, logStream, metadata, timestamp, headers);
+    sem_release();
+  }
 }
 
 // navigate sequence of URLs until TFile content is found; object is extracted and returned
