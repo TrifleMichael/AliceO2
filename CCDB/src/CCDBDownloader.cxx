@@ -346,6 +346,7 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
 
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
+  std::cout << "D\n";
   mHandlesInUse--;
   PerformData* data;
   curlEasyErrorCheck(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &data));
@@ -354,12 +355,14 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   *data->codeDestination = curlCode;
 
   bool rescheduled = false;
+  std::cout << "Here\n";
 
   // If no requests left then signal finished based on type of operation
   if (--(*data->requestsLeft) == 0) {
     switch (data->type) {
       case BLOCKING:
         {
+          std::cout << "E\n";
           long httpCode;
           curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
           char* url;
@@ -403,6 +406,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             }
           }          
         }
+        std::cout << "F\n";
         break;
       case ASYNCHRONOUS:
         // Temporary change before asynchronous calls are reintroduced
@@ -414,15 +418,18 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         break;
     }
   }
+  std::cout << "X\n";
   if (!rescheduled) {
     delete data;
   }
 
   checkHandleQueue();
+  std::cout << "Y\n";
 
   // Calling timeout starts a new download if a new easy_handle was added.
   int running_handles;
   curlMultiErrorCheck(curl_multi_socket_action(mCurlMultiHandle, CURL_SOCKET_TIMEOUT, 0, &running_handles));
+  std::cout << "Z\n";
   checkMultiInfo();
 }
 
@@ -573,6 +580,56 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
   }
 
   return codeVector;
+}
+
+void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
+{
+  (*requestCounter)++;
+
+  std::cout << "a\n";
+  CURLcode* codeVector = new CURLcode(); // todo change
+
+
+  std::cout << "b\n";
+  // Get data about request
+  DownloaderRequestData* requestData;
+  std::multimap<std::string, std::string>* headerMap;
+  std::vector<std::string>* hostsPool;
+  curl_easy_getinfo(handle, CURLINFO_PRIVATE, &requestData);
+  std::cout << "c\n";
+  headerMap = requestData->headerMap;
+  hostsPool = &(requestData->hosts);
+  std::cout << "d\n";
+
+  // Prepare temporary data about transfer
+  auto* data = new CCDBDownloader::PerformData();
+  data->codeDestination = codeVector;
+  *codeVector = CURLE_FAILED_INIT;
+  std::cout << "e\n";
+
+  data->type = BLOCKING; // TODO change that to something that makes sense
+  data->requestsLeft = requestCounter;
+  data->timestamp = requestData->timestamp;
+  std::cout << "f\n";
+
+  data->hostInd = 0;
+  data->locInd = 0;
+  data->hostsPool = hostsPool;
+  data->headerMap = headerMap;
+  data->path = requestData->path;
+  data->alienContentCallback = requestData->alienContentCallback;
+  std::cout << "g\n";
+
+  // Prepare handle and schedule download
+  setHandleOptions(handle, data);
+  mHandlesToBeAdded.push_back(handle);
+  std::cout << "h\n";
+  
+  std::cout << "i\n";
+  checkHandleQueue();
+  std::cout << "j\n";
+
+  // return codeVector;
 }
 
 } // namespace o2

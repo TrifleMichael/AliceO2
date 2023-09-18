@@ -147,6 +147,8 @@ class CCDBDownloader
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
+  void asynchSchedule(CURL* handle, size_t* requestCounter); // todo comment
+
   /**
    * Limits the number of parallel connections. Should be used only if no transfers are happening.
    */
@@ -260,12 +262,19 @@ class CCDBDownloader
     RequestType type;
 
     std::multimap<std::string, std::string>* headerMap;
-    std::vector<std::string>* hostsPool;
     int hostInd;
     int locInd;
     std::string path;
     long timestamp;
+
+    // std::map<CURL*, std::multimap<std::string, std::string>*> headerMaps;
+    // std::map<CURL*, int> hostInd;
+    // std::map<CURL*, int> locInd;
+    // std::map<CURL*, std::string> path;
+    // std::map<CURL*, long> timestamp;
+
     std::function<void(std::string)> alienContentCallback;
+    std::vector<std::string>* hostsPool;
   } PerformData;
 
   /**

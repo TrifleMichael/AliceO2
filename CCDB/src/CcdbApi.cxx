@@ -1558,11 +1558,6 @@ void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
   curl_slist* options_list = nullptr;
   initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
   navigateURLsWithDownloader(dest, curl_handle, fullUrl, path, timestamp);
-  // navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers);
-  // for (size_t hostIndex = 1; hostIndex < hostsPool.size() && isMemoryFileInvalid(dest); hostIndex++) {
-  //   fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp, hostIndex);
-  //   navigateURLsAndLoadFileToMemory(dest, curl_handle, fullUrl, headers); // headers loaded from the file in case of the snapshot reading only
-  // }
   curl_slist_free_all(options_list);
   curl_easy_cleanup(curl_handle);
 }
@@ -1626,6 +1621,63 @@ void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int
     updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
   }
 }
+
+// void CcdbApi::vectoredLoadFileToMemory(std::vector<o2::pmr::vector<char>*>& dest, std::vector<std::string const&> path,
+//                                std::vector<std::map<std::string, std::string>* const> metadata, std::vector<long> timestamp,
+//                                std::vector<std::map<std::string, std::string>*> headers, std::vector<std::string const> etag,
+//                                std::vector<std::string> createdNotAfter, std::vector<std::string> createdNotBefore, bool considerSnapshot) const
+// {
+//   LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
+
+//   std::string semhashedstring{}, snapshotpath{}, logfile{};
+//   boost::interprocess::named_semaphore* sem = nullptr;
+//   std::fstream logStream;
+//   int fromSnapshot = 0;
+//   bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
+//   auto sem_release = [&sem, &semhashedstring, this]() {
+//     if (sem) {
+//       sem->post();
+//       if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
+//         sem->post();
+//         boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
+//       }
+//     }
+//   };
+
+//   for(int i = 0; i < dest.size(); i++) {
+//   bool trySnapshot = mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path));
+//     if (trySnapshot) {
+//       // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
+//       // this would mean that the object was is already fetched and in this mode we don't to validity checks!
+//       getFromSnapshot(createSnapshot, semhashedstring, path, sem, logStream, logfile, timestamp, headers, snapshotpath, dest, fromSnapshot, etag);
+//     } else { // look on the server
+//       getWithCurl(dest, path, metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+//     }
+//   }
+
+//   if (dest.empty()) {
+//     sem_release();
+//     return; // nothing was fetched: either cached value is good or error was produced
+//   }
+
+//   // !considerSnapshot means that the call was made by retrieve for snapshoting reasons
+//   logReading(path, timestamp, headers, fmt::format("{}{}", considerSnapshot ? "load to memory" : "retrieve", fromSnapshot ? " from snapshot" : ""));
+
+//   // Consider saving snapshot
+//   if (createSnapshot && fromSnapshot != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
+//     if (!trySnapshot) {
+//       // Create semaphore if it wasn't already as part of the getFromSnapshot function
+//       std::hash<std::string> hasher;
+//       semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
+//       sem = createNamedSempahore(semhashedstring);
+//       if (sem) {
+//         sem->wait(); // wait until we can enter (no one else there)
+//       }
+//     }
+//     saveSnapshot(dest, createSnapshot, fromSnapshot, path, snapshotpath, logStream, metadata, timestamp, headers);
+//     sem_release();
+//   }
+// }
 
 void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
                                std::map<std::string, std::string> const& metadata, long timestamp,
