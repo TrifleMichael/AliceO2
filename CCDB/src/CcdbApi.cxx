@@ -1482,13 +1482,41 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
+struct HeaderObjectPair_t {
+  std::multimap<std::string, std::string> header;
+  o2::pmr::vector<char>* object = nullptr;
+  int counter = 0;
+};
+
+size_t writeCallback(void* contents, size_t size, size_t nmemb, void* chunkptr) {
+  auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
+  auto& chunk = *ho.object;
+  size_t realsize = size * nmemb, sz = 0;
+  ho.counter++;
+  try {
+    if (chunk.capacity() < chunk.size() + realsize) {
+      auto cl = ho.header.find("Content-Length");
+      if (cl != ho.header.end()) {
+        sz = std::max(chunk.size() + realsize, (size_t)std::stol(cl->second));
+      } else {
+        sz = chunk.size() + realsize;
+        // LOGP(debug, "SIZE IS NOT IN HEADER, allocate {}", sz);
+      }
+      chunk.reserve(sz);
+    }
+    char* contC = (char*)contents;
+    chunk.insert(chunk.end(), contC, contC + realsize);
+  } catch (std::exception e) {
+    // LOGP(alarm, "failed to reserve {} bytes in CURL write callback (realsize = {}): {}", sz, realsize, e.what());
+    realsize = 0;
+  }
+  return realsize;
+}
+
 void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp, size_t* requestCounter) const
 {
-  struct HeaderObjectPair_t {
-    std::multimap<std::string, std::string> header;
-    o2::pmr::vector<char>* object = nullptr;
-    int counter = 0;
-  } hoPair{{}, &dest, 0};
+  auto hoPair = new HeaderObjectPair_t();
+  hoPair->object = &dest;
 
   bool errorflag = false;
   auto signalError = [&chunk = dest, &errorflag]() {
@@ -1496,50 +1524,33 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
     chunk.reserve(1);
     errorflag = true;
   };
-  auto writeCallBack = [](void* contents, size_t size, size_t nmemb, void* chunkptr) {
-    std::cout << "Write callback entered\n";
-    auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
-    auto& chunk = *ho.object;
-    size_t realsize = size * nmemb, sz = 0;
-    ho.counter++;
-    try {
-      if (chunk.capacity() < chunk.size() + realsize) {
-        auto cl = ho.header.find("Content-Length");
-        if (cl != ho.header.end()) {
-          sz = std::max(chunk.size() + realsize, (size_t)std::stol(cl->second));
-        } else {
-          sz = chunk.size() + realsize;
-          LOGP(debug, "SIZE IS NOT IN HEADER, allocate {}", sz);
-        }
-        chunk.reserve(sz);
-      }
-      char* contC = (char*)contents;
-      chunk.insert(chunk.end(), contC, contC + realsize);
-    } catch (std::exception e) {
-      LOGP(alarm, "failed to reserve {} bytes in CURL write callback (realsize = {}): {}", sz, realsize, e.what());
-      realsize = 0;
-    }
-    std::cout << "Write callback finished\n";
-    return realsize;
-  };
+
 
   std::function<void(std::string)> alienContentCallback = [this, &dest](std::string url) {
     this->loadFileToMemory(dest, url, nullptr);
   };
 
-  DownloaderRequestData data;
-  data.headerMap = &(hoPair.header);
-  data.hosts = hostsPool;
-  data.path = path;
-  data.timestamp = timestamp;
-  data.alienContentCallback = alienContentCallback;
+  // std::cout << "TESTING SIZE\n";
+  // std::cout << dest.size() << "\n";
+  // std::cout << "Size ok\n";
+  // auto& ho = *static_cast<HeaderObjectPair_t*>((void*)&hoPair);
+  // auto& chunk = *ho.object;
+  // std::cout << chunk.size() << "\n";
+  // std::cout << "Chunk size ok\n";
+
+  auto data = new DownloaderRequestData();
+  data->headerMap = &(hoPair->header);
+  data->hosts = hostsPool;
+  data->path = path;
+  data->timestamp = timestamp;
+  data->alienContentCallback = alienContentCallback;
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
-  initCurlOptionsForRetrieve(curl_handle, (void*)&hoPair, writeCallBack, false);
-  curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair.header)>);
+  initCurlOptionsForRetrieve(curl_handle, (void*)hoPair, writeCallback, false);
+  curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair->header)>);
   // hoPair.header.clear(); // TODO why it was like that?
-  curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&hoPair.header);
-  curl_easy_setopt(curl_handle, CURLOPT_PRIVATE, (void*)&(data));
+  curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&hoPair->header);
+  curl_easy_setopt(curl_handle, CURLOPT_PRIVATE, (void*)data);
   curlSetSSLOptions(curl_handle);
 
   asynchPerform(curl_handle, requestCounter);
@@ -1557,6 +1568,9 @@ void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
   curl_slist* options_list = nullptr;
   initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
   navigateURLsWithDownloader(dest, curl_handle, fullUrl, path, timestamp, requestCounter);
+  while(*requestCounter > 0) {
+    mDownloader->runLoop(0);
+  }
 
   // curl_slist_free_all(options_list); TODO cleanup later
   // curl_easy_cleanup(curl_handle);
@@ -1709,10 +1723,10 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   } else { // look on the server
     size_t requestCounter = 0;
     getWithCurl(dest, path, metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, &requestCounter);
-    std::cout << "Beginnign to run loop\n";
-    while(requestCounter > 0) {
-      mDownloader->runLoop(0);
-    }
+    // std::cout << "Beginnign to run loop\n";
+    // while(requestCounter > 0) {
+    //   mDownloader->runLoop(0);
+    // }
   }
 
   if (dest.empty()) {
