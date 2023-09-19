@@ -354,7 +354,7 @@ void getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
 void getFromSnapshot(bool createSnapshot, std::string const& path,
                               std::fstream& logStream, std::string& logfile, long timestamp, std::map<std::string, std::string>* headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
-void saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::string& snapshotpath, std::fstream& logStream, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
+void saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::fstream& logStream, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
 boost::interprocess::named_semaphore* createNamedSempahore(std::string& semhashedstring) const; // TODO create here?
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
   void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders = nullptr) const;
@@ -374,8 +374,8 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string& semhashe
     std::vector<bool> considerSnapshotVec) const;  // todo comment
   void getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string>* metadata,
                             long timestamp, std::map<std::string, std::string>* headers, std::string etag, std::string createdNotAfter,
-                            std::string createdNotBefore, bool considerSnapshot, std::string& snapshotpath, bool& semLocked,
-                            boost::interprocess::named_semaphore* sem, int& fromSnapshot, bool& trySnapshot, size_t* requestCounter, bool& requestScheduled) const; // todo comment
+                            std::string createdNotBefore, bool considerSnapshot, bool& semLocked,
+                            boost::interprocess::named_semaphore* sem, int& fromSnapshot, size_t* requestCounter, bool& requestScheduled) const; // todo comment
   void navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const;
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity
