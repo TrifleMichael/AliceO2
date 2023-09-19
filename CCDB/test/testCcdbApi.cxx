@@ -81,6 +81,8 @@ BOOST_AUTO_TEST_CASE(multi_host_test) // needs loadFileToMemory update
   std::cout << "\n";
 }
 
+// todo add local cache test
+
 // BOOST_AUTO_TEST_CASE(alien_test) // needs loadFileToMemory update
 // {
 //   setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);

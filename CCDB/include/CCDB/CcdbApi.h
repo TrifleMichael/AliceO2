@@ -371,7 +371,11 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string& semhashe
     std::vector<std::string> etags,
     std::vector<std::string> createdNotAfterVec,
     std::vector<std::string> createdNotBeforevec,
-    std::vector<bool> considerSnapshotVec) const;
+    std::vector<bool> considerSnapshotVec) const;  // todo comment
+  void getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string>* metadata,
+                            long timestamp, std::map<std::string, std::string>* headers, std::string etag, std::string createdNotAfter,
+                            std::string createdNotBefore, bool considerSnapshot, std::string& snapshotpath, bool& semLocked,
+                            boost::interprocess::named_semaphore* sem, int& fromSnapshot, bool& trySnapshot, size_t* requestCounter, bool& requestScheduled) const; // todo comment
   void navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const;
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity

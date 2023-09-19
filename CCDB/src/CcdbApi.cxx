@@ -1635,9 +1635,8 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 {
   std::vector<o2::pmr::vector<char>*> dests = {&dest};
   std::vector<std::string> paths = {path};
-  std::vector<std::map<std::string, std::string>*> metadataVec;
   std::map<std::string, std::string> metadataCopy = metadata;
-  metadataVec.push_back(&metadataCopy);
+  std::vector<std::map<std::string, std::string>*> metadataVec = {&metadataCopy};
   std::vector<long> timestamps = {timestamp};
   std::vector<std::map<std::string, std::string>*> headersVec = {headers};
   std::vector<std::string> etags = {etag};
@@ -1645,6 +1644,35 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   std::vector<std::string> createdNotBeforeVec = {createdNotBefore};
   std::vector<bool> considerSnapshotVec = {considerSnapshot};
   loadFileToMemory(dests, paths, metadataVec, timestamps, headersVec, etags, createdNotAfterVec, createdNotBeforeVec, considerSnapshotVec);
+}
+
+void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string>* metadata,
+                              long timestamp, std::map<std::string, std::string>* headers, std::string etag, std::string createdNotAfter,
+                              std::string createdNotBefore, bool considerSnapshot, std::string& snapshotpath, bool& semLocked,
+                              boost::interprocess::named_semaphore* sem, int& fromSnapshot, bool& trySnapshot, size_t* requestCounter, bool& requestScheduled) const
+{
+  LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
+  bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
+
+  trySnapshot = mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path));
+  if (trySnapshot) {
+    std::hash<std::string> hasher;
+    std::string semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
+    sem = createNamedSempahore(semhashedstring);
+    if (sem && !semLocked) {
+      sem->wait(); // wait until we can enter (no one else there)
+      semLocked = true;
+    }
+    // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
+    // this would mean that the object was is already fetched and in this mode we don't to validity checks!
+    std::fstream logStream; // todo is logstream here ok
+    std::string logfile; // todo is logfile here ok
+    getFromSnapshot(createSnapshot, path, logStream, logfile, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag); // todo remove sem from args
+  } else { // look on the server
+    std::cout << "Getting with curl\n";
+    getWithCurl(*dest, path, *metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, requestCounter);
+    requestScheduled = true;
+  }
 }
 
 void CcdbApi::loadFileToMemory(
@@ -1665,10 +1693,9 @@ void CcdbApi::loadFileToMemory(
   size_t requestCounter = 0;
   bool requestScheduled = false;
 
-  std::string semhashedstring{}, snapshotpath{}, logfile{};
+  std::string semhashedstring{}, snapshotpath{}, logfile{}; // semhashedstring not longer works properly
   boost::interprocess::named_semaphore* sem = nullptr;
   std::fstream logStream;
-  int fromSnapshot = 0;
   auto sem_release = [&sem, &semhashedstring, this]() {
     if (sem) {
       sem->post();
@@ -1680,43 +1707,21 @@ void CcdbApi::loadFileToMemory(
   };
 
   for(int i = 0; i < dests.size(); i++) {
-    auto dest = dests.at(i);
-    const std::string path = paths.at(i);
-    auto metadata = metadataVec.at(i);
-    auto timestamp = timestamps.at(i);
-    auto headers = headersVec.at(i);
-    const std::string etag = etags.at(i);
-    const std::string createdNotAfter = createdNotAfterVec.at(i);
-    const std::string createdNotBefore = createdNotBeforeVec.at(i);
-    auto considerSnapshot = considerSnapshotVec.at(i);
-
-    LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
-    bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
-
-    bool trySnapshot = mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path));
-    if (trySnapshot) {
-      std::hash<std::string> hasher;
-      semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
-      sem = createNamedSempahore(semhashedstring);
-      if (sem && !semLocked) {
-        sem->wait(); // wait until we can enter (no one else there)
-        semLocked = true;
-      }
-      // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
-      // this would mean that the object was is already fetched and in this mode we don't to validity checks!
-      getFromSnapshot(createSnapshot, path, logStream, logfile, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag); // todo remove sem from args
-    } else { // look on the server
-      getWithCurl(*dest, path, *metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, &requestCounter);
-      requestScheduled = true;
-    }
+    int fromSnapshot = 0;
+    bool trySnapshot = false;
+    getFileToMemory(dests.at(i), paths.at(i), metadataVec.at(i), timestamps.at(i), headersVec.at(i), etags.at(i),
+                    createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i), snapshotpath, semLocked, sem, fromSnapshot, trySnapshot, &requestCounter, requestScheduled);
     fromSnapshots[i] = fromSnapshot;
     trySnapshots[i] = trySnapshot;
   }
 
   if (requestScheduled) {
+    std::cout << "Running the loop\n";
     while(requestCounter > 0) {
       mDownloader->runLoop(0);
     }
+  } else {
+    std::cout << "Loop not about to be ran\n";
   }
 
   // TODO double and triple check if everyting is ok with transporting data from above
@@ -1727,6 +1732,7 @@ void CcdbApi::loadFileToMemory(
     auto timestamp = timestamps.at(i);
     auto headers = headersVec.at(i);
     auto considerSnapshot = considerSnapshotVec.at(i);
+    auto fromSnapshot = fromSnapshots.at(i);
 
     bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
 
@@ -1992,6 +1998,7 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
 void CcdbApi::asynchPerform(CURL* handle, size_t* requestCounter) const
 {
   // todo (mIsCCDBDownloaderEnabled)
+  std::cout << "Stuff scheduled\n";
   mDownloader->asynchSchedule(handle, requestCounter);
 }
 
