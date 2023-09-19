@@ -1633,25 +1633,17 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
                                std::map<std::string, std::string>* headers, std::string const& etag,
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
 {
-  std::vector<o2::pmr::vector<char>*> dests;
-  dests.push_back(&dest);
-  std::vector<std::string> paths;
-  paths.push_back(path);
+  std::vector<o2::pmr::vector<char>*> dests = {&dest};
+  std::vector<std::string> paths = {path};
   std::vector<std::map<std::string, std::string>*> metadataVec;
   std::map<std::string, std::string> metadataCopy = metadata;
   metadataVec.push_back(&metadataCopy);
-  std::vector<long> timestamps;
-  timestamps.push_back(timestamp);
-  std::vector<std::map<std::string, std::string>*> headersVec;
-  headersVec.push_back(headers);
-  std::vector<std::string> etags;
-  etags.push_back(etag);
-  std::vector<std::string> createdNotAfterVec;
-  createdNotAfterVec.push_back(createdNotAfter);
-  std::vector<std::string> createdNotBeforeVec;
-  createdNotBeforeVec.push_back(createdNotBefore);
-  std::vector<bool> considerSnapshotVec;
-  considerSnapshotVec.push_back(considerSnapshot);
+  std::vector<long> timestamps = {timestamp};
+  std::vector<std::map<std::string, std::string>*> headersVec = {headers};
+  std::vector<std::string> etags = {etag};
+  std::vector<std::string> createdNotAfterVec = {createdNotAfter};
+  std::vector<std::string> createdNotBeforeVec = {createdNotBefore};
+  std::vector<bool> considerSnapshotVec = {considerSnapshot};
   loadFileToMemory(dests, paths, metadataVec, timestamps, headersVec, etags, createdNotAfterVec, createdNotBeforeVec, considerSnapshotVec);
 }
 
