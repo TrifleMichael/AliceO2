@@ -362,6 +362,16 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string& semhashe
                         std::map<std::string, std::string> const& metadata, long timestamp,
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
+  void loadFileToMemory(
+    std::vector<o2::pmr::vector<char>*> dests,
+    std::vector<std::string> paths,
+    std::vector<std::map<std::string, std::string>*> metadataVec,
+    std::vector<long> timestamps,
+    std::vector<std::map<std::string, std::string>*> headersVec,
+    std::vector<std::string> etags,
+    std::vector<std::string> createdNotAfterVec,
+    std::vector<std::string> createdNotBeforevec,
+    std::vector<bool> considerSnapshotVec) const;
   void navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const;
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity

@@ -1569,9 +1569,6 @@ void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
   curl_slist* options_list = nullptr;
   initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
   navigateURLsWithDownloader(dest, curl_handle, fullUrl, path, timestamp, requestCounter);
-  while(*requestCounter > 0) {
-    mDownloader->runLoop(0);
-  }
 
   // curl_slist_free_all(options_list); TODO cleanup later
   // curl_easy_cleanup(curl_handle);
@@ -1699,58 +1696,103 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
                                std::map<std::string, std::string>* headers, std::string const& etag,
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
 {
-  LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
+  std::vector<o2::pmr::vector<char>*> dests;
+  dests.push_back(&dest);
+  std::vector<std::string> paths;
+  paths.push_back(path);
+  std::vector<std::map<std::string, std::string>*> metadataVec;
+  std::map<std::string, std::string> metadataCopy = metadata;
+  metadataVec.push_back(&metadataCopy);
+  std::vector<long> timestamps;
+  timestamps.push_back(timestamp);
+  std::vector<std::map<std::string, std::string>*> headersVec;
+  headersVec.push_back(headers);
+  std::vector<std::string> etags;
+  etags.push_back(etag);
+  std::vector<std::string> createdNotAfterVec;
+  createdNotAfterVec.push_back(createdNotAfter);
+  std::vector<std::string> createdNotBeforeVec;
+  createdNotBeforeVec.push_back(createdNotBefore);
+  std::vector<bool> considerSnapshotVec;
+  considerSnapshotVec.push_back(considerSnapshot);
+  loadFileToMemory(dests, paths, metadataVec, timestamps, headersVec, etags, createdNotAfterVec, createdNotBeforeVec, considerSnapshotVec);
+}
 
-  std::string semhashedstring{}, snapshotpath{}, logfile{};
-  boost::interprocess::named_semaphore* sem = nullptr;
-  std::fstream logStream;
-  int fromSnapshot = 0;
-  bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
-  auto sem_release = [&sem, &semhashedstring, this]() {
-    if (sem) {
-      sem->post();
-      if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
-        sem->post();
-        boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
-      }
-    }
-  };
+void CcdbApi::loadFileToMemory(
+    std::vector<o2::pmr::vector<char>*> dests,
+    std::vector<std::string> paths,
+    std::vector<std::map<std::string, std::string>*> metadataVec,
+    std::vector<long> timestamps,
+    std::vector<std::map<std::string, std::string>*> headersVec,
+    std::vector<std::string> etags,
+    std::vector<std::string> createdNotAfterVec,
+    std::vector<std::string> createdNotBeforeVec,
+    std::vector<bool> considerSnapshotVec) const
+{
 
-  bool trySnapshot = mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path));
-  if (trySnapshot) {
-    // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
-    // this would mean that the object was is already fetched and in this mode we don't to validity checks!
-    getFromSnapshot(createSnapshot, semhashedstring, path, sem, logStream, logfile, timestamp, headers, snapshotpath, dest, fromSnapshot, etag);
-  } else { // look on the server
-    size_t requestCounter = 0;
-    getWithCurl(dest, path, metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, &requestCounter);
-    // std::cout << "Beginnign to run loop\n";
-    // while(requestCounter > 0) {
-    //   mDownloader->runLoop(0);
-    // }
-  }
+  for(int i = 0; i < dests.size(); i++) {
+    auto dest = dests.at(i);
+    const std::string path = paths.at(i);
+    auto metadata = metadataVec.at(i);
+    auto timestamp = timestamps.at(i);
+    auto headers = headersVec.at(i);
+    const std::string etag = etags.at(i);
+    const std::string createdNotAfter = createdNotAfterVec.at(i);
+    const std::string createdNotBefore = createdNotBeforeVec.at(i);
+    auto considerSnapshot = considerSnapshotVec.at(i);
 
-  if (dest.empty()) {
-    sem_release();
-    return; // nothing was fetched: either cached value is good or error was produced
-  }
+    LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
 
-  // !considerSnapshot means that the call was made by retrieve for snapshoting reasons
-  logReading(path, timestamp, headers, fmt::format("{}{}", considerSnapshot ? "load to memory" : "retrieve", fromSnapshot ? " from snapshot" : ""));
-
-  // Consider saving snapshot
-  if (createSnapshot && fromSnapshot != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
-    if (!trySnapshot) {
-      // Create semaphore if it wasn't already as part of the getFromSnapshot function
-      std::hash<std::string> hasher;
-      semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
-      sem = createNamedSempahore(semhashedstring);
+    std::string semhashedstring{}, snapshotpath{}, logfile{};
+    boost::interprocess::named_semaphore* sem = nullptr;
+    std::fstream logStream;
+    int fromSnapshot = 0;
+    bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
+    auto sem_release = [&sem, &semhashedstring, this]() {
       if (sem) {
-        sem->wait(); // wait until we can enter (no one else there)
+        sem->post();
+        if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
+          sem->post();
+          boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
+        }
+      }
+    };
+
+    bool trySnapshot = mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path));
+    if (trySnapshot) {
+      // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
+      // this would mean that the object was is already fetched and in this mode we don't to validity checks!
+      getFromSnapshot(createSnapshot, semhashedstring, path, sem, logStream, logfile, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag);
+    } else { // look on the server
+      size_t requestCounter = 0;
+      getWithCurl(*dest, path, *metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, &requestCounter);
+      while(requestCounter > 0) {
+        mDownloader->runLoop(0);
       }
     }
-    saveSnapshot(dest, createSnapshot, fromSnapshot, path, snapshotpath, logStream, metadata, timestamp, headers);
-    sem_release();
+
+    if (dest->empty()) {
+      sem_release();
+      return; // nothing was fetched: either cached value is good or error was produced
+    }
+
+    // !considerSnapshot means that the call was made by retrieve for snapshoting reasons
+    logReading(path, timestamp, headers, fmt::format("{}{}", considerSnapshot ? "load to memory" : "retrieve", fromSnapshot ? " from snapshot" : ""));
+
+    // Consider saving snapshot
+    if (createSnapshot && fromSnapshot != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
+      if (!trySnapshot) {
+        // Create semaphore if it wasn't already as part of the getFromSnapshot function
+        std::hash<std::string> hasher;
+        semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
+        sem = createNamedSempahore(semhashedstring);
+        if (sem) {
+          sem->wait(); // wait until we can enter (no one else there)
+        }
+      }
+      saveSnapshot(*dest, createSnapshot, fromSnapshot, path, snapshotpath, logStream, *metadata, timestamp, headers);
+      sem_release();
+    }
   }
 }
 
