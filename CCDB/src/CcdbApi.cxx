@@ -1587,12 +1587,12 @@ boost::interprocess::named_semaphore* CcdbApi::createNamedSempahore(std::string 
 }
 
 void CcdbApi::getFromSnapshot(bool createSnapshot, std::string const& path,
-                              std::fstream& logStream, std::string& logfile, long timestamp, std::map<std::string, std::string>* headers,
+                              long timestamp, std::map<std::string, std::string>* headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const
 {
   if (createSnapshot) { // create named semaphore
-    logfile = mSnapshotCachePath + "/log";
-    logStream = std::fstream(logfile, ios_base::out | ios_base::app);
+    std::string logfile = mSnapshotCachePath + "/log";
+    std::fstream logStream = std::fstream(logfile, ios_base::out | ios_base::app);
     if (logStream.is_open()) {
       logStream << "CCDB-access[" << getpid() << "] of " << mUniqueAgentID << " to " << path << " timestamp " << timestamp << " for load to memory\n";
     }
@@ -1664,9 +1664,7 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
     }
     // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
     // this would mean that the object was is already fetched and in this mode we don't to validity checks!
-    std::fstream logStream; // todo is logstream here ok
-    std::string logfile; // todo is logfile here ok
-    getFromSnapshot(createSnapshot, path, logStream, logfile, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag); // todo remove sem from args
+    getFromSnapshot(createSnapshot, path, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag); // todo remove sem from args
     sem->post(); // todo is that ok?
   } else { // look on the server
     if(!mDownloader) { // todo not the best way to handle things
@@ -1710,6 +1708,8 @@ void CcdbApi::loadFileToMemory(
       }
     }
   };
+
+  // todo : what about logstream and logfile
 
   for(int i = 0; i < dests.size(); i++) {
     int fromSnapshot = 0;
