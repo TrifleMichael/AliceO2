@@ -1669,6 +1669,9 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
     getFromSnapshot(createSnapshot, path, logStream, logfile, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag); // todo remove sem from args
     sem->post(); // todo is that ok?
   } else { // look on the server
+    if(!mDownloader) { // todo not the best way to handle things
+      mDownloader = new CCDBDownloader();
+    }
     getWithCurl(*dest, path, *metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, requestCounter);
   }
 }
