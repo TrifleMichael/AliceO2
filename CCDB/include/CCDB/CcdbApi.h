@@ -351,7 +351,7 @@ void getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
                           std::map<std::string, std::string> const& metadata, long timestamp,
                           std::map<std::string, std::string>* headers, std::string const& etag,
                           const std::string& createdNotAfter, const std::string& createdNotBefore, size_t* requestCounter) const; // TODO define here?
-void getFromSnapshot(bool createSnapshot, std::string& semhashedstring, std::string const& path, boost::interprocess::named_semaphore* sem,
+void getFromSnapshot(bool createSnapshot, std::string const& path,
                               std::fstream& logStream, std::string& logfile, long timestamp, std::map<std::string, std::string>* headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
 void saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::string& snapshotpath, std::fstream& logStream, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
