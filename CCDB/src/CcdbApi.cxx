@@ -1482,39 +1482,15 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-struct HeaderObjectPair_t {
-  std::multimap<std::string, std::string> header;
-  o2::pmr::vector<char>* object = nullptr;
-  int counter = 0;
-};
-
-// size_t writeCallback(void* contents, size_t size, size_t nmemb, void* chunkptr) {
-//   auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
-//   auto& chunk = *ho.object;
-//   size_t realsize = size * nmemb, sz = 0;
-//   ho.counter++;
-//   try {
-//     if (chunk.capacity() < chunk.size() + realsize) {
-//       auto cl = ho.header.find("Content-Length");
-//       if (cl != ho.header.end()) {
-//         sz = std::max(chunk.size() + realsize, (size_t)std::stol(cl->second));
-//       } else {
-//         sz = chunk.size() + realsize;
-//         // LOGP(debug, "SIZE IS NOT IN HEADER, allocate {}", sz);
-//       }
-//       chunk.reserve(sz);
-//     }
-//     char* contC = (char*)contents;
-//     chunk.insert(chunk.end(), contC, contC + realsize);
-//   } catch (std::exception e) {
-//     // LOGP(alarm, "failed to reserve {} bytes in CURL write callback (realsize = {}): {}", sz, realsize, e.what());
-//     realsize = 0;
-//   }
-//   return realsize;
-// }
-
 void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp, size_t* requestCounter) const
 {
+
+  struct HeaderObjectPair_t {
+    std::multimap<std::string, std::string> header;
+    o2::pmr::vector<char>* object = nullptr;
+    int counter = 0;
+  };
+
   auto hoPair = new HeaderObjectPair_t();
   hoPair->object = &dest;
 
