@@ -63,23 +63,23 @@ BOOST_AUTO_TEST_CASE(base_test)
   std::cout << "\n";
 }
 
-// BOOST_AUTO_TEST_CASE(multi_host_test) // needs loadFileToMemory update
-// {
-//   setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
-//   std::cout << "----------- multi_host_test -----------\n";
-//   CcdbApi api;
-//   api.init("http://bogus-host.cern.ch,http://ccdb-test.cern.ch:8080");
-//   std::map<std::string, std::string> metadata;
-//   std::map<std::string, std::string> headers;
-//   o2::pmr::vector<char> dst;
-//   std::string url = "Analysis/ALICE3/Centrality";
-//   api.loadFileToMemory(dst, url, metadata, 1645780010602, &headers, "", "", "", true);
-//   BOOST_CHECK(dst.size() != 0);
-//   for(int i = 0; i < 50 && i < dst.size(); i++) {
-//     std::cout << dst[i];
-//   }
-//   std::cout << "\n";
-// }
+BOOST_AUTO_TEST_CASE(multi_host_test) // needs loadFileToMemory update
+{
+  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
+  std::cout << "----------- multi_host_test -----------\n";
+  CcdbApi api;
+  api.init("http://bogus-host.cern.ch,http://ccdb-test.cern.ch:8080");
+  std::map<std::string, std::string> metadata;
+  std::map<std::string, std::string> headers;
+  o2::pmr::vector<char> dst;
+  std::string url = "Analysis/ALICE3/Centrality";
+  api.loadFileToMemory(dst, url, metadata, 1645780010602, &headers, "", "", "", true);
+  BOOST_CHECK(dst.size() != 0);
+  for(int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
+}
 
 // BOOST_AUTO_TEST_CASE(alien_test) // needs loadFileToMemory update
 // {
@@ -99,23 +99,43 @@ BOOST_AUTO_TEST_CASE(base_test)
 //   std::cout << "\n";
 // }
 
-// BOOST_AUTO_TEST_CASE(vectored)
-// {
-//   setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
-//   std::cout << "----------- base_test -----------\n";
-//   CcdbApi api;
-//   api.init("http://ccdb-test.cern.ch:8080");
-//   std::map<std::string, std::string> metadata;
-//   std::map<std::string, std::string> headers;
-//   o2::pmr::vector<char> dst;
-//   std::string url = "Analysis/ALICE3/Centrality";
-//   api.loadFileToMemory(dst, url, metadata, 1645780010602, &headers, "", "", "", true);
-//   BOOST_CHECK(dst.size() != 0);
-//   for(int i = 0; i < 50 && i < dst.size(); i++) {
-//     std::cout << dst[i];
-//   }
-//   std::cout << "\n";
-// }
+BOOST_AUTO_TEST_CASE(vectored)
+{
+  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
+  std::cout << "----------- base_test -----------\n";
+  CcdbApi api;
+  api.init("http://ccdb-test.cern.ch:8080");
+
+  int TEST_SAMPLE_SIZE = 5;
+
+  std::vector<o2::pmr::vector<char>*> dsts(TEST_SAMPLE_SIZE);
+  std::vector<std::string> urls(TEST_SAMPLE_SIZE);
+  std::vector<long> timestamps(TEST_SAMPLE_SIZE);
+  std::vector<std::map<std::string, std::string>*> metadatas(TEST_SAMPLE_SIZE);
+  std::vector<std::map<std::string, std::string>*> headers(TEST_SAMPLE_SIZE);
+  std::vector<std::string> etags(TEST_SAMPLE_SIZE);
+  std::vector<std::string> notBefors(TEST_SAMPLE_SIZE);
+  std::vector<std::string> notAfters(TEST_SAMPLE_SIZE);
+  std::vector<bool> considerSnapshots(TEST_SAMPLE_SIZE);
+
+  for(int i = 0; i < TEST_SAMPLE_SIZE; i++) {
+    dsts.at(i) = new o2::pmr::vector<char>();
+    urls.at(i) = "Analysis/ALICE3/Centrality";
+    timestamps.at(i) = 1645780010602;
+    considerSnapshots.at(i) = true;
+    metadatas.at(i) = new std::map<std::string, std::string>();
+    headers.at(i) = new std::map<std::string, std::string>();
+  }
+
+  api.loadFileToMemory(dsts, urls, metadatas, timestamps, headers, etags, notBefors, notAfters, considerSnapshots);
+  for(int i = 0; i < TEST_SAMPLE_SIZE; i++) {
+    BOOST_CHECK(dsts.at(i)->size() != 0);
+    delete dsts.at(i);
+    delete metadatas.at(i);
+    delete headers.at(i);
+  }
+  std::cout << "\n";
+}
 
 // static string ccdbUrl;
 // static string basePath;
