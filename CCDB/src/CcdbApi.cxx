@@ -1574,8 +1574,10 @@ void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
   // curl_easy_cleanup(curl_handle);
 }
 
-boost::interprocess::named_semaphore* CcdbApi::createNamedSempahore(std::string& semhashedstring) const
+boost::interprocess::named_semaphore* CcdbApi::createNamedSempahore(std::string path) const
 {
+  std::hash<std::string> hasher;
+  std::string semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
   try {
     return new boost::interprocess::named_semaphore(boost::interprocess::open_or_create_t{}, semhashedstring.c_str(), 1);
   } catch (std::exception e) {
@@ -1648,20 +1650,17 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 
 void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string>* metadata,
                               long timestamp, std::map<std::string, std::string>* headers, std::string etag, std::string createdNotAfter,
-                              std::string createdNotBefore, bool considerSnapshot, bool& semLocked,
-                              boost::interprocess::named_semaphore* sem, int& fromSnapshot, size_t* requestCounter, bool& requestScheduled) const
+                              std::string createdNotBefore, bool considerSnapshot,
+                              int& fromSnapshot, size_t* requestCounter) const
 {
   LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
   bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
 
   std::string snapshotpath;
   if (mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path))) {
-    std::hash<std::string> hasher;
-    std::string semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
-    sem = createNamedSempahore(semhashedstring);
-    if (sem && !semLocked) {
+    boost::interprocess::named_semaphore* sem = createNamedSempahore(path); // todo remove and free sem after using
+    if (sem) {
       sem->wait(); // wait until we can enter (no one else there)
-      semLocked = true;
     }
     // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
     // this would mean that the object was is already fetched and in this mode we don't to validity checks!
@@ -1671,7 +1670,6 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
     sem->post(); // todo is that ok?
   } else { // look on the server
     getWithCurl(*dest, path, *metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, requestCounter);
-    requestScheduled = true;
   }
 }
 
@@ -1696,7 +1694,8 @@ void CcdbApi::loadFileToMemory(
   size_t requestCounter = 0;
   bool requestScheduled = false;
 
-  std::string semhashedstring{}; // semhashedstring not longer works properly
+  std::string semhashedstring{};
+  std::hash<std::string> hasher;
   boost::interprocess::named_semaphore* sem = nullptr;
   std::fstream logStream;
   auto sem_release = [&sem, &semhashedstring, this]() {
@@ -1709,15 +1708,13 @@ void CcdbApi::loadFileToMemory(
     }
   };
 
-  // to remove:
-  // - request scheduled?
-
   for(int i = 0; i < dests.size(); i++) {
     int fromSnapshot = 0;
     getFileToMemory(dests.at(i), paths.at(i), metadataVec.at(i), timestamps.at(i), headersVec.at(i), etags.at(i),
                     createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i),
-                    semLocked, sem, fromSnapshot, &requestCounter, requestScheduled);
+                    fromSnapshot, &requestCounter);
     fromSnapshots[i] = fromSnapshot;
+    requestScheduled = (fromSnapshots.at(i) == 0);
   }
 
   if (requestScheduled) {
@@ -1732,29 +1729,30 @@ void CcdbApi::loadFileToMemory(
   // TODO double and triple check if everyting is ok with transporting data from above
   for(int i = 0; i < dests.size(); i++) {
     bool createSnapshot = considerSnapshotVec.at(i) && !mSnapshotCachePath.empty(); // create snaphot if absent
+    if(!dests.at(i)->empty()) {
+      // !considerSnapshotVec.at(i) means that the call was made by retrieve for snapshoting reasons
+      logReading(paths.at(i), timestamps.at(i), headersVec.at(i), fmt::format("{}{}", considerSnapshotVec.at(i) ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
 
-    if (dests.at(i)->empty()) { // todo doing that in a vector does not make sense
-      sem_release();
-      // return; // nothing was fetched: either cached value is good or error was produced
-    }
+      // Consider saving snapshot
+      if (createSnapshot && fromSnapshots.at(i) != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
 
-    // !considerSnapshotVec.at(i) means that the call was made by retrieve for snapshoting reasons
-    logReading(paths.at(i), timestamps.at(i), headersVec.at(i), fmt::format("{}{}", considerSnapshotVec.at(i) ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
-
-    // Consider saving snapshot
-    if (createSnapshot && fromSnapshots.at(i) != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
-      if (fromSnapshots.at(i) == 0) {
-        // Create semaphore if it wasn't already as part of the getFromSnapshot function
-        std::hash<std::string> hasher;
-        semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + paths.at(i))).substr(0, 16);
-        sem = createNamedSempahore(semhashedstring);
+        sem = createNamedSempahore(paths.at(i));
         if (sem) {
           sem->wait(); // wait until we can enter (no one else there)
         }
+        saveSnapshot(*dests.at(i), createSnapshot, fromSnapshots.at(i), paths.at(i), logStream, *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
+        sem->post();
+        semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + paths.at(i))).substr(0, 16);
+        sem_release();
       }
-      saveSnapshot(*dests.at(i), createSnapshot, fromSnapshots.at(i), paths.at(i), logStream, *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
-      sem_release();
+    } else {
+      // Todo log error?
     }
+  }
+
+  for(int i = 0; i < dests.size(); i++) {
+    semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + paths.at(i))).substr(0, 16);
+    sem_release();
   }
 }
 

@@ -137,7 +137,6 @@ BOOST_AUTO_TEST_CASE(local_cache_test)
     std::cout << dst[i];
   }
   std::cout << "\n";
-
 }
 
 // BOOST_AUTO_TEST_CASE(alien_test) // needs loadFileToMemory update
