@@ -1610,11 +1610,12 @@ void CcdbApi::getFromSnapshot(bool createSnapshot, std::string const& path,
   }
 }
 
-void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::fstream& logStream, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const
+void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const
 {
   auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
   std::string snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
   o2::utils::createDirectoriesIfAbsent(snapshotdir);
+  std::fstream logStream;
   if (logStream.is_open()) {
     logStream << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
   }
@@ -1645,9 +1646,10 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   std::vector<std::string> createdNotAfterVec = {createdNotAfter};
   std::vector<std::string> createdNotBeforeVec = {createdNotBefore};
   std::vector<bool> considerSnapshotVec = {considerSnapshot};
-  loadFileToMemory(dests, paths, metadataVec, timestamps, headersVec, etags, createdNotAfterVec, createdNotBeforeVec, considerSnapshotVec);
+  vectoredLoadFileToMemory(dests, paths, metadataVec, timestamps, headersVec, etags, createdNotAfterVec, createdNotBeforeVec, considerSnapshotVec);
 }
 
+// todo change name
 void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string>* metadata,
                               long timestamp, std::map<std::string, std::string>* headers, std::string etag, std::string createdNotAfter,
                               std::string createdNotBefore, bool considerSnapshot,
@@ -1664,7 +1666,7 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
     }
     // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
     // this would mean that the object was is already fetched and in this mode we don't to validity checks!
-    getFromSnapshot(createSnapshot, path, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag); // todo remove sem from args
+    getFromSnapshot(createSnapshot, path, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag);
     sem->post(); // todo is that ok?
   } else { // look on the server
     if(!mDownloader) { // todo not the best way to handle things
@@ -1674,7 +1676,7 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
   }
 }
 
-void CcdbApi::loadFileToMemory(
+void CcdbApi::vectoredLoadFileToMemory(
     std::vector<o2::pmr::vector<char>*> dests,
     std::vector<std::string> paths,
     std::vector<std::map<std::string, std::string>*> metadataVec,
@@ -1698,7 +1700,6 @@ void CcdbApi::loadFileToMemory(
   std::string semhashedstring{};
   std::hash<std::string> hasher;
   boost::interprocess::named_semaphore* sem = nullptr;
-  std::fstream logStream;
   auto sem_release = [&sem, &semhashedstring, this]() {
     if (sem) {
       sem->post();
@@ -1709,15 +1710,11 @@ void CcdbApi::loadFileToMemory(
     }
   };
 
-  // todo : what about logstream and logfile
-
   for(int i = 0; i < dests.size(); i++) {
-    int fromSnapshot = 0;
     getFileToMemory(dests.at(i), paths.at(i), metadataVec.at(i), timestamps.at(i), headersVec.at(i), etags.at(i),
                     createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i),
-                    fromSnapshot, &requestCounter);
-    fromSnapshots[i] = fromSnapshot;
-    requestScheduled = (fromSnapshots.at(i) == 0);
+                    fromSnapshots.at(i), &requestCounter);
+    requestScheduled = requestScheduled ? requestScheduled : (fromSnapshots.at(i) == 0);
   }
 
   if (requestScheduled) {
@@ -1743,7 +1740,7 @@ void CcdbApi::loadFileToMemory(
         if (sem) {
           sem->wait(); // wait until we can enter (no one else there)
         }
-        saveSnapshot(*dests.at(i), createSnapshot, fromSnapshots.at(i), paths.at(i), logStream, *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
+        saveSnapshot(*dests.at(i), createSnapshot, fromSnapshots.at(i), paths.at(i), *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
         sem->post();
         semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + paths.at(i))).substr(0, 16);
         sem_release();
@@ -1751,11 +1748,6 @@ void CcdbApi::loadFileToMemory(
     } else {
       // Todo log error?
     }
-  }
-
-  for(int i = 0; i < dests.size(); i++) {
-    semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + paths.at(i))).substr(0, 16);
-    sem_release();
   }
 }
 

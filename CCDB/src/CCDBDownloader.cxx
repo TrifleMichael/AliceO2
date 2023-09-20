@@ -361,11 +361,17 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   switch (data->type) {
     case BLOCKING:
       {
+        
+      }
+      break;
+    case ASYNCHRONOUS:
+      {
+        // todo comment
         long httpCode;
         curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
         char* url;
         curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
-        std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n";
+        std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n"; // todo remove std::couts
         auto locations = getLocations(data->hostsPool->at(data->hostInd), data->headerMap); // todo change to data->hostInd
 
         if (300 <= httpCode && httpCode < 400 && data->locInd < locations.size()) {
@@ -404,10 +410,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           }
         }          
       }
-      break;
-    case ASYNCHRONOUS:
-      // Temporary change before asynchronous calls are reintroduced
-      LOG(error) << "CCDBDownloader: Illegal request type";
       break;
     case ASYNCHRONOUS_WITH_CALLBACK:
       // Temporary change before asynchronous calls will callbacks are reintroduced
@@ -532,18 +534,6 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
   std::vector<CURLcode> codeVector(handleVector.size());
   size_t requestsLeft = handleVector.size();
 
-  DownloaderRequestData* requestData;
-  std::multimap<std::string, std::string>* headerMap;
-  std::vector<std::string>* hostsPool;
-  curl_easy_getinfo(handleVector.at(0), CURLINFO_PRIVATE, &requestData);
-  headerMap = requestData->headerMap;
-  hostsPool = &(requestData->hosts);
-
-  // std::cout << "Reading host pool of size " << hostsPool->size() << "\n";
-  // for(int i = 0; i < hostsPool->size(); i++) {
-  //   std::cout << hostsPool->at(i) << "\n";
-  // }
-
   for (int i = 0; i < handleVector.size(); i++) {
     auto* data = new CCDBDownloader::PerformData();
     data->codeDestination = &codeVector[i];
@@ -551,26 +541,12 @@ std::vector<CURLcode> CCDBDownloader::batchBlockingPerform(std::vector<CURL*> co
 
     data->type = BLOCKING;
     data->requestsLeft = &requestsLeft;
-    data->timestamp = requestData->timestamp;
-
-    data->hostInd = 0;
-    data->locInd = 0;
-    data->hostsPool = hostsPool;
-    data->headerMap = headerMap;
-    data->path = requestData->path;
-    data->alienContentCallback = requestData->alienContentCallback;
-
     setHandleOptions(handleVector[i], data);
     mHandlesToBeAdded.push_back(handleVector[i]);
   }
   checkHandleQueue();
   while (requestsLeft > 0) {
     uv_run(mUVLoop, UV_RUN_ONCE);
-  }
-
-  auto locs = getLocations(hostsPool->at(0), headerMap);
-  for(auto it = locs.begin(); it < locs.end(); it++) {
-    std::cout << "LOC: " << (*it) << "\n";
   }
 
   return codeVector;
@@ -595,7 +571,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   data->codeDestination = codeVector;
   *codeVector = CURLE_FAILED_INIT;
 
-  data->type = BLOCKING; // TODO change that to something that makes sense
+  data->type = ASYNCHRONOUS; // TODO change that to something that makes sense
   data->requestsLeft = requestCounter;
   data->timestamp = requestData->timestamp;
 
