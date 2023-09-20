@@ -1482,7 +1482,9 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp, size_t* requestCounter) const
+void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::string path, long timestamp,
+                                        size_t* requestCounter, std::map<std::string, std::string>* headers, std::map<std::string, std::string>* metadata,
+                                        std::string etag, std::string createdNotAfter, std::string createdNotBefore) const
 {
 
   struct HeaderObjectPair_t {
@@ -1505,14 +1507,6 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
   std::function<void(std::string)> alienContentCallback = [this, &dest](std::string url) {
     this->loadFileToMemory(dest, url, nullptr);
   };
-
-  // std::cout << "TESTING SIZE\n";
-  // std::cout << dest.size() << "\n";
-  // std::cout << "Size ok\n";
-  // auto& ho = *static_cast<HeaderObjectPair_t*>((void*)&hoPair);
-  // auto& chunk = *ho.object;
-  // std::cout << chunk.size() << "\n";
-  // std::cout << "Chunk size ok\n";
 
   auto writeCallback = [](void* contents, size_t size, size_t nmemb, void* chunkptr) {
     auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
@@ -1539,6 +1533,12 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
     return realsize;
   };
 
+  CURL* curl_handle = curl_easy_init();
+  curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
+  string fullUrl = getFullUrlForRetrieval(curl_handle, path, *metadata, timestamp);
+  curl_slist* options_list = nullptr;
+  initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+
   auto data = new DownloaderRequestData(); // todo free
   data->headerMap = &(hoPair->header);
   data->hosts = hostsPool;
@@ -1546,7 +1546,7 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
   data->timestamp = timestamp;
   data->alienContentCallback = alienContentCallback;
 
-  curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl_handle, CURLOPT_URL, fullUrl.c_str());
   initCurlOptionsForRetrieve(curl_handle, (void*)hoPair, writeCallback, false);
   curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair->header)>);
   // hoPair.header.clear(); // TODO why it was like that?
@@ -1555,23 +1555,6 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
   curlSetSSLOptions(curl_handle);
 
   asynchPerform(curl_handle, requestCounter);
-}
-
-void CcdbApi::getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
-                          std::map<std::string, std::string> const& metadata, long timestamp,
-                          std::map<std::string, std::string>* headers, std::string const& etag,
-                          const std::string& createdNotAfter, const std::string& createdNotBefore, size_t* requestCounter) const
-{
-  CURL* curl_handle = curl_easy_init();
-  curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
-  string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
-
-  curl_slist* options_list = nullptr;
-  initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
-  navigateURLsWithDownloader(dest, curl_handle, fullUrl, path, timestamp, requestCounter);
-
-  // curl_slist_free_all(options_list); TODO cleanup later
-  // curl_easy_cleanup(curl_handle);
 }
 
 boost::interprocess::named_semaphore* CcdbApi::createNamedSempahore(std::string path) const
@@ -1583,6 +1566,19 @@ boost::interprocess::named_semaphore* CcdbApi::createNamedSempahore(std::string 
   } catch (std::exception e) {
     LOG(warn) << "Exception occurred during CCDB (cache) semaphore setup; Continuing without";
     return nullptr;
+  }
+}
+
+void CcdbApi::releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const
+{
+  if (sem) {
+    sem->post();
+    if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
+      sem->post();
+      std::hash<std::string> hasher;
+      std::string semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + path)).substr(0, 16);
+      boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
+    }
   }
 }
 
@@ -1667,12 +1663,12 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
     // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
     // this would mean that the object was is already fetched and in this mode we don't to validity checks!
     getFromSnapshot(createSnapshot, path, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag);
-    sem->post(); // todo is that ok?
+    releaseNamedSemaphore(sem, path);
   } else { // look on the server
     if(!mDownloader) { // todo not the best way to handle things
       mDownloader = new CCDBDownloader();
     }
-    getWithCurl(*dest, path, *metadata, timestamp, headers, etag, createdNotAfter, createdNotBefore, requestCounter);
+    navigateURLsWithDownloader(*dest, path, timestamp, requestCounter, headers, metadata, etag, createdNotAfter, createdNotBefore);
   }
 }
 
@@ -1687,63 +1683,33 @@ void CcdbApi::vectoredLoadFileToMemory(
     std::vector<std::string> createdNotBeforeVec,
     std::vector<bool> considerSnapshotVec) const
 {
-  // std::hash<std::string> hasher2;
-  // std::string semhashedstring2 = "aliceccdb" + std::to_string(hasher2(mSnapshotCachePath + paths.at(0))).substr(0, 16);
-  // auto sem2 = createNamedSempahore(semhashedstring2);
-  // sem2->post(); // TODO REMOVE!
 
-  bool semLocked = false;
   std::vector<int> fromSnapshots(dests.size());
   size_t requestCounter = 0;
-  bool requestScheduled = false;
-
-  std::string semhashedstring{};
-  std::hash<std::string> hasher;
-  boost::interprocess::named_semaphore* sem = nullptr;
-  auto sem_release = [&sem, &semhashedstring, this]() {
-    if (sem) {
-      sem->post();
-      if (sem->try_wait()) { // if nobody else is waiting remove the semaphore resource
-        sem->post();
-        boost::interprocess::named_semaphore::remove(semhashedstring.c_str());
-      }
-    }
-  };
 
   for(int i = 0; i < dests.size(); i++) {
     getFileToMemory(dests.at(i), paths.at(i), metadataVec.at(i), timestamps.at(i), headersVec.at(i), etags.at(i),
                     createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i),
                     fromSnapshots.at(i), &requestCounter);
-    requestScheduled = requestScheduled ? requestScheduled : (fromSnapshots.at(i) == 0);
+    logReading(paths.at(i), timestamps.at(i), headersVec.at(i), fmt::format("{}{}", considerSnapshotVec.at(i) ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
 
-  if (requestScheduled) {
-    std::cout << "Running the loop\n";
-    while(requestCounter > 0) {
-      mDownloader->runLoop(0);
-    }
-  } else {
-    std::cout << "Loop not about to be ran\n";
+  while(requestCounter > 0) {
+    mDownloader->runLoop(0);
   }
 
   // TODO double and triple check if everyting is ok with transporting data from above
   for(int i = 0; i < dests.size(); i++) {
     bool createSnapshot = considerSnapshotVec.at(i) && !mSnapshotCachePath.empty(); // create snaphot if absent
     if(!dests.at(i)->empty()) {
-      // !considerSnapshotVec.at(i) means that the call was made by retrieve for snapshoting reasons
-      logReading(paths.at(i), timestamps.at(i), headersVec.at(i), fmt::format("{}{}", considerSnapshotVec.at(i) ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
-
       // Consider saving snapshot
       if (createSnapshot && fromSnapshots.at(i) != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
-
-        sem = createNamedSempahore(paths.at(i));
+        auto sem = createNamedSempahore(paths.at(i));
         if (sem) {
           sem->wait(); // wait until we can enter (no one else there)
         }
         saveSnapshot(*dests.at(i), createSnapshot, fromSnapshots.at(i), paths.at(i), *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
-        sem->post();
-        semhashedstring = "aliceccdb" + std::to_string(hasher(mSnapshotCachePath + paths.at(i))).substr(0, 16);
-        sem_release();
+        releaseNamedSemaphore(sem, paths.at(i));
       }
     } else {
       // Todo log error?

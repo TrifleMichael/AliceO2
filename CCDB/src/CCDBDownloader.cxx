@@ -376,7 +376,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           // REDIRECT
           std::string newLocation = locations.at(data->locInd++);
           std::string newUrl;
-          if (newLocation.find("alien", 0) != std::string::npos) {
+          if (newLocation.find("alien:/", 0) != std::string::npos) {
             // ALIEN
             newUrl = newLocation;
             std::cout << "Redirecting to alien " << newUrl << "\n";

@@ -345,16 +345,15 @@ class CcdbApi //: public DatabaseInterface
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
-void navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string& url, std::string path, long timestamp, size_t* requestCounter) const; // todo here?
+void navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::string path, long timestamp,
+                                        size_t* requestCounter, std::map<std::string, std::string>* headers, std::map<std::string, std::string>* metadata,
+                                        std::string etag, std::string createdNotAfter, std::string createdNotBefore) const; // todo check, move etc
 void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
-void getWithCurl(o2::pmr::vector<char>& dest, std::string const& path,
-                          std::map<std::string, std::string> const& metadata, long timestamp,
-                          std::map<std::string, std::string>* headers, std::string const& etag,
-                          const std::string& createdNotAfter, const std::string& createdNotBefore, size_t* requestCounter) const; // TODO define here?
 void getFromSnapshot(bool createSnapshot, std::string const& path,
                               long timestamp, std::map<std::string, std::string>* headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
 void saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
+void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const; // todo rename move
 boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const; // TODO create here?
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
   void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders = nullptr) const;
