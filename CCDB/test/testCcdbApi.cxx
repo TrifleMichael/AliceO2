@@ -119,6 +119,24 @@ BOOST_AUTO_TEST_CASE(vectored)
   std::cout << "\n";
 }
 
+BOOST_AUTO_TEST_CASE(alien_test) // needs loadFileToMemory update
+{
+  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
+  std::cout << "----------- alien_test -----------\n";
+  CcdbApi api;
+  api.init("http://alice-ccdb.cern.ch");
+  std::map<std::string, std::string> metadata;
+  std::map<std::string, std::string> headers;
+  o2::pmr::vector<char> dst;
+  std::string url = "Analysis/ALICE3/Centrality";
+  api.loadFileToMemory(dst, url, metadata, 1646729604010, &headers, "", "", "", true);
+  BOOST_CHECK(dst.size() != 0);
+  for(int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
+}
+
 // todo something so other tests are not affected
 BOOST_AUTO_TEST_CASE(local_cache_test)
 {
@@ -138,24 +156,6 @@ BOOST_AUTO_TEST_CASE(local_cache_test)
   }
   std::cout << "\n";
   setenv("ALICEO2_CCDB_LOCALCACHE", "", 1);
-}
-
-BOOST_AUTO_TEST_CASE(alien_test) // needs loadFileToMemory update
-{
-  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
-  std::cout << "----------- alien_test -----------\n";
-  CcdbApi api;
-  api.init("http://alice-ccdb.cern.ch");
-  std::map<std::string, std::string> metadata;
-  std::map<std::string, std::string> headers;
-  o2::pmr::vector<char> dst;
-  std::string url = "Analysis/ALICE3/Centrality";
-  api.loadFileToMemory(dst, url, metadata, 1646729604010, &headers, "", "", "", true);
-  BOOST_CHECK(dst.size() != 0);
-  for(int i = 0; i < 50 && i < dst.size(); i++) {
-    std::cout << dst[i];
-  }
-  std::cout << "\n";
 }
 
 // static string ccdbUrl;
