@@ -355,8 +355,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
   bool rescheduled = false;
 
-  // If no requests left then signal finished based on type of operation
-  // if (--(*data->requestsLeft) == 0) {
   --(*data->requestsLeft);
   switch (data->type) {
     case BLOCKING:
@@ -383,6 +381,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             newUrl = newLocation;
             std::cout << "Redirecting to alien " << newUrl << "\n";
             data->alienContentCallback(newUrl); // todo, check if alien failed?
+            // todo cvmfs
           } else {
             // HTTP
             newUrl = data->hostsPool->at(data->hostInd) + newLocation;
@@ -411,12 +410,11 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         }          
       }
       break;
-    case ASYNCHRONOUS_WITH_CALLBACK:
+    case ASYNCHRONOUS_WITH_CALLBACK: // todo remove
       // Temporary change before asynchronous calls will callbacks are reintroduced
       LOG(error) << "CCDBDownloader: Illegal request type";
       break;
   }
-  // }
   if (!rescheduled) {
     delete data;
   }
@@ -503,13 +501,14 @@ CURLcode CCDBDownloader::perform(CURL* handle)
 
 std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const
 {
+  // Todo check if locs are formed the same way as in api
   std::vector<std::string> locs;
   auto iter = headerMap->find("Location");
   if (iter != headerMap->end()) {
-    if (iter->second.find("alien", 0) != std::string::npos) {
-      locs.push_back(iter->second); // complement_Location(iter->second)
+    if (iter->second.find("/", 0) != std::string::npos) {
+      locs.push_back(iter->second);
     } else {
-      locs.push_back(baseUrl + iter->second); // complement_Location(iter->second)
+      locs.push_back(baseUrl + iter->second);
     }
   }
   // add alternative locations (not yet included)
@@ -519,9 +518,9 @@ std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::
     for (auto it = range.first; it != range.second; ++it) {
       if (std::find(locs.begin(), locs.end(), it->second) == locs.end()) {
         if (it->second.find("alien", 0) != std::string::npos) {
-          locs.push_back(it->second); // complement_Location(iter->second)
+          locs.push_back(it->second);
         } else {
-          locs.push_back(baseUrl + it->second); // complement_Location(iter->second)
+          locs.push_back(baseUrl + it->second);
         }
       }
     }
@@ -559,7 +558,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   CURLcode* codeVector = new CURLcode(); // todo change
 
   // Get data about request
-  DownloaderRequestData* requestData;
+  DownloaderRequestData* requestData; // todo nest
   std::multimap<std::string, std::string>* headerMap;
   std::vector<std::string>* hostsPool;
   curl_easy_getinfo(handle, CURLINFO_PRIVATE, &requestData);

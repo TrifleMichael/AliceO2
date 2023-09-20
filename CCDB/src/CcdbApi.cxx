@@ -1491,7 +1491,7 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
     int counter = 0;
   };
 
-  auto hoPair = new HeaderObjectPair_t();
+  auto hoPair = new HeaderObjectPair_t(); // todo free
   hoPair->object = &dest;
 
   bool errorflag = false;
@@ -1539,7 +1539,7 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, CURL* curl
     return realsize;
   };
 
-  auto data = new DownloaderRequestData();
+  auto data = new DownloaderRequestData(); // todo free
   data->headerMap = &(hoPair->header);
   data->hosts = hostsPool;
   data->path = path;
@@ -1751,6 +1751,7 @@ void CcdbApi::vectoredLoadFileToMemory(
   }
 }
 
+// todo remove
 // navigate sequence of URLs until TFile content is found; object is extracted and returned
 void CcdbApi::navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const
 {
