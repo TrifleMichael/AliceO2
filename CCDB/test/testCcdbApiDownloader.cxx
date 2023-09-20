@@ -155,8 +155,9 @@ std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<struct HeaderObje
   return handles;
 }
 
-BOOST_AUTO_TEST_CASE(vectored)
+BOOST_AUTO_TEST_CASE(vectored_test)
 {
+  std::cout << "------- vectored_test ---------\n";
   int TRANSFERS = 10;
 
   if (curl_global_init(CURL_GLOBAL_ALL)) {
@@ -194,6 +195,7 @@ BOOST_AUTO_TEST_CASE(vectored)
 
 BOOST_AUTO_TEST_CASE(perform_test)
 {
+  std::cout << "------- perform_test ---------\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -219,6 +221,7 @@ BOOST_AUTO_TEST_CASE(perform_test)
 
 BOOST_AUTO_TEST_CASE(blocking_batch_test)
 {
+  std::cout << "------- blocking_batch_test ---------\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -259,6 +262,7 @@ BOOST_AUTO_TEST_CASE(blocking_batch_test)
 
 BOOST_AUTO_TEST_CASE(test_with_break)
 {
+  std::cout << "------- test_with_break ---------\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -350,6 +354,7 @@ void testTimerCB(uv_timer_t* handle)
 
 BOOST_AUTO_TEST_CASE(external_loop_test)
 {
+  std::cout << "------- external_loop_test ---------\n";
   // Prepare uv_loop to be provided to the downloader
   auto uvLoop = new uv_loop_t();
   uv_loop_init(uvLoop);
