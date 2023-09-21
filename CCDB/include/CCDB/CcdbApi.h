@@ -352,7 +352,7 @@ void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment 
 void getFromSnapshot(bool createSnapshot, std::string const& path,
                               long timestamp, std::map<std::string, std::string>* headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
-void saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
+void saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
 void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const; // todo rename move
 boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const; // TODO create here?
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)

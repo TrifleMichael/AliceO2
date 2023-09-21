@@ -1607,24 +1607,33 @@ void CcdbApi::getFromSnapshot(bool createSnapshot, std::string const& path,
   }
 }
 
-void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, bool createSnapshot, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const
+void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const
 {
-  auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
-  std::string snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
-  o2::utils::createDirectoriesIfAbsent(snapshotdir);
-  std::fstream logStream;
-  if (logStream.is_open()) {
-    logStream << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
-  }
-  { // dump image to a file
-    LOGP(debug, "creating snapshot {} -> {}", path, snapshotpath);
-    CCDBQuery querysummary(path, metadata, timestamp);
-    {
-      std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
-      std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
+  // Consider saving snapshot
+  if (!mSnapshotCachePath.empty() && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
+    auto sem = createNamedSempahore(path);
+    if (sem) {
+      sem->wait(); // wait until we can enter (no one else there)
     }
-    // now open the same file as root file and store metadata
-    updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
+
+    auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
+    std::string snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
+    o2::utils::createDirectoriesIfAbsent(snapshotdir);
+    std::fstream logStream;
+    if (logStream.is_open()) {
+      logStream << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
+    }
+    { // dump image to a file
+      LOGP(debug, "creating snapshot {} -> {}", path, snapshotpath);
+      CCDBQuery querysummary(path, metadata, timestamp);
+      {
+        std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
+        std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
+      }
+      // now open the same file as root file and store metadata
+      updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
+    }
+    releaseNamedSemaphore(sem, path);
   }
 }
 
@@ -1688,31 +1697,27 @@ void CcdbApi::vectoredLoadFileToMemory(
   std::vector<int> fromSnapshots(dests.size());
   size_t requestCounter = 0;
 
+  // Get files from snapshots and schedule downloads
   for(int i = 0; i < dests.size(); i++) {
+    // getFileToMemory either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
     getFileToMemory(dests.at(i), paths.at(i), metadataVec.at(i), timestamps.at(i), headersVec.at(i), etags.at(i),
                     createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i), fromSnapshots.at(i), &requestCounter);
     logReading(paths.at(i), timestamps.at(i), headersVec.at(i), fmt::format("{}{}", considerSnapshotVec.at(i) ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
 
+  // Download the rest
   while(requestCounter > 0) {
     mDownloader->runLoop(0);
   }
 
-  // TODO double and triple check if everyting is ok with transporting data from above
+  // Save snapshots
   for(int i = 0; i < dests.size(); i++) {
-    bool createSnapshot = considerSnapshotVec.at(i) && !mSnapshotCachePath.empty(); // create snaphot if absent
-    if(!dests.at(i)->empty()) {
-      // Consider saving snapshot
-      if (createSnapshot && fromSnapshots.at(i) != 2 && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
-        auto sem = createNamedSempahore(paths.at(i));
-        if (sem) {
-          sem->wait(); // wait until we can enter (no one else there)
-        }
-        saveSnapshot(*dests.at(i), createSnapshot, fromSnapshots.at(i), paths.at(i), *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
-        releaseNamedSemaphore(sem, paths.at(i));
+    if (!dests.at(i)->empty()) {
+      if (considerSnapshotVec.at(i) && fromSnapshots.at(i) != 2) {
+        saveSnapshot(*dests.at(i), fromSnapshots.at(i), paths.at(i), *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
       }
     } else {
-      // Todo log error?
+      // todo log error
     }
   }
 }
