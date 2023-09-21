@@ -247,28 +247,19 @@ class CCDBDownloader
 
   DataForSocket mSocketData;
 
-  /**
+  /** todo revise (now is specific info about navigating urls i guess)
    * Structure which is stored in a easy_handle. It carries information about the request which the easy_handle is part of.
    * All easy handles coming from one request have an identical PerformData structure.
    */
   typedef struct PerformData {
-    std::condition_variable* cv;
-    bool* completionFlag;
     CURLcode* codeDestination;
-    void (*cbFun)(void*);
-    std::thread* cbThread;
-    void* cbData;
     size_t* requestsLeft;
     RequestType type;
 
-    std::multimap<std::string, std::string>* headerMap;
     int hostInd;
     int locInd;
-    std::string path;
-    long timestamp;
 
-    std::function<bool(std::string)> alienContentCallback;
-    std::vector<std::string>* hostsPool;
+    DownloaderRequestData* requestData;
   } PerformData;
 
   /**
