@@ -40,7 +40,7 @@ typedef struct DownloaderRequestData { // TODO move
   std::string path;
   long timestamp;
 
-  std::function<void(std::string)> alienContentCallback;
+  std::function<bool(std::string)> alienContentCallback;
 } DownloaderRequestData;
 
 namespace o2::ccdb
@@ -267,13 +267,7 @@ class CCDBDownloader
     std::string path;
     long timestamp;
 
-    // std::map<CURL*, std::multimap<std::string, std::string>*> headerMaps;
-    // std::map<CURL*, int> hostInd;
-    // std::map<CURL*, int> locInd;
-    // std::map<CURL*, std::string> path;
-    // std::map<CURL*, long> timestamp;
-
-    std::function<void(std::string)> alienContentCallback;
+    std::function<bool(std::string)> alienContentCallback;
     std::vector<std::string>* hostsPool;
   } PerformData;
 

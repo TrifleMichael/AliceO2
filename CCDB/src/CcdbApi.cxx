@@ -1504,8 +1504,9 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::strin
   };
 
 
-  std::function<void(std::string)> alienContentCallback = [this, &dest](std::string url) {
-    this->loadFileToMemory(dest, url, nullptr);
+  std::function<bool(std::string)> alienContentCallback = [this, &dest](std::string url) {
+    return this->loadLocalContentToMemory(dest, url);
+    // this->loadFileToMemory(dest, url, nullptr);
   };
 
   auto writeCallback = [](void* contents, size_t size, size_t nmemb, void* chunkptr) {
@@ -1634,7 +1635,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 {
   std::vector<o2::pmr::vector<char>*> dests = {&dest};
   std::vector<std::string> paths = {path};
-  std::map<std::string, std::string> metadataCopy = metadata;
+  std::map<std::string, std::string> metadataCopy = metadata; // Create a copy because metadata will be passed as a pointer so it cannot be constant. The const in definition is for backwards compatability.
   std::vector<std::map<std::string, std::string>*> metadataVec = {&metadataCopy};
   std::vector<long> timestamps = {timestamp};
   std::vector<std::map<std::string, std::string>*> headersVec = {headers};
@@ -1689,8 +1690,7 @@ void CcdbApi::vectoredLoadFileToMemory(
 
   for(int i = 0; i < dests.size(); i++) {
     getFileToMemory(dests.at(i), paths.at(i), metadataVec.at(i), timestamps.at(i), headersVec.at(i), etags.at(i),
-                    createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i),
-                    fromSnapshots.at(i), &requestCounter);
+                    createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i), fromSnapshots.at(i), &requestCounter);
     logReading(paths.at(i), timestamps.at(i), headersVec.at(i), fmt::format("{}{}", considerSnapshotVec.at(i) ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
 
@@ -1715,6 +1715,22 @@ void CcdbApi::vectoredLoadFileToMemory(
       // Todo log error?
     }
   }
+}
+
+bool CcdbApi::loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const
+{
+  if (url.find("alien:/", 0) != std::string::npos) {
+    loadFileToMemory(dest, url, nullptr); // headers loaded from the file in case of the snapshot reading only
+    return true;
+  }
+  if ((url.find("file:/", 0) != std::string::npos)) {
+    std::string path = url.substr(7);
+    if (std::filesystem::exists(path)) {
+      loadFileToMemory(dest, path, nullptr);
+      return true;
+    }
+  }
+  return false;
 }
 
 // todo remove

@@ -557,7 +557,6 @@ BOOST_AUTO_TEST_CASE(TestUpdateMetadata, *utf::precondition(if_reachable()))
 
 BOOST_AUTO_TEST_CASE(base_test)
 {
-  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
   std::cout << "----------- base_test -----------\n";
   CcdbApi api;
   api.init("http://ccdb-test.cern.ch:8080");
@@ -575,7 +574,6 @@ BOOST_AUTO_TEST_CASE(base_test)
 
 BOOST_AUTO_TEST_CASE(multi_host_test) // needs loadFileToMemory update
 {
-  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
   std::cout << "----------- multi_host_test -----------\n";
   CcdbApi api;
   api.init("http://bogus-host.cern.ch,http://ccdb-test.cern.ch:8080");
@@ -593,7 +591,6 @@ BOOST_AUTO_TEST_CASE(multi_host_test) // needs loadFileToMemory update
 
 BOOST_AUTO_TEST_CASE(vectored)
 {
-  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
   std::cout << "----------- base_test -----------\n";
   CcdbApi api;
   api.init("http://ccdb-test.cern.ch:8080");
@@ -629,9 +626,8 @@ BOOST_AUTO_TEST_CASE(vectored)
   std::cout << "\n";
 }
 
-BOOST_AUTO_TEST_CASE(alien_test) // needs loadFileToMemory update
+BOOST_AUTO_TEST_CASE(alien_test)
 {
-  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
   std::cout << "----------- alien_test -----------\n";
   CcdbApi api;
   api.init("http://alice-ccdb.cern.ch");
@@ -650,8 +646,6 @@ BOOST_AUTO_TEST_CASE(alien_test) // needs loadFileToMemory update
 // todo something so other tests are not affected
 BOOST_AUTO_TEST_CASE(local_cache_test)
 {
-  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "1", 1);
-  setenv("ALICEO2_CCDB_LOCALCACHE", "LOCAL_CACHE", 1);
   std::cout << "----------- local_cache_test -----------\n";
   CcdbApi api;
   api.init("file://LOCAL_CACHE");
@@ -665,7 +659,4 @@ BOOST_AUTO_TEST_CASE(local_cache_test)
     std::cout << dst[i];
   }
   std::cout << "\n";
-
-  setenv("ALICEO2_CCDB_LOCALCACHE", "", 1);
-  setenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI", "", 1);
 }

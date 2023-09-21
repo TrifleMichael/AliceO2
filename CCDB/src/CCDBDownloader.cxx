@@ -376,12 +376,13 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           // REDIRECT
           std::string newLocation = locations.at(data->locInd++);
           std::string newUrl;
-          if (newLocation.find("alien:/", 0) != std::string::npos) {
-            // ALIEN
+          if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
+            // ALIEN OR CVMFS
             newUrl = newLocation;
             std::cout << "Redirecting to alien " << newUrl << "\n";
-            data->alienContentCallback(newUrl); // todo, check if alien failed?
-            // todo cvmfs
+            if (!data->alienContentCallback(newUrl)) {
+              // todo redirect if fails
+            }
           } else {
             // HTTP
             newUrl = data->hostsPool->at(data->hostInd) + newLocation;
