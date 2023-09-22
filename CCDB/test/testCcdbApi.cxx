@@ -591,22 +591,31 @@ BOOST_AUTO_TEST_CASE(multi_host_test) // needs loadFileToMemory update
 
 BOOST_AUTO_TEST_CASE(vectored)
 {
-  std::cout << "----------- base_test -----------\n";
+  std::cout << "----------- vectored -----------\n";
   CcdbApi api;
   api.init("http://ccdb-test.cern.ch:8080");
 
   int TEST_SAMPLE_SIZE = 5;
 
   std::vector<CcdbApi::RequestContext> contexts(TEST_SAMPLE_SIZE);
-  for(auto context : contexts) {
+  for(auto& context : contexts) {
     context.dest = new o2::pmr::vector<char>();
+    std::cout << "1!\n";
+    std::cout << context.dest->size() << "\n";
+    std::cout << "2!\n";
+    std::cout << contexts.at(0).dest->size() << "\n";
+    std::cout << "Done\n";
     context.path = "Analysis/ALICE3/Centrality";
     context.timestamp = 1645780010602;
     context.considerSnapshot = true;
   }
 
-
+  std::cout << "sizerino: " << contexts.size() << "\n";
+  std::cout << "Size at 0\n";
+  std::cout << contexts.at(0).dest->size() << "\n";
+  std::cout << "Done\n";
   api.vectoredLoadFileToMemory(contexts);
+
   for(auto context : contexts) {
     BOOST_CHECK(context.dest->size() != 0);
     // delete dsts.at(i); // todo maybe delete

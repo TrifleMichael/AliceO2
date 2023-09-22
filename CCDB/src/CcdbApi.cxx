@@ -1653,7 +1653,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   requestContext.createdNotAfter = createdNotAfter;
   requestContext.createdNotBefore = createdNotBefore;
   requestContext.considerSnapshot = considerSnapshot;
-  std::vector<RequestContext> contexts;
+  std::vector<RequestContext> contexts = {requestContext};
   vectoredLoadFileToMemory(contexts);
 }
 
