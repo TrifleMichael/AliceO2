@@ -1643,7 +1643,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
 {
   RequestContext requestContext;
-  requestContext.dest = dest;
+  requestContext.dest = &dest;
   requestContext.path = path;
   std::map<std::string, std::string> metadataCopy = metadata; // Create a copy because metadata will be passed as a pointer so it cannot be constant. The const in definition is for backwards compatability.
   requestContext.metadata = metadataCopy;
@@ -1686,18 +1686,17 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
 
 void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestContexts) const
 {
-
-  std::vector<int> fromSnapshots(requestContext.size());
+  std::vector<int> fromSnapshots(requestContexts.size());
   size_t requestCounter = 0;
 
   // Get files from snapshots and schedule downloads
-  for(int i = 0; i < requestContext.size(); i++) {
+  for(int i = 0; i < requestContexts.size(); i++) {
     // getFileToMemory either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
-    auto requestContext = requestContexts.at(i)
-    getFileToMemory(requestContext.dest, requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.header, requestContext.etag,
-                    requestContext.createdNotAfter requestContext.createdNotBefore, requestContext.considerSnapshot, requestContext.fromSnapshot, &requestCounter);
+    auto requestContext = requestContexts.at(i);
+    getFileToMemory(requestContext.dest, requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.headers, requestContext.etag,
+                    requestContext.createdNotAfter, requestContext.createdNotBefore, requestContext.considerSnapshot, fromSnapshots.at(i), &requestCounter);
     logReading(requestContext.path, requestContext.timestamp, &requestContext.headers,
-               fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", requestContext.fromSnapshot ? " from snapshot" : ""));
+               fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
 
   // Download the rest
@@ -1706,10 +1705,11 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
   }
 
   // Save snapshots
-  for (auto requestContext : requestContexts) {
+  for(int i = 0; i < requestContexts.size(); i++) {
+    auto requestContext = requestContexts.at(i);
     if (!requestContext.dest->empty()) {
-      if (requestContext.considerSnapshot && requestContext.fromSnapshot != 2) {
-        saveSnapshot(*requestContext.dest, requestContext.fromSnapshot, requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.headers);
+      if (requestContext.considerSnapshot && fromSnapshots.at(i) != 2) {
+        saveSnapshot(*requestContext.dest, fromSnapshots.at(i), requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.headers);
       }
     } else {
       // todo log error

@@ -597,18 +597,18 @@ BOOST_AUTO_TEST_CASE(vectored)
 
   int TEST_SAMPLE_SIZE = 5;
 
-  std::vector<RequestContext> contexts(TEST_SAMPLE_SIZE);
+  std::vector<CcdbApi::RequestContext> contexts(TEST_SAMPLE_SIZE);
   for(auto context : contexts) {
     context.dest = new o2::pmr::vector<char>();
-    context.url = "Analysis/ALICE3/Centrality";
+    context.path = "Analysis/ALICE3/Centrality";
     context.timestamp = 1645780010602;
-    // considerSnapshots.at(i) = true; // todo snapshot option
+    context.considerSnapshot = true;
   }
 
 
   api.vectoredLoadFileToMemory(contexts);
   for(auto context : contexts) {
-    BOOST_CHECK(context.dst->size() != 0);
+    BOOST_CHECK(context.dest->size() != 0);
     // delete dsts.at(i); // todo maybe delete
   }
   std::cout << "\n";

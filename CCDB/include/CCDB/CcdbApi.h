@@ -348,7 +348,8 @@ class CcdbApi //: public DatabaseInterface
     std::string etag;
     std::string createdNotAfter;
     std::string createdNotBefore;
-  };
+    bool considerSnapshot;
+  } RequestContext;
 
   TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
 
