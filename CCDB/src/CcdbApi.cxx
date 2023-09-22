@@ -1483,7 +1483,7 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
 }
 
 void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::string path, long timestamp,
-                                        size_t* requestCounter, std::map<std::string, std::string>* headers, std::map<std::string, std::string>* metadata,
+                                        size_t* requestCounter, std::map<std::string, std::string> headers, std::map<std::string, std::string> metadata,
                                         std::string etag, std::string createdNotAfter, std::string createdNotBefore) const
 {
 
@@ -1536,9 +1536,9 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::strin
 
   CURL* curl_handle = curl_easy_init();
   curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
-  string fullUrl = getFullUrlForRetrieval(curl_handle, path, *metadata, timestamp);
+  string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
   curl_slist* options_list = nullptr;
-  initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, headers, etag, createdNotAfter, createdNotBefore);
+  initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, &headers, etag, createdNotAfter, createdNotBefore);
 
   auto data = new DownloaderRequestData(); // todo free
   data->headerMap = &(hoPair->header);
@@ -1584,7 +1584,7 @@ void CcdbApi::releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, s
 }
 
 void CcdbApi::getFromSnapshot(bool createSnapshot, std::string const& path,
-                              long timestamp, std::map<std::string, std::string>* headers,
+                              long timestamp, std::map<std::string, std::string> headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const
 {
   if (createSnapshot) { // create named semaphore
@@ -1596,18 +1596,18 @@ void CcdbApi::getFromSnapshot(bool createSnapshot, std::string const& path,
   }
 
   if (mInSnapshotMode) { // file must be there, otherwise a fatal will be produced;
-    loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), headers);
+    loadFileToMemory(dest, getSnapshotFile(mSnapshotTopPath, path), &headers);
     fromSnapshot = 1;
   } else if (mPreferSnapshotCache && std::filesystem::exists(snapshotpath)) {
     // if file is available, use it, otherwise cache it below from the server. Do this only when etag is empty since otherwise the object was already fetched and cached
     if (etag.empty()) {
-      loadFileToMemory(dest, snapshotpath, headers);
+      loadFileToMemory(dest, snapshotpath, &headers);
     }
     fromSnapshot = 2;
   }
 }
 
-void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const
+void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string> headers) const
 {
   // Consider saving snapshot
   if (!mSnapshotCachePath.empty() && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
@@ -1631,7 +1631,7 @@ void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::s
         std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
       }
       // now open the same file as root file and store metadata
-      updateMetaInformationInLocalFile(snapshotpath, headers, &querysummary);
+      updateMetaInformationInLocalFile(snapshotpath, &headers, &querysummary);
     }
     releaseNamedSemaphore(sem, path);
   }
@@ -1642,22 +1642,24 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
                                std::map<std::string, std::string>* headers, std::string const& etag,
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
 {
-  std::vector<o2::pmr::vector<char>*> dests = {&dest};
-  std::vector<std::string> paths = {path};
+  RequestContext requestContext;
+  requestContext.dest = dest;
+  requestContext.path = path;
   std::map<std::string, std::string> metadataCopy = metadata; // Create a copy because metadata will be passed as a pointer so it cannot be constant. The const in definition is for backwards compatability.
-  std::vector<std::map<std::string, std::string>*> metadataVec = {&metadataCopy};
-  std::vector<long> timestamps = {timestamp};
-  std::vector<std::map<std::string, std::string>*> headersVec = {headers};
-  std::vector<std::string> etags = {etag};
-  std::vector<std::string> createdNotAfterVec = {createdNotAfter};
-  std::vector<std::string> createdNotBeforeVec = {createdNotBefore};
-  std::vector<bool> considerSnapshotVec = {considerSnapshot};
-  vectoredLoadFileToMemory(dests, paths, metadataVec, timestamps, headersVec, etags, createdNotAfterVec, createdNotBeforeVec, considerSnapshotVec);
+  requestContext.metadata = metadataCopy;
+  requestContext.timestamp = timestamp;
+  requestContext.headers = *headers;
+  requestContext.etag = etag;
+  requestContext.createdNotAfter = createdNotAfter;
+  requestContext.createdNotBefore = createdNotBefore;
+  requestContext.considerSnapshot = considerSnapshot;
+  std::vector<RequestContext> contexts;
+  vectoredLoadFileToMemory(contexts);
 }
 
 // todo change name
-void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string>* metadata,
-                              long timestamp, std::map<std::string, std::string>* headers, std::string etag, std::string createdNotAfter,
+void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string> metadata,
+                              long timestamp, std::map<std::string, std::string> headers, std::string etag, std::string createdNotAfter,
                               std::string createdNotBefore, bool considerSnapshot,
                               int& fromSnapshot, size_t* requestCounter) const
 {
@@ -1682,27 +1684,20 @@ void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std
   }
 }
 
-void CcdbApi::vectoredLoadFileToMemory(
-    std::vector<o2::pmr::vector<char>*> dests,
-    std::vector<std::string> paths,
-    std::vector<std::map<std::string, std::string>*> metadataVec,
-    std::vector<long> timestamps,
-    std::vector<std::map<std::string, std::string>*> headersVec,
-    std::vector<std::string> etags,
-    std::vector<std::string> createdNotAfterVec,
-    std::vector<std::string> createdNotBeforeVec,
-    std::vector<bool> considerSnapshotVec) const
+void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestContexts) const
 {
 
-  std::vector<int> fromSnapshots(dests.size());
+  std::vector<int> fromSnapshots(requestContext.size());
   size_t requestCounter = 0;
 
   // Get files from snapshots and schedule downloads
-  for(int i = 0; i < dests.size(); i++) {
+  for(int i = 0; i < requestContext.size(); i++) {
     // getFileToMemory either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
-    getFileToMemory(dests.at(i), paths.at(i), metadataVec.at(i), timestamps.at(i), headersVec.at(i), etags.at(i),
-                    createdNotAfterVec.at(i), createdNotBeforeVec.at(i), considerSnapshotVec.at(i), fromSnapshots.at(i), &requestCounter);
-    logReading(paths.at(i), timestamps.at(i), headersVec.at(i), fmt::format("{}{}", considerSnapshotVec.at(i) ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
+    auto requestContext = requestContexts.at(i)
+    getFileToMemory(requestContext.dest, requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.header, requestContext.etag,
+                    requestContext.createdNotAfter requestContext.createdNotBefore, requestContext.considerSnapshot, requestContext.fromSnapshot, &requestCounter);
+    logReading(requestContext.path, requestContext.timestamp, &requestContext.headers,
+               fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", requestContext.fromSnapshot ? " from snapshot" : ""));
   }
 
   // Download the rest
@@ -1711,10 +1706,10 @@ void CcdbApi::vectoredLoadFileToMemory(
   }
 
   // Save snapshots
-  for(int i = 0; i < dests.size(); i++) {
-    if (!dests.at(i)->empty()) {
-      if (considerSnapshotVec.at(i) && fromSnapshots.at(i) != 2) {
-        saveSnapshot(*dests.at(i), fromSnapshots.at(i), paths.at(i), *metadataVec.at(i), timestamps.at(i), headersVec.at(i));
+  for (auto requestContext : requestContexts) {
+    if (!requestContext.dest->empty()) {
+      if (requestContext.considerSnapshot && requestContext.fromSnapshot != 2) {
+        saveSnapshot(*requestContext.dest, requestContext.fromSnapshot, requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.headers);
       }
     } else {
       // todo log error

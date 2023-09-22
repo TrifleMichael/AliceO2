@@ -339,6 +339,17 @@ class CcdbApi //: public DatabaseInterface
    */
   static void curlSetSSLOptions(CURL* curl);
 
+  typedef struct RequestContext { // todo comment move
+    o2::pmr::vector<char>* dest;
+    std::string path;
+    std::map<std::string, std::string> metadata;
+    long timestamp;
+    std::map<std::string, std::string> headers;
+    std::string etag;
+    std::string createdNotAfter;
+    std::string createdNotBefore;
+  };
+
   TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
 
   TObject* retrieveFromTFile(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp,
@@ -346,13 +357,13 @@ class CcdbApi //: public DatabaseInterface
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
 void navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::string path, long timestamp,
-                                        size_t* requestCounter, std::map<std::string, std::string>* headers, std::map<std::string, std::string>* metadata,
+                                        size_t* requestCounter, std::map<std::string, std::string> headers, std::map<std::string, std::string> metadata,
                                         std::string etag, std::string createdNotAfter, std::string createdNotBefore) const; // todo check, move etc
 void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
 void getFromSnapshot(bool createSnapshot, std::string const& path,
-                              long timestamp, std::map<std::string, std::string>* headers,
+                              long timestamp, std::map<std::string, std::string> headers,
                               std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
-void saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers) const; // TODO define here?
+void saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string> headers) const; // TODO define here?
 void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const; // todo rename move
 boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const; // TODO create here?
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
@@ -361,18 +372,9 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string path) con
                         std::map<std::string, std::string> const& metadata, long timestamp,
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
-  void vectoredLoadFileToMemory(
-    std::vector<o2::pmr::vector<char>*> dests,
-    std::vector<std::string> paths,
-    std::vector<std::map<std::string, std::string>*> metadataVec,
-    std::vector<long> timestamps,
-    std::vector<std::map<std::string, std::string>*> headersVec,
-    std::vector<std::string> etags,
-    std::vector<std::string> createdNotAfterVec,
-    std::vector<std::string> createdNotBeforevec,
-    std::vector<bool> considerSnapshotVec) const;  // todo comment
-  void getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string>* metadata,
-                            long timestamp, std::map<std::string, std::string>* headers, std::string etag, std::string createdNotAfter,
+  void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
+  void getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string> metadata,
+                            long timestamp, std::map<std::string, std::string> headers, std::string etag, std::string createdNotAfter,
                             std::string createdNotBefore, bool considerSnapshot,
                             int& fromSnapshot, size_t* requestCounter) const; // todo comment
   void navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const;
