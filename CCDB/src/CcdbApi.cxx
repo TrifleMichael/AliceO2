@@ -1606,33 +1606,33 @@ void CcdbApi::getFromSnapshot(bool createSnapshot, std::string const& path,
   }
 }
 
-void CcdbApi::saveSnapshot(o2::pmr::vector<char>& dest, int fromSnapshot, std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string> headers) const
+void CcdbApi::saveSnapshot(RequestContext& requestContext) const
 {
   // Consider saving snapshot
   if (!mSnapshotCachePath.empty() && !(mInSnapshotMode && mSnapshotTopPath == mSnapshotCachePath)) { // store in the snapshot only if the object was not read from the snapshot
-    auto sem = createNamedSempahore(path);
+    auto sem = createNamedSempahore(requestContext.path);
     if (sem) {
       sem->wait(); // wait until we can enter (no one else there)
     }
 
-    auto snapshotdir = getSnapshotDir(mSnapshotCachePath, path);
-    std::string snapshotpath = getSnapshotFile(mSnapshotCachePath, path);
+    auto snapshotdir = getSnapshotDir(mSnapshotCachePath, requestContext.path);
+    std::string snapshotpath = getSnapshotFile(mSnapshotCachePath, requestContext.path);
     o2::utils::createDirectoriesIfAbsent(snapshotdir);
     std::fstream logStream;
     if (logStream.is_open()) {
       logStream << "CCDB-access[" << getpid() << "] ... " << mUniqueAgentID << " downloading to snapshot " << snapshotpath << " from memory\n";
     }
     { // dump image to a file
-      LOGP(debug, "creating snapshot {} -> {}", path, snapshotpath);
-      CCDBQuery querysummary(path, metadata, timestamp);
+      LOGP(debug, "creating snapshot {} -> {}", requestContext.path, snapshotpath);
+      CCDBQuery querysummary(requestContext.path, requestContext.metadata, requestContext.timestamp);
       {
         std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
-        std::copy(dest.begin(), dest.end(), std::ostreambuf_iterator<char>(objFile));
+        std::copy(requestContext.dest->begin(), requestContext.dest->end(), std::ostreambuf_iterator<char>(objFile));
       }
       // now open the same file as root file and store metadata
-      updateMetaInformationInLocalFile(snapshotpath, &headers, &querysummary);
+      updateMetaInformationInLocalFile(snapshotpath, &requestContext.headers, &querysummary);
     }
-    releaseNamedSemaphore(sem, path);
+    releaseNamedSemaphore(sem, requestContext.path);
   }
 }
 
@@ -1704,7 +1704,7 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
     auto requestContext = requestContexts.at(i);
     if (!requestContext.dest->empty()) {
       if (requestContext.considerSnapshot && fromSnapshots.at(i) != 2) {
-        saveSnapshot(*requestContext.dest, fromSnapshots.at(i), requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.headers);
+        saveSnapshot(requestContext);
       }
     } else {
       // todo log error
