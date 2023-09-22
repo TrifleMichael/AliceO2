@@ -596,19 +596,23 @@ BOOST_AUTO_TEST_CASE(vectored)
   api.init("http://ccdb-test.cern.ch:8080");
 
   int TEST_SAMPLE_SIZE = 5;
+  std::vector<o2::pmr::vector<char>> dests(TEST_SAMPLE_SIZE);
+  std::vector<std::map<std::string, std::string>> metadatas(TEST_SAMPLE_SIZE);
+  std::vector<std::map<std::string, std::string>> headers(TEST_SAMPLE_SIZE);
 
-  std::vector<CcdbApi::RequestContext> contexts(TEST_SAMPLE_SIZE);
-  for(auto& context : contexts) {
-    context.dest = new o2::pmr::vector<char>();
-    context.path = "Analysis/ALICE3/Centrality";
-    context.timestamp = 1645780010602;
-    context.considerSnapshot = true;
+  std::vector<CcdbApi::RequestContext> contexts;
+  for(int i = 0; i < TEST_SAMPLE_SIZE; i++) {
+  // for(auto& context : contexts) {
+    contexts.push_back(CcdbApi::RequestContext(dests.at(i), metadatas.at(i), headers.at(i)));
+    contexts.at(i).path = "Analysis/ALICE3/Centrality";
+    contexts.at(i).timestamp = 1645780010602;
+    contexts.at(i).considerSnapshot = true;
   }
 
   api.vectoredLoadFileToMemory(contexts);
 
   for(auto context : contexts) {
-    BOOST_CHECK(context.dest->size() != 0);
+    BOOST_CHECK(context.dest.size() != 0);
     // delete dsts.at(i); // todo maybe delete
   }
   std::cout << "\n";

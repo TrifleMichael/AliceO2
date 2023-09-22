@@ -1492,10 +1492,10 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
   };
 
   auto hoPair = new HeaderObjectPair_t(); // todo free
-  hoPair->object = requestContext.dest;
+  hoPair->object = &requestContext.dest;
 
   bool errorflag = false;
-  auto signalError = [&chunk = *requestContext.dest, &errorflag]() {
+  auto signalError = [&chunk = requestContext.dest, &errorflag]() {
     chunk.clear();
     chunk.reserve(1);
     errorflag = true;
@@ -1503,7 +1503,7 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
 
 
   std::function<bool(std::string)> alienContentCallback = [this, &requestContext](std::string url) {
-    return this->loadLocalContentToMemory(*requestContext.dest, url);
+    return this->loadLocalContentToMemory(requestContext.dest, url);
     // this->loadFileToMemory(dest, url, nullptr);
   };
 
@@ -1627,7 +1627,7 @@ void CcdbApi::saveSnapshot(RequestContext& requestContext) const
       CCDBQuery querysummary(requestContext.path, requestContext.metadata, requestContext.timestamp);
       {
         std::ofstream objFile(snapshotpath, std::ios::out | std::ofstream::binary);
-        std::copy(requestContext.dest->begin(), requestContext.dest->end(), std::ostreambuf_iterator<char>(objFile));
+        std::copy(requestContext.dest.begin(), requestContext.dest.end(), std::ostreambuf_iterator<char>(objFile));
       }
       // now open the same file as root file and store metadata
       updateMetaInformationInLocalFile(snapshotpath, &requestContext.headers, &querysummary);
@@ -1641,13 +1641,11 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
                                std::map<std::string, std::string>* headers, std::string const& etag,
                                const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot) const
 {
-  RequestContext requestContext;
-  requestContext.dest = &dest;
+  RequestContext requestContext(dest, metadata, *headers);
   requestContext.path = path;
-  std::map<std::string, std::string> metadataCopy = metadata; // Create a copy because metadata will be passed as a pointer so it cannot be constant. The const in definition is for backwards compatability.
-  requestContext.metadata = metadataCopy;
+  // std::map<std::string, std::string> metadataCopy = metadata; // Create a copy because metadata will be passed as a pointer so it cannot be constant. The const in definition is for backwards compatability.
+  // requestContext.metadata = metadataCopy;
   requestContext.timestamp = timestamp;
-  requestContext.headers = *headers;
   requestContext.etag = etag;
   requestContext.createdNotAfter = createdNotAfter;
   requestContext.createdNotBefore = createdNotBefore;
@@ -1670,7 +1668,7 @@ void CcdbApi::getFileToMemory(RequestContext& requestContext, int& fromSnapshot,
     }
     // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
     // this would mean that the object was is already fetched and in this mode we don't to validity checks!
-    getFromSnapshot(createSnapshot, requestContext.path, requestContext.timestamp, requestContext.headers, snapshotpath, *requestContext.dest, fromSnapshot, requestContext.etag);
+    getFromSnapshot(createSnapshot, requestContext.path, requestContext.timestamp, requestContext.headers, snapshotpath, requestContext.dest, fromSnapshot, requestContext.etag);
     releaseNamedSemaphore(sem, requestContext.path);
   } else { // look on the server
     if(!mDownloader) { // todo not the best way to handle things
@@ -1701,8 +1699,8 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
 
   // Save snapshots
   for(int i = 0; i < requestContexts.size(); i++) {
-    auto requestContext = requestContexts.at(i);
-    if (!requestContext.dest->empty()) {
+    auto& requestContext = requestContexts.at(i);
+    if (!requestContext.dest.empty()) {
       if (requestContext.considerSnapshot && fromSnapshots.at(i) != 2) {
         saveSnapshot(requestContext);
       }

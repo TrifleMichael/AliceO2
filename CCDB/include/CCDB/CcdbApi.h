@@ -340,15 +340,22 @@ class CcdbApi //: public DatabaseInterface
   static void curlSetSSLOptions(CURL* curl);
 
   typedef struct RequestContext { // todo comment move
-    o2::pmr::vector<char>* dest;
+    o2::pmr::vector<char>& dest;
     std::string path;
-    std::map<std::string, std::string> metadata;
+    std::map<std::string, std::string> const& metadata;
     long timestamp;
-    std::map<std::string, std::string> headers;
+    std::map<std::string, std::string>& headers;
     std::string etag;
     std::string createdNotAfter;
     std::string createdNotBefore;
     bool considerSnapshot;
+
+    RequestContext(o2::pmr::vector<char>& d,
+                   std::map<std::string, std::string> const& m,
+                   std::map<std::string, std::string>& h)
+        : dest(d), metadata(m), headers(h) {
+
+        }
   } RequestContext;
 
   TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
