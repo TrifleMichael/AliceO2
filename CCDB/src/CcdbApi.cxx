@@ -1482,9 +1482,7 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::string path, long timestamp,
-                                        size_t* requestCounter, std::map<std::string, std::string> headers, std::map<std::string, std::string> metadata,
-                                        std::string etag, std::string createdNotAfter, std::string createdNotBefore) const
+void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const
 {
 
   struct HeaderObjectPair_t {
@@ -1494,18 +1492,18 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::strin
   };
 
   auto hoPair = new HeaderObjectPair_t(); // todo free
-  hoPair->object = &dest;
+  hoPair->object = requestContext.dest;
 
   bool errorflag = false;
-  auto signalError = [&chunk = dest, &errorflag]() {
+  auto signalError = [&chunk = *requestContext.dest, &errorflag]() {
     chunk.clear();
     chunk.reserve(1);
     errorflag = true;
   };
 
 
-  std::function<bool(std::string)> alienContentCallback = [this, &dest](std::string url) {
-    return this->loadLocalContentToMemory(dest, url);
+  std::function<bool(std::string)> alienContentCallback = [this, &requestContext](std::string url) {
+    return this->loadLocalContentToMemory(*requestContext.dest, url);
     // this->loadFileToMemory(dest, url, nullptr);
   };
 
@@ -1536,15 +1534,16 @@ void CcdbApi::navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::strin
 
   CURL* curl_handle = curl_easy_init();
   curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, mUniqueAgentID.c_str());
-  string fullUrl = getFullUrlForRetrieval(curl_handle, path, metadata, timestamp);
+  string fullUrl = getFullUrlForRetrieval(curl_handle, requestContext.path, requestContext.metadata, requestContext.timestamp);
   curl_slist* options_list = nullptr;
-  initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, timestamp, &headers, etag, createdNotAfter, createdNotBefore);
+  initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, requestContext.timestamp, &requestContext.headers,
+                                       requestContext.etag, requestContext.createdNotAfter, requestContext.createdNotBefore);
 
   auto data = new DownloaderRequestData(); // todo free
   data->headerMap = &(hoPair->header);
   data->hosts = hostsPool;
-  data->path = path;
-  data->timestamp = timestamp;
+  data->path = requestContext.path;
+  data->timestamp = requestContext.timestamp;
   data->alienContentCallback = alienContentCallback;
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, fullUrl.c_str());
@@ -1658,29 +1657,26 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 }
 
 // todo change name
-void CcdbApi::getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string> metadata,
-                              long timestamp, std::map<std::string, std::string> headers, std::string etag, std::string createdNotAfter,
-                              std::string createdNotBefore, bool considerSnapshot,
-                              int& fromSnapshot, size_t* requestCounter) const
+void CcdbApi::getFileToMemory(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const
 {
-  LOGP(debug, "loadFileToMemory {} ETag=[{}]", path, etag);
-  bool createSnapshot = considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
+  LOGP(debug, "loadFileToMemory {} ETag=[{}]", requestContext.path, requestContext.etag);
+  bool createSnapshot = requestContext.considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
 
   std::string snapshotpath;
-  if (mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, path))) {
-    boost::interprocess::named_semaphore* sem = createNamedSempahore(path); // todo remove and free sem after using
+  if (mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, requestContext.path))) {
+    boost::interprocess::named_semaphore* sem = createNamedSempahore(requestContext.path); // todo remove and free sem after using
     if (sem) {
       sem->wait(); // wait until we can enter (no one else there)
     }
     // if we are in snapshot mode we can simply open the file, unless the etag is non-empty:
     // this would mean that the object was is already fetched and in this mode we don't to validity checks!
-    getFromSnapshot(createSnapshot, path, timestamp, headers, snapshotpath, *dest, fromSnapshot, etag);
-    releaseNamedSemaphore(sem, path);
+    getFromSnapshot(createSnapshot, requestContext.path, requestContext.timestamp, requestContext.headers, snapshotpath, *requestContext.dest, fromSnapshot, requestContext.etag);
+    releaseNamedSemaphore(sem, requestContext.path);
   } else { // look on the server
     if(!mDownloader) { // todo not the best way to handle things
       mDownloader = new CCDBDownloader();
     }
-    navigateURLsWithDownloader(*dest, path, timestamp, requestCounter, headers, metadata, etag, createdNotAfter, createdNotBefore);
+    navigateURLsWithDownloader(requestContext, requestCounter);
   }
 }
 
@@ -1692,9 +1688,8 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
   // Get files from snapshots and schedule downloads
   for(int i = 0; i < requestContexts.size(); i++) {
     // getFileToMemory either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
-    auto requestContext = requestContexts.at(i);
-    getFileToMemory(requestContext.dest, requestContext.path, requestContext.metadata, requestContext.timestamp, requestContext.headers, requestContext.etag,
-                    requestContext.createdNotAfter, requestContext.createdNotBefore, requestContext.considerSnapshot, fromSnapshots.at(i), &requestCounter);
+    auto& requestContext = requestContexts.at(i);
+    getFileToMemory(requestContext, fromSnapshots.at(i), &requestCounter);
     logReading(requestContext.path, requestContext.timestamp, &requestContext.headers,
                fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }

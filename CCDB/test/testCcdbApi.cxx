@@ -600,20 +600,11 @@ BOOST_AUTO_TEST_CASE(vectored)
   std::vector<CcdbApi::RequestContext> contexts(TEST_SAMPLE_SIZE);
   for(auto& context : contexts) {
     context.dest = new o2::pmr::vector<char>();
-    std::cout << "1!\n";
-    std::cout << context.dest->size() << "\n";
-    std::cout << "2!\n";
-    std::cout << contexts.at(0).dest->size() << "\n";
-    std::cout << "Done\n";
     context.path = "Analysis/ALICE3/Centrality";
     context.timestamp = 1645780010602;
     context.considerSnapshot = true;
   }
 
-  std::cout << "sizerino: " << contexts.size() << "\n";
-  std::cout << "Size at 0\n";
-  std::cout << contexts.at(0).dest->size() << "\n";
-  std::cout << "Done\n";
   api.vectoredLoadFileToMemory(contexts);
 
   for(auto context : contexts) {

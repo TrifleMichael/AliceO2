@@ -357,9 +357,7 @@ class CcdbApi //: public DatabaseInterface
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
-void navigateURLsWithDownloader(o2::pmr::vector<char>& dest, std::string path, long timestamp,
-                                        size_t* requestCounter, std::map<std::string, std::string> headers, std::map<std::string, std::string> metadata,
-                                        std::string etag, std::string createdNotAfter, std::string createdNotBefore) const; // todo check, move etc
+void navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const; // todo check, move etc
 void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
 void getFromSnapshot(bool createSnapshot, std::string const& path,
                               long timestamp, std::map<std::string, std::string> headers,
@@ -374,10 +372,7 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string path) con
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
   void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
-  void getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string> metadata,
-                            long timestamp, std::map<std::string, std::string> headers, std::string etag, std::string createdNotAfter,
-                            std::string createdNotBefore, bool considerSnapshot,
-                            int& fromSnapshot, size_t* requestCounter) const; // todo comment
+  void getFileToMemory(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
   void navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const;
   bool loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const; // todo comment
 
