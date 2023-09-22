@@ -31,7 +31,7 @@ fi
 : ${CTF_MAX_FREE_DISK_WAIT:="600"}    # if not enough disk space after this time throw error
 
 # entropy encoding/decoding mode, default "" is equivalent to '--ans-version compat' (compatible with < 09/2023 data),
-# use '--ans-version 1.0 --ccdb-dict none' for the new per-TF dictionary mode
+# use '--ans-version 1.0 --ctf-dict none' for the new per-TF dictionary mode
 : ${RANS_OPT:=""}
 
 workflow_has_parameter CTF && export SAVECTF=1
@@ -96,7 +96,9 @@ CTP_CONFIG=
 if [[ -z ${ALPIDE_ERR_DUMPS:-} ]]; then
   [[ $EPNSYNCMODE == 1 ]] && ALPIDE_ERR_DUMPS="1" || ALPIDE_ERR_DUMPS="0"
 fi
-
+if [[ $CTFINPUT != 1 ]]; then
+  GPU_OUTPUT+=",tpc-triggers"
+fi
 if [[ $SYNCMODE == 1 ]]; then
   if [[ $BEAMTYPE == "PbPb" ]]; then
     ITS_CONFIG_KEY+="fastMultConfig.cutMultClusLow=${CUT_MULT_MIN_ITS:-100};fastMultConfig.cutMultClusHigh=${CUT_MULT_MAX_ITS:-200};fastMultConfig.cutMultVtxHigh=${CUT_MULT_VTX_ITS:-20};"

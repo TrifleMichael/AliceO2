@@ -27,6 +27,7 @@
 #include <string>
 #include <array>
 #include <vector>
+#include <mutex>
 
 class TStopwatch;
 namespace o2
@@ -77,6 +78,7 @@ struct TPCPadGainCalib;
 struct TPCZSLinkMapping;
 struct GPUSettingsO2;
 class GPUO2InterfaceQA;
+struct GPUTrackingInOutPointers;
 
 class GPURecoWorkflowSpec : public o2::framework::Task
 {
@@ -84,6 +86,8 @@ class GPURecoWorkflowSpec : public o2::framework::Task
   using CompletionPolicyData = std::vector<framework::InputSpec>;
 
   struct Config {
+    int itsTriggerType = 0;
+    int lumiScaleMode = 0;
     bool decompressTPC = false;
     bool decompressTPCFromROOT = false;
     bool caClusterer = false;
@@ -104,9 +108,8 @@ class GPURecoWorkflowSpec : public o2::framework::Task
     bool requireCTPLumi = false;
     bool outputErrorQA = false;
     bool runITSTracking = false;
-    int itsTriggerType = 0;
     bool itsOverrBeamEst = false;
-    int lumiScaleMode = 0;
+    bool tpcTriggerHandling = false;
   };
 
   GPURecoWorkflowSpec(CompletionPolicyData* policyData, Config const& specconfig, std::vector<int> const& tpcsectors, unsigned long tpcSectorMask, std::shared_ptr<o2::base::GRPGeomRequest>& ggr);
@@ -134,9 +137,14 @@ class GPURecoWorkflowSpec : public o2::framework::Task
   bool fetchCalibsCCDBTPC(o2::framework::ProcessingContext& pc, T& newCalibObjects);
   bool fetchCalibsCCDBITS(o2::framework::ProcessingContext& pc);
   /// storing the new calib objects by overwritting the old calibs
-  void storeUpdatedCalibsTPCPtrs();
+  void cleanOldCalibsTPCPtrs();
 
   void doCalibUpdates(o2::framework::ProcessingContext& pc);
+
+  void doTrackTuneTPC(GPUTrackingInOutPointers& ptrs, char* buffout);
+
+  template <class A, class B, class C, class D, class E, class F, class G, class H, class I, class J, class K>
+  void processInputs(o2::framework::ProcessingContext&, A&, B&, C&, D&, E&, F&, G&, bool&, H&, I&, J&, K&);
 
   int runITSTracking(o2::framework::ProcessingContext& pc);
 
@@ -168,6 +176,7 @@ class GPURecoWorkflowSpec : public o2::framework::Task
   std::vector<int> mTPCSectors;
   std::unique_ptr<o2::its::Tracker> mITSTracker;
   std::unique_ptr<o2::its::Vertexer> mITSVertexer;
+  std::mutex mMutexDecodeInput;
   o2::its::TimeFrame* mITSTimeFrame = nullptr;
   const o2::itsmft::TopologyDictionary* mITSDict = nullptr;
   const o2::dataformats::MeanVertexObject* mMeanVertex;
@@ -175,6 +184,7 @@ class GPURecoWorkflowSpec : public o2::framework::Task
   int mVerbosity = 0;
   unsigned int mNTFs = 0;
   unsigned int mNDebugDumps = 0;
+  unsigned int mNextThreadIndex = 0;
   bool mUpdateGainMapCCDB = true;
   std::unique_ptr<o2::gpu::GPUSettingsTF> mTFSettings;
   Config mSpecConfig;
