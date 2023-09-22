@@ -339,6 +339,18 @@ class CcdbApi //: public DatabaseInterface
    */
   static void curlSetSSLOptions(CURL* curl);
 
+  typedef struct RequestContext { // todo comment move
+    o2::pmr::vector<char>* dest;
+    std::string path;
+    std::map<std::string, std::string> metadata;
+    long timestamp;
+    std::map<std::string, std::string> headers;
+    std::string etag;
+    std::string createdNotAfter;
+    std::string createdNotBefore;
+    bool considerSnapshot;
+  } RequestContext;
+
   TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
 
   TObject* retrieveFromTFile(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp,
@@ -361,16 +373,7 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string path) con
                         std::map<std::string, std::string> const& metadata, long timestamp,
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
-  void vectoredLoadFileToMemory(
-    std::vector<o2::pmr::vector<char>*> dests,
-    std::vector<std::string> paths,
-    std::vector<std::map<std::string, std::string>> metadataVec,
-    std::vector<long> timestamps,
-    std::vector<std::map<std::string, std::string>> headersVec,
-    std::vector<std::string> etags,
-    std::vector<std::string> createdNotAfterVec,
-    std::vector<std::string> createdNotBeforevec,
-    std::vector<bool> considerSnapshotVec) const;  // todo comment
+  void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
   void getFileToMemory(o2::pmr::vector<char>* dest, std::string path, std::map<std::string, std::string> metadata,
                             long timestamp, std::map<std::string, std::string> headers, std::string etag, std::string createdNotAfter,
                             std::string createdNotBefore, bool considerSnapshot,

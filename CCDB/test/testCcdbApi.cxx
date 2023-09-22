@@ -597,27 +597,19 @@ BOOST_AUTO_TEST_CASE(vectored)
 
   int TEST_SAMPLE_SIZE = 5;
 
-  std::vector<o2::pmr::vector<char>*> dsts(TEST_SAMPLE_SIZE);
-  std::vector<std::string> urls(TEST_SAMPLE_SIZE);
-  std::vector<long> timestamps(TEST_SAMPLE_SIZE);
-  std::vector<std::map<std::string, std::string>> metadatas(TEST_SAMPLE_SIZE);
-  std::vector<std::map<std::string, std::string>> headers(TEST_SAMPLE_SIZE);
-  std::vector<std::string> etags(TEST_SAMPLE_SIZE);
-  std::vector<std::string> notBefors(TEST_SAMPLE_SIZE);
-  std::vector<std::string> notAfters(TEST_SAMPLE_SIZE);
-  std::vector<bool> considerSnapshots(TEST_SAMPLE_SIZE);
-
-  for(int i = 0; i < TEST_SAMPLE_SIZE; i++) {
-    dsts.at(i) = new o2::pmr::vector<char>();
-    urls.at(i) = "Analysis/ALICE3/Centrality";
-    timestamps.at(i) = 1645780010602;
-    considerSnapshots.at(i) = true;
+  std::vector<CcdbApi::RequestContext> contexts(TEST_SAMPLE_SIZE);
+  for(auto context : contexts) {
+    context.dest = new o2::pmr::vector<char>();
+    context.path = "Analysis/ALICE3/Centrality";
+    context.timestamp = 1645780010602;
+    context.considerSnapshot = true;
   }
 
-  api.vectoredLoadFileToMemory(dsts, urls, metadatas, timestamps, headers, etags, notBefors, notAfters, considerSnapshots);
-  for(int i = 0; i < TEST_SAMPLE_SIZE; i++) {
-    BOOST_CHECK(dsts.at(i)->size() != 0);
-    delete dsts.at(i);
+
+  api.vectoredLoadFileToMemory(contexts);
+  for(auto context : contexts) {
+    BOOST_CHECK(context.dest->size() != 0);
+    // delete dsts.at(i); // todo maybe delete
   }
   std::cout << "\n";
 }
