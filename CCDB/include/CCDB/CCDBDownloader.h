@@ -52,7 +52,7 @@ typedef struct DownloaderRequestData { // TODO move
   long timestamp;
   HeaderObjectPair_t hoPair;
 
-  std::function<bool(std::string)> alienContentCallback;
+  std::function<bool(std::string)> localContentCallback;
 } DownloaderRequestData;
 
 /*

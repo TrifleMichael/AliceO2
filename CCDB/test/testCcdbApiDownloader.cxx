@@ -137,7 +137,7 @@ std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<o2::pmr::vector<c
     data->hosts.push_back("http://ccdb-test.cern.ch:8080");
     data->path = "Analysis/ALICE3/Centrality";
     data->timestamp = 1646729604010;
-    data->alienContentCallback = nullptr;
+    data->localContentCallback = nullptr;
 
     curl_easy_setopt(curl_handle, CURLOPT_URL, "http://ccdb-test.cern.ch:8080/Analysis/ALICE3/Centrality/1646729604010");
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, writeCallbackNoLambda);

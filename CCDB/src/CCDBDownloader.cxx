@@ -382,7 +382,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             // ALIEN OR CVMFS
             newUrl = newLocation;
             std::cout << "Redirecting to alien " << newUrl << "\n";
-            if (requestData->alienContentCallback(newUrl)) { // todo rename from alienContentCallback
+            if (requestData->localContentCallback(newUrl)) {
               contentRetrieved = true;
             } else {
               // Prepare next redirect url

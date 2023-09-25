@@ -1496,7 +1496,7 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
   };
 
 
-  std::function<bool(std::string)> alienContentCallback = [this, &requestContext](std::string url) {
+  std::function<bool(std::string)> localContentCallback = [this, &requestContext](std::string url) {
     return this->loadLocalContentToMemory(requestContext.dest, url);
     // this->loadFileToMemory(dest, url, nullptr);
   };
@@ -1536,7 +1536,7 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
   data->hosts = hostsPool;
   data->path = requestContext.path;
   data->timestamp = requestContext.timestamp;
-  data->alienContentCallback = alienContentCallback;
+  data->localContentCallback = localContentCallback;
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, fullUrl.c_str());
   initCurlOptionsForRetrieve(curl_handle, (void*)(&data->hoPair), writeCallback, false);
