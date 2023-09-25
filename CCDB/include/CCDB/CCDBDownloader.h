@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <map>
 #include <functional>
+#include "MemoryResources/MemoryResources.h" // todo any ifdefs?
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
@@ -34,17 +35,25 @@ typedef struct uv_handle_s uv_handle_t;
 using namespace std;
 
 
-typedef struct DownloaderRequestData { // TODO move
-  std::multimap<std::string, std::string> *headerMap;
-  std::vector<std::string> hosts;
-  std::string path;
-  long timestamp;
 
-  std::function<bool(std::string)> alienContentCallback;
-} DownloaderRequestData;
 
 namespace o2::ccdb
 {
+
+struct HeaderObjectPair_t { // TODO move
+  std::multimap<std::string, std::string> header;
+  o2::pmr::vector<char>* object = nullptr;
+  int counter = 0;
+};
+
+typedef struct DownloaderRequestData { // TODO move
+  std::vector<std::string> hosts;
+  std::string path;
+  long timestamp;
+  HeaderObjectPair_t hoPair;
+
+  std::function<bool(std::string)> alienContentCallback;
+} DownloaderRequestData;
 
 /*
  Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.

@@ -91,11 +91,11 @@ size_t header_map_callback(char* buffer, size_t size, size_t nitems, void* userd
 }
 } // namespace
 
-struct HeaderObjectPair_t {
-  std::multimap<std::string, std::string> header;
-  o2::pmr::vector<char>* object = nullptr;
-  int counter = 0;
-};
+// struct HeaderObjectPair_t {
+//   std::multimap<std::string, std::string> header;
+//   o2::pmr::vector<char>* object = nullptr;
+//   int counter = 0;
+// };
 
 size_t writeCallbackNoLambda(void* contents, size_t size, size_t nmemb, void* chunkptr) {
   auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
@@ -122,7 +122,7 @@ size_t writeCallbackNoLambda(void* contents, size_t size, size_t nmemb, void* ch
   return realsize;
 }
 
-std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<struct HeaderObjectPair_t*>& hoPairs, std::vector<o2::pmr::vector<char>*>& dests)
+std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<o2::pmr::vector<char>*>& dests)
 {
   std::vector<CURL*> handles;
 
@@ -132,12 +132,8 @@ std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<struct HeaderObje
     CURL* curl_handle = curl_easy_init();
     handles.push_back(curl_handle);
 
-    auto hoPair = new struct HeaderObjectPair_t();
-    hoPair->object = dest;
-    hoPairs.push_back(hoPair);
-
     auto data = new DownloaderRequestData();
-    data->headerMap = &(hoPair->header);
+    data->hoPair.object = dest;
     data->hosts.push_back("http://ccdb-test.cern.ch:8080");
     data->path = "Analysis/ALICE3/Centrality";
     data->timestamp = 1646729604010;
@@ -145,11 +141,11 @@ std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<struct HeaderObje
 
     curl_easy_setopt(curl_handle, CURLOPT_URL, "http://ccdb-test.cern.ch:8080/Analysis/ALICE3/Centrality/1646729604010");
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, writeCallbackNoLambda);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)hoPair);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)&(data->hoPair));
 
-    curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair->header)>);
+    curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(data->hoPair.header)>);
     // hoPair.header.clear(); // TODO why it was like that?
-    curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&(hoPair->header));
+    curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&(data->hoPair.header));
     curl_easy_setopt(curl_handle, CURLOPT_PRIVATE, (void*)data);    
   }
   return handles;
@@ -167,9 +163,8 @@ BOOST_AUTO_TEST_CASE(vectored_test)
 
   CCDBDownloader downloader;
   std::vector<o2::pmr::vector<char>*> dests;
-  std::vector<struct HeaderObjectPair_t*> hoPairs;
 
-  auto handles = prepareAsyncHandles(TRANSFERS, hoPairs, dests);
+  auto handles = prepareAsyncHandles(TRANSFERS, dests);
   size_t transfersLeft = 0;
 
   int z = 0;

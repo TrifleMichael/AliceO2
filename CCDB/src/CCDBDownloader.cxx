@@ -372,7 +372,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
         std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n"; // todo remove std::couts
 
-        auto locations = getLocations(requestData->hosts.at(performData->hostInd), requestData->headerMap); // todo change to performData->hostInd
+        auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header)); // todo change to performData->hostInd
 
         if (300 <= httpCode && httpCode < 400 && performData->locInd < locations.size()) {
           // REDIRECT
@@ -402,7 +402,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           if (++performData->hostInd < requestData->hosts.size()) {
             std::string newUrl = requestData->hosts.at(performData->hostInd) + "/" + requestData->path + "/" + std::to_string(requestData->timestamp);
             std::cout << "Rescheduling for " << newUrl << "\n";
-            requestData->headerMap->clear(); // TODO is this safe?
+            requestData->hoPair.header.clear(); // TODO is this safe?
             curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
             mHandlesToBeAdded.push_back(easy_handle);
             (*performData->requestsLeft) += 1; // TODO unhack
@@ -565,7 +565,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   std::multimap<std::string, std::string>* headerMap;
   std::vector<std::string>* hostsPool;
   curl_easy_getinfo(handle, CURLINFO_PRIVATE, &requestData);
-  headerMap = requestData->headerMap;
+  headerMap = &(requestData->hoPair.header);
   hostsPool = &(requestData->hosts);
 
   // Prepare temporary data about transfer

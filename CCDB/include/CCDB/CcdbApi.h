@@ -353,9 +353,7 @@ class CcdbApi //: public DatabaseInterface
     RequestContext(o2::pmr::vector<char>& d,
                    std::map<std::string, std::string> const& m,
                    std::map<std::string, std::string>& h)
-        : dest(d), metadata(m), headers(h) {
-
-        }
+        : dest(d), metadata(m), headers(h) {}
   } RequestContext;
 
   TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;

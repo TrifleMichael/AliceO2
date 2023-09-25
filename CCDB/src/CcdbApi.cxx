@@ -1484,15 +1484,8 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
 
 void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const
 {
-
-  struct HeaderObjectPair_t {
-    std::multimap<std::string, std::string> header;
-    o2::pmr::vector<char>* object = nullptr;
-    int counter = 0;
-  };
-
-  auto hoPair = new HeaderObjectPair_t(); // todo free
-  hoPair->object = &requestContext.dest;
+  auto data = new DownloaderRequestData(); // todo free
+  data->hoPair.object = &requestContext.dest;
 
   bool errorflag = false;
   auto signalError = [&chunk = requestContext.dest, &errorflag]() {
@@ -1539,18 +1532,16 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
   initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, requestContext.timestamp, &requestContext.headers,
                                        requestContext.etag, requestContext.createdNotAfter, requestContext.createdNotBefore);
 
-  auto data = new DownloaderRequestData(); // todo free
-  data->headerMap = &(hoPair->header);
   data->hosts = hostsPool;
   data->path = requestContext.path;
   data->timestamp = requestContext.timestamp;
   data->alienContentCallback = alienContentCallback;
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, fullUrl.c_str());
-  initCurlOptionsForRetrieve(curl_handle, (void*)hoPair, writeCallback, false);
-  curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair->header)>);
+  initCurlOptionsForRetrieve(curl_handle, (void*)(&data->hoPair), writeCallback, false);
+  curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(data->hoPair.header)>);
   // hoPair.header.clear(); // TODO why it was like that?
-  curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&hoPair->header);
+  curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&(data->hoPair.header));
   curl_easy_setopt(curl_handle, CURLOPT_PRIVATE, (void*)data);
   curlSetSSLOptions(curl_handle);
 
