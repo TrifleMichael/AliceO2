@@ -354,6 +354,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   *performData->codeDestination = curlCode;
 
   bool rescheduled = false;
+  bool contentRetrieved = false;
 
   switch (performData->type) {
     case BLOCKING:
@@ -381,12 +382,15 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             // ALIEN OR CVMFS
             newUrl = newLocation;
             std::cout << "Redirecting to alien " << newUrl << "\n";
-            if (!requestData->alienContentCallback(newUrl)) {
-              // todo redirect if fails
+            if (requestData->alienContentCallback(newUrl)) { // todo rename from alienContentCallback
+              contentRetrieved = true;
             } else {
-              --(*performData->requestsLeft);
+              // Prepare next redirect url
+              newLocation = (performData->locInd < locations.size()) ? locations.at(performData->locInd) : "";
+              performData->locInd++;
             }
-          } else {
+          }
+          if (!contentRetrieved && newLocation != "") {
             // HTTP
             newUrl = requestData->hosts.at(performData->hostInd) + newLocation;
             std::cout << "Redirecting to http " << newUrl << "\n"; // todo clear map or not?
@@ -394,9 +398,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             mHandlesToBeAdded.push_back(easy_handle);
             rescheduled = true;
           }
-        } else if (performData->locInd == locations.size()) {
-          // NEW HOST
-          std::cout << "Expanded all locations. Maybe another host can help\n";
+        }
+        if (!rescheduled && !contentRetrieved && performData->locInd == locations.size()) {
+          // TRY NEW HOST
+          std::cout << "Expanded all locations. Maybe another host can help\n"; // todo reword
 
           // set url
           if (++performData->hostInd < requestData->hosts.size()) {
@@ -407,11 +412,12 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             mHandlesToBeAdded.push_back(easy_handle);
             rescheduled = true;
           } else {
-            std::cout << "No more hosts available\n";
+            std::cout << "No more hosts available\n"; // todo log error?
           }
         }
 
-        if (!rescheduled) {
+        if (contentRetrieved || !rescheduled) {
+          // No more transfers will be done for this request, start cleanup
           --(*performData->requestsLeft);
           delete requestData;
         }
