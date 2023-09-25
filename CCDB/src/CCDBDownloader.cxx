@@ -412,7 +412,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         }
 
         if (!rescheduled) {
-          std::cout << "Deleting request data\n";
           --(*performData->requestsLeft);
           delete requestData;
         }
@@ -424,6 +423,9 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       break;
   }
   if (!rescheduled) {
+    if (performData->type == ASYNCHRONOUS) {
+      delete performData->codeDestination; // Curl codes are not used in asynch calls
+    }
     delete performData;
   }
 
