@@ -355,11 +355,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
   bool rescheduled = false;
 
-  --(*performData->requestsLeft);
   switch (performData->type) {
     case BLOCKING:
       {
-        
+        --(*performData->requestsLeft);
       }
       break;
     case ASYNCHRONOUS:
@@ -372,7 +371,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
         std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n"; // todo remove std::couts
 
-        auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header)); // todo change to performData->hostInd
+        auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header));
 
         if (300 <= httpCode && httpCode < 400 && performData->locInd < locations.size()) {
           // REDIRECT
@@ -384,6 +383,8 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             std::cout << "Redirecting to alien " << newUrl << "\n";
             if (!requestData->alienContentCallback(newUrl)) {
               // todo redirect if fails
+            } else {
+              --(*performData->requestsLeft);
             }
           } else {
             // HTTP
@@ -391,7 +392,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             std::cout << "Redirecting to http " << newUrl << "\n"; // todo clear map or not?
             curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
             mHandlesToBeAdded.push_back(easy_handle);
-            (*performData->requestsLeft) += 1; // TODO unhack
             rescheduled = true;
           }
         } else if (performData->locInd == locations.size()) {
@@ -405,7 +405,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             requestData->hoPair.header.clear(); // TODO is this safe?
             curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
             mHandlesToBeAdded.push_back(easy_handle);
-            (*performData->requestsLeft) += 1; // TODO unhack
             rescheduled = true;
           } else {
             std::cout << "No more hosts available\n";
@@ -414,6 +413,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
         if (!rescheduled) {
           std::cout << "Deleting request data\n";
+          --(*performData->requestsLeft);
           delete requestData;
         }
       }
@@ -566,7 +566,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   CURLcode* codeVector = new CURLcode(); // todo change
 
   // Get data about request
-  DownloaderRequestData* requestData; // todo nest
+  DownloaderRequestData* requestData;
   std::multimap<std::string, std::string>* headerMap;
   std::vector<std::string>* hostsPool;
   curl_easy_getinfo(handle, CURLINFO_PRIVATE, &requestData);
@@ -574,7 +574,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   hostsPool = &(requestData->hosts);
 
   // Prepare temporary data about transfer
-  auto* data = new CCDBDownloader::PerformData();
+  auto* data = new CCDBDownloader::PerformData(); // todo free somewhere
   data->codeDestination = codeVector;
   *codeVector = CURLE_FAILED_INIT;
 
