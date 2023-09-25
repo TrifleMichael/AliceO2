@@ -1484,7 +1484,8 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
 
 void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const
 {
-  auto data = new DownloaderRequestData(); // todo free
+  // todo is it true?
+  auto data = new DownloaderRequestData();  // Deleted in transferFinished of CCDBDownloader.cxx
   data->hoPair.object = &requestContext.dest;
 
   bool errorflag = false;
@@ -1662,7 +1663,7 @@ void CcdbApi::getFileToMemory(RequestContext& requestContext, int& fromSnapshot,
     getFromSnapshot(createSnapshot, requestContext.path, requestContext.timestamp, requestContext.headers, snapshotpath, requestContext.dest, fromSnapshot, requestContext.etag);
     releaseNamedSemaphore(sem, requestContext.path);
   } else { // look on the server
-    if(!mDownloader) { // todo not the best way to handle things
+    if(!mDownloader) { // todo move to curl_perform
       mDownloader = new CCDBDownloader();
     }
     navigateURLsWithDownloader(requestContext, requestCounter);

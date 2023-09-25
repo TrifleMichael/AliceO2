@@ -410,7 +410,12 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           } else {
             std::cout << "No more hosts available\n";
           }
-        }          
+        }
+
+        if (!rescheduled) {
+          std::cout << "Deleting request data\n";
+          delete requestData;
+        }
       }
       break;
     case ASYNCHRONOUS_WITH_CALLBACK: // todo remove
