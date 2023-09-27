@@ -21,6 +21,9 @@
 #include <mutex>
 #include <condition_variable>
 #include <unordered_map>
+#include <map>
+#include <functional>
+#include "MemoryResources/MemoryResources.h" // todo any ifdefs?
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_timer_s uv_timer_t;
@@ -31,6 +34,21 @@ typedef struct uv_handle_s uv_handle_t;
 
 namespace o2::ccdb
 {
+
+struct HeaderObjectPair_t { // TODO move
+  std::multimap<std::string, std::string> header;
+  o2::pmr::vector<char>* object = nullptr;
+  int counter = 0;
+};
+
+typedef struct DownloaderRequestData { // TODO move
+  std::vector<std::string> hosts;
+  std::string path;
+  long timestamp;
+  HeaderObjectPair_t hoPair;
+
+  std::function<bool(std::string)> localContentCallback;
+} DownloaderRequestData;
 
 /*
  Some functions below aren't member functions of CCDBDownloader because both curl and libuv require callback functions which have to be either static or non-member.
@@ -133,6 +151,8 @@ class CCDBDownloader
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
+  void asynchSchedule(CURL* handle, size_t* requestCounter); // todo comment
+
   /**
    * Limits the number of parallel connections. Should be used only if no transfers are happening.
    */
@@ -176,6 +196,7 @@ class CCDBDownloader
   void runLoop(bool noWait);
 
  private:
+  std::vector<std::string> getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const; // Todo commment and stuff
   std::string mUserAgentId = "CCDBDownloader";
   /**
    * Sets up internal UV loop.
@@ -230,19 +251,19 @@ class CCDBDownloader
 
   DataForSocket mSocketData;
 
-  /**
+  /** todo revise (now is specific info about navigating urls i guess)
    * Structure which is stored in a easy_handle. It carries information about the request which the easy_handle is part of.
    * All easy handles coming from one request have an identical PerformData structure.
    */
   typedef struct PerformData {
-    std::condition_variable* cv;
-    bool* completionFlag;
     CURLcode* codeDestination;
-    void (*cbFun)(void*);
-    std::thread* cbThread;
-    void* cbData;
     size_t* requestsLeft;
     RequestType type;
+
+    int hostInd;
+    int locInd;
+
+    DownloaderRequestData* requestData;
   } PerformData;
 
   /**

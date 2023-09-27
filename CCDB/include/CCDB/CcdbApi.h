@@ -28,6 +28,8 @@
 #include <CommonUtils/ConfigurableParam.h>
 #include <type_traits>
 #include <vector>
+#include <boost/interprocess/sync/named_semaphore.hpp>
+#include "MemoryResources/MemoryResources.h"
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
 #include "MemoryResources/MemoryResources.h"
@@ -337,19 +339,47 @@ class CcdbApi //: public DatabaseInterface
    */
   static void curlSetSSLOptions(CURL* curl);
 
+  typedef struct RequestContext { // todo comment move
+    o2::pmr::vector<char>& dest;
+    std::string path;
+    std::map<std::string, std::string> const& metadata;
+    long timestamp;
+    std::map<std::string, std::string>& headers;
+    std::string etag;
+    std::string createdNotAfter;
+    std::string createdNotBefore;
+    bool considerSnapshot;
+
+    RequestContext(o2::pmr::vector<char>& d,
+                   std::map<std::string, std::string> const& m,
+                   std::map<std::string, std::string>& h)
+        : dest(d), metadata(m), headers(h) {}
+  } RequestContext;
+
   TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
 
   TObject* retrieveFromTFile(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp,
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
+void navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const; // todo check, move etc
+void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
+void getFromSnapshot(bool createSnapshot, std::string const& path,
+                              long timestamp, std::map<std::string, std::string> headers,
+                              std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
+void saveSnapshot(RequestContext& requestContext) const; // TODO define here?
+void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const; // todo rename move
+boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const; // TODO create here?
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
   void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders = nullptr) const;
   void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
                         std::map<std::string, std::string> const& metadata, long timestamp,
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
+  void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
+  void getFileToMemory(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
   void navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const;
+  bool loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const; // todo comment
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity
   static bool isMemoryFileInvalid(const o2::pmr::vector<char>& v) { return v.size() == 0 && v.capacity() > 0; }
@@ -550,7 +580,7 @@ class CcdbApi //: public DatabaseInterface
   CURLcode CURL_perform(CURL* handle) const;
 
   mutable CCDBDownloader* mDownloader = nullptr; //! the multi-handle (async) CURL downloader
-  bool mIsCCDBDownloaderEnabled = false;
+  bool mIsCCDBDownloaderPreferred = false;
   /// Base URL of the CCDB (with port)
   std::string mUniqueAgentID{}; // Unique User-Agent ID communicated to server for logging
   std::string mUrl{};

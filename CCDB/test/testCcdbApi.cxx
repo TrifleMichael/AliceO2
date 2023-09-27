@@ -45,6 +45,7 @@ using namespace o2::ccdb;
 namespace utf = boost::unit_test;
 namespace tt = boost::test_tools;
 
+
 static string ccdbUrl;
 static string basePath;
 bool hostReachable = false;
@@ -552,4 +553,102 @@ BOOST_AUTO_TEST_CASE(TestUpdateMetadata, *utf::precondition(if_reachable()))
   headers = f.api.retrieveHeaders(basePath + "Test", metadata);
   BOOST_CHECK(headers.count("custom") > 0);
   BOOST_CHECK(headers.at("custom") == "second");
+}
+
+BOOST_AUTO_TEST_CASE(base_test)
+{
+  std::cout << "----------- base_test -----------\n";
+  CcdbApi api;
+  api.init("http://ccdb-test.cern.ch:8080");
+  std::map<std::string, std::string> metadata;
+  std::map<std::string, std::string> headers;
+  o2::pmr::vector<char> dst;
+  std::string url = "Analysis/ALICE3/Centrality";
+  api.loadFileToMemory(dst, url, metadata, 1645780010602, &headers, "", "", "", true);
+  BOOST_CHECK(dst.size() != 0);
+  for(int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
+}
+
+BOOST_AUTO_TEST_CASE(multi_host_test) // needs loadFileToMemory update
+{
+  std::cout << "----------- multi_host_test -----------\n";
+  CcdbApi api;
+  api.init("http://bogus-host.cern.ch,http://ccdb-test.cern.ch:8080");
+  std::map<std::string, std::string> metadata;
+  std::map<std::string, std::string> headers;
+  o2::pmr::vector<char> dst;
+  std::string url = "Analysis/ALICE3/Centrality";
+  api.loadFileToMemory(dst, url, metadata, 1645780010602, &headers, "", "", "", true);
+  BOOST_CHECK(dst.size() != 0);
+  for(int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
+}
+
+BOOST_AUTO_TEST_CASE(vectored)
+{
+  std::cout << "----------- vectored -----------\n";
+  CcdbApi api;
+  api.init("http://ccdb-test.cern.ch:8080");
+
+  int TEST_SAMPLE_SIZE = 5;
+  std::vector<o2::pmr::vector<char>> dests(TEST_SAMPLE_SIZE);
+  std::vector<std::map<std::string, std::string>> metadatas(TEST_SAMPLE_SIZE);
+  std::vector<std::map<std::string, std::string>> headers(TEST_SAMPLE_SIZE);
+
+  std::vector<CcdbApi::RequestContext> contexts;
+  for(int i = 0; i < TEST_SAMPLE_SIZE; i++) {
+  // for(auto& context : contexts) {
+    contexts.push_back(CcdbApi::RequestContext(dests.at(i), metadatas.at(i), headers.at(i)));
+    contexts.at(i).path = "Analysis/ALICE3/Centrality";
+    contexts.at(i).timestamp = 1645780010602;
+    contexts.at(i).considerSnapshot = true;
+  }
+
+  api.vectoredLoadFileToMemory(contexts);
+
+  for(auto context : contexts) {
+    BOOST_CHECK(context.dest.size() != 0);
+    // delete dsts.at(i); // todo maybe delete
+  }
+  std::cout << "\n";
+}
+
+// BOOST_AUTO_TEST_CASE(alien_test)
+// {
+//   std::cout << "----------- alien_test -----------\n";
+//   CcdbApi api;
+//   api.init("http://alice-ccdb.cern.ch");
+//   std::map<std::string, std::string> metadata;
+//   std::map<std::string, std::string> headers;
+//   o2::pmr::vector<char> dst;
+//   std::string url = "Analysis/ALICE3/Centrality";
+//   api.loadFileToMemory(dst, url, metadata, 1646729604010, &headers, "", "", "", true);
+//   BOOST_CHECK(dst.size() != 0);
+//   for(int i = 0; i < 50 && i < dst.size(); i++) {
+//     std::cout << dst[i];
+//   }
+//   std::cout << "\n";
+// }
+
+// todo something so other tests are not affected
+BOOST_AUTO_TEST_CASE(local_cache_test)
+{
+  std::cout << "----------- local_cache_test -----------\n";
+  CcdbApi api;
+  api.init("file://LOCAL_CACHE");
+  std::map<std::string, std::string> metadata;
+  std::map<std::string, std::string> headers;
+  o2::pmr::vector<char> dst;
+  std::string url = "Analysis/ALICE3/Centrality";
+  api.loadFileToMemory(dst, url, metadata, 1645780010602, &headers, "", "", "", true);
+  BOOST_CHECK(dst.size() != 0);
+  for(int i = 0; i < 50 && i < dst.size(); i++) {
+    std::cout << dst[i];
+  }
+  std::cout << "\n";
 }
