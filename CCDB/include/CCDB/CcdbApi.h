@@ -580,7 +580,7 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string path) con
   CURLcode CURL_perform(CURL* handle) const;
 
   mutable CCDBDownloader* mDownloader = nullptr; //! the multi-handle (async) CURL downloader
-  bool mIsCCDBDownloaderEnabled = false;
+  bool mIsCCDBDownloaderPreferred = false;
   /// Base URL of the CCDB (with port)
   std::string mUniqueAgentID{}; // Unique User-Agent ID communicated to server for logging
   std::string mUrl{};

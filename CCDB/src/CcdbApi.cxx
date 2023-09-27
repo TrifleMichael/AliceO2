@@ -61,25 +61,20 @@ CcdbApi::CcdbApi()
   setUniqueAgentID();
 
   DeploymentMode deploymentMode = DefaultsHelpers::deploymentMode();
-  mIsCCDBDownloaderEnabled = 0;
+  mIsCCDBDownloaderPreferred = 0;
   if (deploymentMode == DeploymentMode::OnlineDDS && deploymentMode == DeploymentMode::OnlineECS && deploymentMode == DeploymentMode::OnlineAUX && deploymentMode == DeploymentMode::FST) {
-    mIsCCDBDownloaderEnabled = 1;
+    mIsCCDBDownloaderPreferred = 1;
   }
-  if (getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI")) {
-    mIsCCDBDownloaderEnabled = atoi(getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI"));
+  if (getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI")) { // todo rename ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI to ALICEO2_PREFER_MULTIHANDLE_CCDBAPI
+    mIsCCDBDownloaderPreferred = atoi(getenv("ALICEO2_ENABLE_MULTIHANDLE_CCDBAPI"));
   }
-  if (mIsCCDBDownloaderEnabled) {
-    std::cout << "Enabling downloader\n";
-    mDownloader = new CCDBDownloader();
-  }
+  mDownloader = new CCDBDownloader();
 }
 
 CcdbApi::~CcdbApi()
 {
   curl_global_cleanup();
-  if (mDownloader) {
-    delete mDownloader;
-  }
+  delete mDownloader;
 }
 
 void CcdbApi::setUniqueAgentID()
@@ -120,14 +115,12 @@ void CcdbApi::curlInit()
   CcdbApi::mJAlienCredentials->loadCredentials();
   CcdbApi::mJAlienCredentials->selectPreferedCredentials();
 
-  // allow to configure the socket timeout of CCDBDownloader, if activated (for some tuning studies)
-  if (mIsCCDBDownloaderEnabled) {
-    if (getenv("ALICEO2_CCDB_SOCKET_TIMEOUT")) {
-      auto timeoutMS = atoi(getenv("ALICEO2_CCDB_SOCKET_TIMEOUT"));
-      if (timeoutMS >= 0) {
-        LOG(info) << "Setting socket timeout to " << timeoutMS << " milliseconds";
-        mDownloader->setKeepaliveTimeoutTime(timeoutMS);
-      }
+  // allow to configure the socket timeout of CCDBDownloader (for some tuning studies)
+  if (getenv("ALICEO2_CCDB_SOCKET_TIMEOUT")) {
+    auto timeoutMS = atoi(getenv("ALICEO2_CCDB_SOCKET_TIMEOUT"));
+    if (timeoutMS >= 0) {
+      LOG(info) << "Setting socket timeout to " << timeoutMS << " milliseconds";
+      mDownloader->setKeepaliveTimeoutTime(timeoutMS);
     }
   }
 }
@@ -1663,9 +1656,6 @@ void CcdbApi::getFileToMemory(RequestContext& requestContext, int& fromSnapshot,
     getFromSnapshot(createSnapshot, requestContext.path, requestContext.timestamp, requestContext.headers, snapshotpath, requestContext.dest, fromSnapshot, requestContext.etag);
     releaseNamedSemaphore(sem, requestContext.path);
   } else { // look on the server
-    if(!mDownloader) { // todo move to curl_perform
-      mDownloader = new CCDBDownloader();
-    }
     navigateURLsWithDownloader(requestContext, requestCounter);
   }
 }
@@ -1955,14 +1945,12 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
 
 void CcdbApi::asynchPerform(CURL* handle, size_t* requestCounter) const
 {
-  // todo (mIsCCDBDownloaderEnabled)
   mDownloader->asynchSchedule(handle, requestCounter);
 }
 
 CURLcode CcdbApi::CURL_perform(CURL* handle) const
 {
-  if (mIsCCDBDownloaderEnabled) {
-    std::cout << "Downloader perform\n";
+  if (mIsCCDBDownloaderPreferred) {
     return mDownloader->perform(handle);
   }
   CURLcode result;
