@@ -374,7 +374,9 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
         auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header));
 
-        if (300 <= httpCode && httpCode < 400 && performData->locInd < locations.size()) {
+        if (404 == httpCode) {
+          LOG(error) << "Requested resource does not exist: " << url;
+        } else if (300 <= httpCode && httpCode < 400 && performData->locInd < locations.size()) {
           // REDIRECT
           std::string newLocation = locations.at(performData->locInd++);
           std::string newUrl;
@@ -398,9 +400,13 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
             mHandlesToBeAdded.push_back(easy_handle);
             rescheduled = true;
           }
+        } else if (200 <= httpCode && httpCode < 300) {
+          contentRetrieved = true;
+        } else {
+          LOG(error) << "Error in fetching object " << url << ", curl response code:" << httpCode;
         }
         if (!rescheduled && !contentRetrieved && performData->locInd == locations.size()) {
-          // TRY NEW HOST
+          // Ran out of locations to redirect, try new host
           std::cout << "Expanded all locations. Maybe another host can help\n"; // todo reword
 
           // set url
@@ -416,10 +422,13 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           }
         }
 
-        if (contentRetrieved || !rescheduled) {
+        if (!rescheduled) {
           // No more transfers will be done for this request, start cleanup
           --(*performData->requestsLeft);
           delete requestData;
+          if (!contentRetrieved) {
+            LOGP(alarm, "Curl request to {}, response code: {}", url, httpCode);
+          }
         }
       }
       break;

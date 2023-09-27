@@ -1477,7 +1477,6 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
 
 void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const
 {
-  // todo is it true?
   auto data = new DownloaderRequestData();  // Deleted in transferFinished of CCDBDownloader.cxx
   data->hoPair.object = &requestContext.dest;
 
@@ -1491,7 +1490,6 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
 
   std::function<bool(std::string)> localContentCallback = [this, &requestContext](std::string url) {
     return this->loadLocalContentToMemory(requestContext.dest, url);
-    // this->loadFileToMemory(dest, url, nullptr);
   };
 
   auto writeCallback = [](void* contents, size_t size, size_t nmemb, void* chunkptr) {
@@ -1534,7 +1532,6 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
   curl_easy_setopt(curl_handle, CURLOPT_URL, fullUrl.c_str());
   initCurlOptionsForRetrieve(curl_handle, (void*)(&data->hoPair), writeCallback, false);
   curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(data->hoPair.header)>);
-  // hoPair.header.clear(); // TODO why it was like that?
   curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&(data->hoPair.header));
   curl_easy_setopt(curl_handle, CURLOPT_PRIVATE, (void*)data);
   curlSetSSLOptions(curl_handle);
@@ -1647,7 +1644,7 @@ void CcdbApi::getFileToMemory(RequestContext& requestContext, int& fromSnapshot,
 
   std::string snapshotpath;
   if (mInSnapshotMode || std::filesystem::exists(snapshotpath = getSnapshotFile(mSnapshotCachePath, requestContext.path))) {
-    boost::interprocess::named_semaphore* sem = createNamedSempahore(requestContext.path); // todo remove and free sem after using
+    boost::interprocess::named_semaphore* sem = createNamedSempahore(requestContext.path);
     if (sem) {
       sem->wait(); // wait until we can enter (no one else there)
     }
@@ -1687,7 +1684,7 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
         saveSnapshot(requestContext);
       }
     } else {
-      // todo log error
+      LOG(error) << "Did not receive content for " << requestContext.path << " at index " << i << "\n";
     }
   }
 }
@@ -1955,7 +1952,6 @@ CURLcode CcdbApi::CURL_perform(CURL* handle) const
   }
   CURLcode result;
   for (int i = 1; i <= mCurlRetries && (result = curl_easy_perform(handle)) != CURLE_OK; i++) {
-    std::cout << "Regular perform\n";
     usleep(mCurlDelayRetries * i);
   }
   return result;
