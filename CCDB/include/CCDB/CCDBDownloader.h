@@ -283,6 +283,8 @@ class CCDBDownloader
 
   void tryNewHost(PerformData* performData, CURL* easy_handle); // todo comment
   void getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations); // todo comment
+  void httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle); // todo
+  void followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved); // todo
 
   /**
    *  Is used to react to polling file descriptors in poll_handle.

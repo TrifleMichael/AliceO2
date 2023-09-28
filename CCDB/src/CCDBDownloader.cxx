@@ -368,6 +368,28 @@ void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newU
   }
 }
 
+void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle)
+{
+  auto requestData = performData->requestData;
+  newUrl = requestData->hosts.at(performData->hostInd) + newLocation;
+  LOG(debug) << "Trying content location " << newUrl; // todo clear map or not?
+  curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+  mHandlesToBeAdded.push_back(easy_handle);
+}
+
+void CCDBDownloader::followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved)
+{
+  std::string newLocation = locations.at(performData->locInd++);
+  std::string newUrl;
+  if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
+    getLocalContent(performData, newUrl, newLocation, contentRetrieved, locations);
+  }
+  if (!contentRetrieved && newLocation != "") {
+    httpRedirect(performData, newUrl, newLocation, easy_handle);
+    rescheduled = true;
+  }
+}
+
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
   mHandlesInUse--;
@@ -414,20 +436,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           LOGP(debug, "Object exists but I am not serving it since it's already in your possession");
           contentRetrieved = true;
         } else if (300 <= httpCode && httpCode < 400 && performData->locInd < locations.size()) {
-          // REDIRECT
-          std::string newLocation = locations.at(performData->locInd++);
-          std::string newUrl;
-          if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
-            getLocalContent(performData, newUrl, newLocation, contentRetrieved, locations);
-          }
-          if (!contentRetrieved && newLocation != "") {
-            // HTTP
-            newUrl = requestData->hosts.at(performData->hostInd) + newLocation;
-            LOG(debug) << "Trying content location " << newUrl; // todo clear map or not?
-            curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
-            mHandlesToBeAdded.push_back(easy_handle);
-            rescheduled = true;
-          }
+          followRedirect(performData, easy_handle, locations, rescheduled, contentRetrieved);
         } else if (200 <= httpCode && httpCode < 300) {
           contentRetrieved = true;
         } else {
