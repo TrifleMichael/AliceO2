@@ -602,7 +602,6 @@ BOOST_AUTO_TEST_CASE(vectored)
 
   std::vector<CcdbApi::RequestContext> contexts;
   for(int i = 0; i < TEST_SAMPLE_SIZE; i++) {
-  // for(auto& context : contexts) {
     contexts.push_back(CcdbApi::RequestContext(dests.at(i), metadatas.at(i), headers.at(i)));
     contexts.at(i).path = "Analysis/ALICE3/Centrality";
     contexts.at(i).timestamp = 1645780010602;
@@ -613,7 +612,6 @@ BOOST_AUTO_TEST_CASE(vectored)
 
   for(auto context : contexts) {
     BOOST_CHECK(context.dest.size() != 0);
-    // delete dsts.at(i); // todo maybe delete
   }
   std::cout << "\n";
 }

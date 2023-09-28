@@ -380,7 +380,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
         char* url;
         curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
-        //std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n"; // todo remove std::couts
+        LOG(debug) << "Transfer for " << url << " finished with code " << httpCode << "\n";
 
         auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header));
 
@@ -396,7 +396,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
             // ALIEN OR CVMFS
             newUrl = newLocation;
-            std::cout << "Redirecting to alien " << newUrl << "\n";
+            LOG(debug) << "Redirecting to local content " << newUrl << "\n";
             if (requestData->localContentCallback(newUrl)) {
               contentRetrieved = true;
             } else {
@@ -408,7 +408,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           if (!contentRetrieved && newLocation != "") {
             // HTTP
             newUrl = requestData->hosts.at(performData->hostInd) + newLocation;
-            std::cout << "Redirecting to http " << newUrl << "\n"; // todo clear map or not?
+            LOG(debug) << "Trying content location " << newUrl; // todo clear map or not?
             curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
             mHandlesToBeAdded.push_back(easy_handle);
             rescheduled = true;
@@ -420,18 +420,17 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         }
         if (!rescheduled && !contentRetrieved && performData->locInd == locations.size()) {
           // Ran out of locations to redirect, try new host
-          std::cout << "Expanded all locations. Maybe another host can help\n"; // todo reword
 
           // set url
           if (++performData->hostInd < requestData->hosts.size()) {
             std::string newUrl = requestData->hosts.at(performData->hostInd) + "/" + requestData->path + "/" + std::to_string(requestData->timestamp);
-            std::cout << "Rescheduling for " << newUrl << "\n";
+            LOG(debug) << "Connecting to another host " << newUrl;
             requestData->hoPair.header.clear(); // TODO is this safe?
             curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
             mHandlesToBeAdded.push_back(easy_handle);
             rescheduled = true;
           } else {
-            std::cout << "No more hosts available\n"; // todo log error?
+            LOG(error) << "File " << requestData->path << " could not be retrieved. No more hosts to try.";
           }
         }
 
