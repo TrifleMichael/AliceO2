@@ -1480,8 +1480,8 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
   auto data = new DownloaderRequestData();  // Deleted in transferFinished of CCDBDownloader.cxx
   data->hoPair.object = &requestContext.dest;
 
-  bool errorflag = false;
-  auto signalError = [&chunk = requestContext.dest, &errorflag]() {
+  // bool errorflag = false; // todo remove
+  auto signalError = [&chunk = requestContext.dest, &errorflag = data->errorflag]() {
     chunk.clear();
     chunk.reserve(1);
     errorflag = true;
@@ -1524,6 +1524,7 @@ void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t*
   initCurlHTTPHeaderOptionsForRetrieve(curl_handle, options_list, requestContext.timestamp, &requestContext.headers,
                                        requestContext.etag, requestContext.createdNotAfter, requestContext.createdNotBefore);
 
+  data->headers = &requestContext.headers;
   data->hosts = hostsPool;
   data->path = requestContext.path;
   data->timestamp = requestContext.timestamp;

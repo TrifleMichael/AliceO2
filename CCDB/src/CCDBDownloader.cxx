@@ -365,17 +365,30 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
     case ASYNCHRONOUS:
       {
         DownloaderRequestData* requestData = performData->requestData;
+        
+        if (requestData->headers) {
+          for (auto& p : requestData->hoPair.header) {
+            (*requestData->headers)[p.first] = p.second;
+          }
+        }
+        if (requestData->errorflag && requestData->headers) {
+          (*requestData->headers)["Error"] = "An error occurred during retrieval";
+        }
+
         // todo comment
         long httpCode;
         curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
         char* url;
         curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
-        std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n"; // todo remove std::couts
+        //std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n"; // todo remove std::couts
 
         auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header));
 
         if (404 == httpCode) {
           LOG(error) << "Requested resource does not exist: " << url;
+        } else if (304 == httpCode) {
+          LOGP(debug, "Object exists but I am not serving it since it's already in your possession");
+          contentRetrieved = true;
         } else if (300 <= httpCode && httpCode < 400 && performData->locInd < locations.size()) {
           // REDIRECT
           std::string newLocation = locations.at(performData->locInd++);

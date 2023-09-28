@@ -51,8 +51,10 @@ typedef struct DownloaderRequestData { // TODO move
   std::string path;
   long timestamp;
   HeaderObjectPair_t hoPair;
+  std::map<std::string, std::string>* headers;
 
   std::function<bool(std::string)> localContentCallback;
+  bool errorflag = false; // todo test
 } DownloaderRequestData;
 
 /*
