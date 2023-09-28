@@ -344,6 +344,30 @@ void CCDBDownloader::destroyCurlContext(curl_context_t* context)
   uv_close((uv_handle_t*)context->poll_handle, curlCloseCB);
 }
 
+void CCDBDownloader::tryNewHost(PerformData* performData, CURL* easy_handle)
+{
+  auto requestData = performData->requestData;
+  std::string newUrl = requestData->hosts.at(performData->hostInd) + "/" + requestData->path + "/" + std::to_string(requestData->timestamp);
+  LOG(debug) << "Connecting to another host " << newUrl;
+  requestData->hoPair.header.clear(); // TODO is this safe?
+  curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+  mHandlesToBeAdded.push_back(easy_handle);
+}
+
+void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations)
+{
+  auto requestData = performData->requestData;
+  newUrl = newLocation;
+  LOG(debug) << "Redirecting to local content " << newUrl << "\n";
+  if (requestData->localContentCallback(newUrl)) {
+    contentRetrieved = true;
+  } else {
+    // Prepare next redirect url
+    newLocation = (performData->locInd < locations.size()) ? locations.at(performData->locInd) : "";
+    performData->locInd++;
+  }
+}
+
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 {
   mHandlesInUse--;
@@ -394,16 +418,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           std::string newLocation = locations.at(performData->locInd++);
           std::string newUrl;
           if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
-            // ALIEN OR CVMFS
-            newUrl = newLocation;
-            LOG(debug) << "Redirecting to local content " << newUrl << "\n";
-            if (requestData->localContentCallback(newUrl)) {
-              contentRetrieved = true;
-            } else {
-              // Prepare next redirect url
-              newLocation = (performData->locInd < locations.size()) ? locations.at(performData->locInd) : "";
-              performData->locInd++;
-            }
+            getLocalContent(performData, newUrl, newLocation, contentRetrieved, locations);
           }
           if (!contentRetrieved && newLocation != "") {
             // HTTP
@@ -420,14 +435,8 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         }
         if (!rescheduled && !contentRetrieved && performData->locInd == locations.size()) {
           // Ran out of locations to redirect, try new host
-
-          // set url
           if (++performData->hostInd < requestData->hosts.size()) {
-            std::string newUrl = requestData->hosts.at(performData->hostInd) + "/" + requestData->path + "/" + std::to_string(requestData->timestamp);
-            LOG(debug) << "Connecting to another host " << newUrl;
-            requestData->hoPair.header.clear(); // TODO is this safe?
-            curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
-            mHandlesToBeAdded.push_back(easy_handle);
+            tryNewHost(performData, easy_handle);
             rescheduled = true;
           } else {
             LOG(error) << "File " << requestData->path << " could not be retrieved. No more hosts to try.";

@@ -281,6 +281,9 @@ class CCDBDownloader
    */
   static void closesocketCallback(void* clientp, curl_socket_t item);
 
+  void tryNewHost(PerformData* performData, CURL* easy_handle); // todo comment
+  void getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations); // todo comment
+
   /**
    *  Is used to react to polling file descriptors in poll_handle.
    *
