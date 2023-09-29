@@ -1475,12 +1475,11 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const
+void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const // todo rename to scheduleDownload
 {
   auto data = new DownloaderRequestData();  // Deleted in transferFinished of CCDBDownloader.cxx
   data->hoPair.object = &requestContext.dest;
 
-  // bool errorflag = false; // todo remove
   auto signalError = [&chunk = requestContext.dest, &errorflag = data->errorflag]() {
     chunk.clear();
     chunk.reserve(1);
@@ -1704,137 +1703,6 @@ bool CcdbApi::loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string&
     }
   }
   return false;
-}
-
-// todo remove
-// navigate sequence of URLs until TFile content is found; object is extracted and returned
-void CcdbApi::navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const
-{
-  // let's see first of all if the url is something specific that curl cannot handle
-  if (url.find("alien:/", 0) != std::string::npos) {
-    return loadFileToMemory(dest, url, nullptr); // headers loaded from the file in case of the snapshot reading only
-  }
-  if ((url.find("file:/", 0) != std::string::npos)) {
-    std::string path = url.substr(7);
-    if (std::filesystem::exists(path)) {
-      return loadFileToMemory(dest, path, nullptr);
-    } else {
-      return;
-    }
-  }
-  // otherwise make an HTTP/CURL request
-  struct HeaderObjectPair_t {
-    std::multimap<std::string, std::string> header;
-    o2::pmr::vector<char>* object = nullptr;
-    int counter = 0;
-  } hoPair{{}, &dest, 0};
-
-  bool errorflag = false;
-  auto signalError = [&chunk = dest, &errorflag]() {
-    chunk.clear();
-    chunk.reserve(1);
-    errorflag = true;
-  };
-  auto writeCallBack = [](void* contents, size_t size, size_t nmemb, void* chunkptr) {
-    auto& ho = *static_cast<HeaderObjectPair_t*>(chunkptr);
-    auto& chunk = *ho.object;
-    size_t realsize = size * nmemb, sz = 0;
-    ho.counter++;
-    try {
-      if (chunk.capacity() < chunk.size() + realsize) {
-        auto cl = ho.header.find("Content-Length");
-        if (cl != ho.header.end()) {
-          sz = std::max(chunk.size() + realsize, (size_t)std::stol(cl->second));
-        } else {
-          sz = chunk.size() + realsize;
-          LOGP(debug, "SIZE IS NOT IN HEADER, allocate {}", sz);
-        }
-        chunk.reserve(sz);
-      }
-      char* contC = (char*)contents;
-      chunk.insert(chunk.end(), contC, contC + realsize);
-    } catch (std::exception e) {
-      LOGP(alarm, "failed to reserve {} bytes in CURL write callback (realsize = {}): {}", sz, realsize, e.what());
-      realsize = 0;
-    }
-    return realsize;
-  };
-
-  // specify URL to get
-  curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
-  initCurlOptionsForRetrieve(curl_handle, (void*)&hoPair, writeCallBack, false);
-  curl_easy_setopt(curl_handle, CURLOPT_HEADERFUNCTION, header_map_callback<decltype(hoPair.header)>);
-  hoPair.header.clear();
-  curl_easy_setopt(curl_handle, CURLOPT_HEADERDATA, (void*)&hoPair.header);
-  curlSetSSLOptions(curl_handle);
-
-  auto res = CURL_perform(curl_handle);
-  long response_code = -1;
-  if (res == CURLE_OK && curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &response_code) == CURLE_OK) {
-    if (headers) {
-      for (auto& p : hoPair.header) {
-        (*headers)[p.first] = p.second;
-      }
-    }
-    if (200 <= response_code && response_code < 300) {
-      // good response and the content is directly provided and should have been dumped into "chunk"
-    } else if (response_code == 304) {
-      LOGP(debug, "Object exists but I am not serving it since it's already in your possession");
-    }
-    // this is a more general redirection
-    else if (300 <= response_code && response_code < 400) {
-      // we try content locations in order of appearance until one succeeds
-      // 1st: The "Location" field
-      // 2nd: Possible "Content-Location" fields - Location field
-      // some locations are relative to the main server so we need to fix/complement them
-      auto complement_Location = [this](std::string const& loc) {
-        if (loc[0] == '/') {
-          // if it's just a path (noticed by trailing '/' we prepend the server url
-          return getURL() + loc;
-        }
-        return loc;
-      };
-
-      std::vector<std::string> locs;
-      auto iter = hoPair.header.find("Location");
-      if (iter != hoPair.header.end()) {
-        locs.push_back(complement_Location(iter->second));
-      }
-      // add alternative locations (not yet included)
-      auto iter2 = hoPair.header.find("Content-Location");
-      if (iter2 != hoPair.header.end()) {
-        auto range = hoPair.header.equal_range("Content-Location");
-        for (auto it = range.first; it != range.second; ++it) {
-          if (std::find(locs.begin(), locs.end(), it->second) == locs.end()) {
-            locs.push_back(complement_Location(it->second));
-          }
-        }
-      }
-      for (auto& l : locs) {
-        if (l.size() > 0) {
-          LOG(debug) << "Trying content location " << l;
-          navigateURLsAndLoadFileToMemory(dest, curl_handle, l, headers);
-          if (dest.size()) { /* or other success marker in future */
-            break;
-          }
-        }
-      }
-    } else if (response_code == 404) {
-      LOG(error) << "Requested resource does not exist: " << url;
-      signalError();
-    } else {
-      LOG(error) << "Error in fetching object " << url << ", curl response code:" << response_code;
-      signalError();
-    }
-  } else {
-    LOGP(alarm, "Curl request to {} failed with result {}, response code: {}", url, int(res), response_code);
-    signalError();
-  }
-  // indicate that an error occurred ---> used by caching layers (such as CCDBManager)
-  if (errorflag && headers) {
-    (*headers)["Error"] = "An error occurred during retrieval";
-  }
-  return;
 }
 
 void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders) const

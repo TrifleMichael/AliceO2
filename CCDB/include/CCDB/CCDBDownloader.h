@@ -235,8 +235,7 @@ class CCDBDownloader
    */
   enum RequestType {
     BLOCKING,
-    ASYNCHRONOUS,
-    ASYNCHRONOUS_WITH_CALLBACK
+    ASYNCHRONOUS
   };
 
   /**

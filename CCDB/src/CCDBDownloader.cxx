@@ -462,10 +462,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         }
       }
       break;
-    case ASYNCHRONOUS_WITH_CALLBACK: // todo remove
-      // Temporary change before asynchronous calls will callbacks are reintroduced
-      LOG(error) << "CCDBDownloader: Illegal request type";
-      break;
   }
   if (!rescheduled) {
     if (performData->type == ASYNCHRONOUS) {
@@ -556,7 +552,6 @@ CURLcode CCDBDownloader::perform(CURL* handle)
 
 std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const
 {
-  // Todo check if locs are formed the same way as in api
   std::vector<std::string> locs;
   auto iter = headerMap->find("Location");
   if (iter != headerMap->end()) {
@@ -625,7 +620,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   data->codeDestination = codeVector;
   *codeVector = CURLE_FAILED_INIT;
 
-  data->type = ASYNCHRONOUS; // TODO change that to something that makes sense
+  data->type = ASYNCHRONOUS;
   data->requestsLeft = requestCounter;
   data->hostInd = 0;
   data->locInd = 0;

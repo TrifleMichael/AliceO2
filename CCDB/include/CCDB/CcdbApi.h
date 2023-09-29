@@ -378,7 +378,6 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string path) con
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
   void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
   void getFileToMemory(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
-  void navigateURLsAndLoadFileToMemory(o2::pmr::vector<char>& dest, CURL* curl_handle, std::string const& url, std::map<string, string>* headers) const;
   bool loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const; // todo comment
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity
