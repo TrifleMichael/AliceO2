@@ -362,7 +362,7 @@ class CcdbApi //: public DatabaseInterface
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
 
-void navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const; // todo check, move etc
+void scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const; // todo check, move etc
 void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
 void getFromSnapshot(bool createSnapshot, std::string const& path,
                               long timestamp, std::map<std::string, std::string> headers,
@@ -377,7 +377,7 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string path) con
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
   void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
-  void getFileToMemory(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
+  void navigateSourcesAndLoadFile(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
   bool loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const; // todo comment
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity

@@ -1475,7 +1475,7 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-void CcdbApi::navigateURLsWithDownloader(RequestContext& requestContext, size_t* requestCounter) const // todo rename to scheduleDownload
+void CcdbApi::scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const // todo rename to scheduleDownload
 {
   auto data = new DownloaderRequestData();  // Deleted in transferFinished of CCDBDownloader.cxx
   data->hoPair.object = &requestContext.dest;
@@ -1637,7 +1637,7 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
 }
 
 // todo change name
-void CcdbApi::getFileToMemory(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const
+void CcdbApi::navigateSourcesAndLoadFile(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const
 {
   LOGP(debug, "loadFileToMemory {} ETag=[{}]", requestContext.path, requestContext.etag);
   bool createSnapshot = requestContext.considerSnapshot && !mSnapshotCachePath.empty(); // create snaphot if absent
@@ -1653,7 +1653,7 @@ void CcdbApi::getFileToMemory(RequestContext& requestContext, int& fromSnapshot,
     getFromSnapshot(createSnapshot, requestContext.path, requestContext.timestamp, requestContext.headers, snapshotpath, requestContext.dest, fromSnapshot, requestContext.etag);
     releaseNamedSemaphore(sem, requestContext.path);
   } else { // look on the server
-    navigateURLsWithDownloader(requestContext, requestCounter);
+    scheduleDownload(requestContext, requestCounter);
   }
 }
 
@@ -1664,9 +1664,9 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
 
   // Get files from snapshots and schedule downloads
   for(int i = 0; i < requestContexts.size(); i++) {
-    // getFileToMemory either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
+    // navigateSourcesAndLoadFile either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
     auto& requestContext = requestContexts.at(i);
-    getFileToMemory(requestContext, fromSnapshots.at(i), &requestCounter);
+    navigateSourcesAndLoadFile(requestContext, fromSnapshots.at(i), &requestCounter);
     logReading(requestContext.path, requestContext.timestamp, &requestContext.headers,
                fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
