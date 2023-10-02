@@ -24,19 +24,19 @@
 #include <TObject.h>
 #include <TMessage.h>
 #include "CCDB/CcdbObjectInfo.h"
-#include "CCDB/CCDBDownloader.h"
 #include <CommonUtils/ConfigurableParam.h>
 #include <type_traits>
 #include <vector>
-#include <boost/interprocess/sync/named_semaphore.hpp>
-#include "MemoryResources/MemoryResources.h"
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
 #include "MemoryResources/MemoryResources.h"
+#include <boost/interprocess/sync/named_semaphore.hpp>
 #include <TJAlienCredentials.h>
 #else
 class TJAlienCredentials;
 #endif
+
+#include "CCDB/CCDBDownloader.h"
 
 class TFile;
 class TGrid;
@@ -339,6 +339,14 @@ class CcdbApi //: public DatabaseInterface
    */
   static void curlSetSSLOptions(CURL* curl);
 
+  TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
+
+  TObject* retrieveFromTFile(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp,
+                             std::map<std::string, std::string>* headers, std::string const& etag,
+                             const std::string& createdNotAfter, const std::string& createdNotBefore) const;
+
+void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
+#if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
   typedef struct RequestContext { // todo comment move
     o2::pmr::vector<char>& dest;
     std::string path;
@@ -355,29 +363,19 @@ class CcdbApi //: public DatabaseInterface
                    std::map<std::string, std::string>& h)
         : dest(d), metadata(m), headers(h) {}
   } RequestContext;
-
-  TObject* retrieve(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp) const;
-
-  TObject* retrieveFromTFile(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp,
-                             std::map<std::string, std::string>* headers, std::string const& etag,
-                             const std::string& createdNotAfter, const std::string& createdNotBefore) const;
-
-void scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const; // todo check, move etc
-void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
-void getFromSnapshot(bool createSnapshot, std::string const& path,
-                              long timestamp, std::map<std::string, std::string> headers,
-                              std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
 void saveSnapshot(RequestContext& requestContext) const; // TODO define here?
-void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const; // todo rename move
-boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const; // TODO create here?
-#if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
+void scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const; // todo check, move etc
+
+  void getFromSnapshot(bool createSnapshot, std::string const& path,
+                                long timestamp, std::map<std::string, std::string> headers,
+                                std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
+  void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const; // todo rename move
+  boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const; // TODO create here?
   void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders = nullptr) const;
   void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
                         std::map<std::string, std::string> const& metadata, long timestamp,
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
-  void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
-  void navigateSourcesAndLoadFile(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
   bool loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const; // todo comment
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity
@@ -393,6 +391,8 @@ boost::interprocess::named_semaphore* createNamedSempahore(std::string path) con
     }
     return obj;
   }
+  void navigateSourcesAndLoadFile(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
+  void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
 #endif
 
  private:

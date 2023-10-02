@@ -20,7 +20,6 @@
 #include "CommonUtils/StringUtils.h"
 #include "CommonUtils/FileSystemUtils.h"
 #include "CommonUtils/MemFileHelper.h"
-#include "MemoryResources/MemoryResources.h"
 #include "Framework/DefaultsHelpers.h"
 #include "Framework/DataTakingContext.h"
 #include <chrono>
