@@ -91,7 +91,7 @@ size_t header_map_callback(char* buffer, size_t size, size_t nitems, void* userd
 }
 } // namespace
 
-// struct HeaderObjectPair_t {
+// struct HeaderObjectPair_t { // todo remove
 //   std::multimap<std::string, std::string> header;
 //   o2::pmr::vector<char>* object = nullptr;
 //   int counter = 0;

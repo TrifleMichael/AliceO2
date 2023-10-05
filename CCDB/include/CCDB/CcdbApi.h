@@ -344,10 +344,8 @@ class CcdbApi //: public DatabaseInterface
   TObject* retrieveFromTFile(std::string const& path, std::map<std::string, std::string> const& metadata, long timestamp,
                              std::map<std::string, std::string>* headers, std::string const& etag,
                              const std::string& createdNotAfter, const std::string& createdNotBefore) const;
-
-void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment and or move
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
-  typedef struct RequestContext { // todo comment move
+  typedef struct RequestContext {
     o2::pmr::vector<char>& dest;
     std::string path;
     std::map<std::string, std::string> const& metadata;
@@ -363,20 +361,26 @@ void asynchPerform(CURL* handle, size_t* requestCounter) const; // todo comment 
                    std::map<std::string, std::string>& h)
         : dest(d), metadata(m), headers(h) {}
   } RequestContext;
-void saveSnapshot(RequestContext& requestContext) const; // TODO define here?
-void scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const; // todo check, move etc
+
+// Stores file associated with requestContext as a snapshot.
+void saveSnapshot(RequestContext& requestContext) const;
+
+// Schedules download via CCDBDownloader, but doesn't perform it until mUVLoop is ran.
+void scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const;
 
   void getFromSnapshot(bool createSnapshot, std::string const& path,
                                 long timestamp, std::map<std::string, std::string> headers,
-                                std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const; // TODO define here?
-  void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const; // todo rename move
-  boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const; // TODO create here?
+                                std::string& snapshotpath, o2::pmr::vector<char>& dest, int& fromSnapshot, std::string const& etag) const;
+  void releaseNamedSemaphore(boost::interprocess::named_semaphore* sem, std::string path) const;
+  boost::interprocess::named_semaphore* createNamedSempahore(std::string path) const;
   void loadFileToMemory(o2::pmr::vector<char>& dest, const std::string& path, std::map<std::string, std::string>* localHeaders = nullptr) const;
   void loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& path,
                         std::map<std::string, std::string> const& metadata, long timestamp,
                         std::map<std::string, std::string>* headers, std::string const& etag,
                         const std::string& createdNotAfter, const std::string& createdNotBefore, bool considerSnapshot = true) const;
-  bool loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const; // todo comment
+
+  // Loads files from alien and cvmfs into given destination.
+  bool loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const;
 
   // the failure to load the file to memory is signaled by 0 size and non-0 capacity
   static bool isMemoryFileInvalid(const o2::pmr::vector<char>& v) { return v.size() == 0 && v.capacity() > 0; }
@@ -391,13 +395,35 @@ void scheduleDownload(RequestContext& requestContext, size_t* requestCounter) co
     }
     return obj;
   }
-  void navigateSourcesAndLoadFile(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const; // todo comment
-  void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;  // todo comment
+
+  /**
+   * Retrieves files either as snapshot or schedules them to be downloaded via CCDBDownloader.
+   *
+   * @param requestContext Structure giving details about the transfer.
+   * @param fromSnapshot After navigateSourcesAndLoadFile returns signals whether file was retrieved from snapshot.
+   * @param requestCounter Pointer to the variable storing the number of requests to be done.
+   */
+  void navigateSourcesAndLoadFile(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const;
+
+  /**
+   * Retrieves files described via RequestContexts into memory. Downloads are performed in parallel via CCDBDownloader.
+   *
+   * @param requestContext Structure giving details about the transfer.
+   */
+  void vectoredLoadFileToMemory(std::vector<RequestContext>& requestContext) const;
 #endif
 
  private:
   // Sets the unique agent ID
   void setUniqueAgentID();
+
+  /**
+   * Schedules download of data associated with the curl_handle. Doing that increments the requestCounter by 1. Requests are performed by running the mUVLoop
+   *
+   * @param handle CURL handle associated with the request.
+   * @param requestCounter Pointer to the variable storing the number of requests to be done.
+   */
+  void asynchPerform(CURL* handle, size_t* requestCounter) const;
 
   // internal helper function to update a CCDB file with meta information
   static void updateMetaInformationInLocalFile(std::string const& filename, std::map<std::string, std::string> const* headers, CCDBQuery const* querysummary = nullptr);

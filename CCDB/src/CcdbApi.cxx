@@ -1474,7 +1474,7 @@ std::string CcdbApi::getHostUrl(int hostIndex) const
   return hostsPool.at(hostIndex);
 }
 
-void CcdbApi::scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const // todo rename to scheduleDownload
+void CcdbApi::scheduleDownload(RequestContext& requestContext, size_t* requestCounter) const
 {
   auto data = new DownloaderRequestData();  // Deleted in transferFinished of CCDBDownloader.cxx
   data->hoPair.object = &requestContext.dest;
@@ -1635,7 +1635,6 @@ void CcdbApi::loadFileToMemory(o2::pmr::vector<char>& dest, std::string const& p
   vectoredLoadFileToMemory(contexts);
 }
 
-// todo change name
 void CcdbApi::navigateSourcesAndLoadFile(RequestContext& requestContext, int& fromSnapshot, size_t* requestCounter) const
 {
   LOGP(debug, "loadFileToMemory {} ETag=[{}]", requestContext.path, requestContext.etag);
