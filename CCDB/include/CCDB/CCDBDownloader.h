@@ -55,7 +55,7 @@ typedef struct DownloaderRequestData { // TODO move
   std::map<std::string, std::string>* headers;
 
   std::function<bool(std::string)> localContentCallback;
-  bool errorflag = false; // todo test
+  bool errorflag = false;
 } DownloaderRequestData;
 #endif
 
@@ -160,7 +160,13 @@ class CCDBDownloader
    */
   std::vector<CURLcode> batchBlockingPerform(std::vector<CURL*> const& handleVector);
 
-  void asynchSchedule(CURL* handle, size_t* requestCounter); // todo comment
+  /**
+   * Schedules an asynchronous transfer but doesn't perform it.
+   * 
+   * @param handle Handle to be performed on.
+   * @param requestCounter Counter shared by a batch of CURL handles.
+   */
+  void asynchSchedule(CURL* handle, size_t* requestCounter);
 
   /**
    * Limits the number of parallel connections. Should be used only if no transfers are happening.
@@ -260,18 +266,15 @@ class CCDBDownloader
   DataForSocket mSocketData;
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
-  /** todo revise (now is specific info about navigating urls i guess)
+  /**
    * Structure which is stored in a easy_handle. It carries information about the request which the easy_handle is part of.
-   * All easy handles coming from one request have an identical PerformData structure.
    */
   typedef struct PerformData {
     CURLcode* codeDestination;
     size_t* requestsLeft;
     RequestType type;
-
     int hostInd;
     int locInd;
-
     DownloaderRequestData* requestData;
   } PerformData;
 #endif
@@ -285,10 +288,17 @@ class CCDBDownloader
   static void closesocketCallback(void* clientp, curl_socket_t item);
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
-  void tryNewHost(PerformData* performData, CURL* easy_handle); // todo comment
-  void getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations); // todo comment
-  void httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle); // todo
-  void followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved); // todo
+  // Reschedules the transfer to be performed with a different host.
+  void tryNewHost(PerformData* performData, CURL* easy_handle);
+
+  // Retrieves content from either alien, cvmfs or local storage using a callback to CCDBApi.
+  void getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations);
+
+  // Continues a transfer via a http redirect.
+  void httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle);
+
+  // Continues a transfer via a redirect. The redirect can point to a local file, alien file or a http address.
+  void followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved);
 #endif
 
   /**

@@ -349,7 +349,7 @@ void CCDBDownloader::tryNewHost(PerformData* performData, CURL* easy_handle)
   auto requestData = performData->requestData;
   std::string newUrl = requestData->hosts.at(performData->hostInd) + "/" + requestData->path + "/" + std::to_string(requestData->timestamp);
   LOG(debug) << "Connecting to another host " << newUrl;
-  requestData->hoPair.header.clear(); // TODO is this safe?
+  requestData->hoPair.header.clear();
   curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
   mHandlesToBeAdded.push_back(easy_handle);
 }
@@ -372,7 +372,7 @@ void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newUrl,
 {
   auto requestData = performData->requestData;
   newUrl = requestData->hosts.at(performData->hostInd) + newLocation;
-  LOG(debug) << "Trying content location " << newUrl; // todo clear map or not?
+  LOG(debug) << "Trying content location " << newUrl;
   curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
   mHandlesToBeAdded.push_back(easy_handle);
 }
@@ -421,15 +421,17 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
           (*requestData->headers)["Error"] = "An error occurred during retrieval";
         }
 
-        // todo comment
+        // Log that transfer finished
         long httpCode;
         curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &httpCode);
         char* url;
         curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
         LOG(debug) << "Transfer for " << url << " finished with code " << httpCode << "\n";
 
+        // Get alternative locations for the same host
         auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header));
 
+        // React to received http code
         if (404 == httpCode) {
           LOG(error) << "Requested resource does not exist: " << url;
         } else if (304 == httpCode) {
@@ -442,6 +444,8 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         } else {
           LOG(error) << "Error in fetching object " << url << ", curl response code:" << httpCode;
         }
+
+        // Check if content was retrieved, or scheduled to be retrieved
         if (!rescheduled && !contentRetrieved && performData->locInd == locations.size()) {
           // Ran out of locations to redirect, try new host
           if (++performData->hostInd < requestData->hosts.size()) {
@@ -453,9 +457,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         }
 
         if (!rescheduled) {
-          // No more transfers will be done for this request, start cleanup
+          // No more transfers will be done for this request, do cleanup specific for ASYNCHRONOUS calls
           --(*performData->requestsLeft);
           delete requestData;
+          delete performData->codeDestination;
           if (!contentRetrieved) {
             LOGP(alarm, "Curl request to {}, response code: {}", url, httpCode);
           }
@@ -464,9 +469,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       break;
   }
   if (!rescheduled) {
-    if (performData->type == ASYNCHRONOUS) {
-      delete performData->codeDestination; // Curl codes are not used in asynch calls
-    }
+    // No more transfers will be done for this request, do general cleanup
     delete performData;
   }
 
@@ -605,7 +608,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
 {
   (*requestCounter)++;
 
-  CURLcode* codeVector = new CURLcode(); // todo change
+  CURLcode* codeVector = new CURLcode();
 
   // Get data about request
   DownloaderRequestData* requestData;
@@ -616,7 +619,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   hostsPool = &(requestData->hosts);
 
   // Prepare temporary data about transfer
-  auto* data = new CCDBDownloader::PerformData(); // todo free somewhere
+  auto* data = new CCDBDownloader::PerformData(); // Freed in transferFinished
   data->codeDestination = codeVector;
   *codeVector = CURLE_FAILED_INIT;
 
