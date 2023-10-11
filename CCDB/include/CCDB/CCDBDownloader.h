@@ -41,13 +41,13 @@ namespace o2::ccdb
 {
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
-struct HeaderObjectPair_t { // TODO move
+struct HeaderObjectPair_t {
   std::multimap<std::string, std::string> header;
   o2::pmr::vector<char>* object = nullptr;
   int counter = 0;
 };
 
-typedef struct DownloaderRequestData { // TODO move
+typedef struct DownloaderRequestData {
   std::vector<std::string> hosts;
   std::string path;
   long timestamp;
@@ -211,7 +211,14 @@ class CCDBDownloader
   void runLoop(bool noWait);
 
  private:
-  std::vector<std::string> getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const; // Todo commment and stuff
+  /**
+   * Returns a vector of possible content locations based on the redirect headers.
+   * 
+   * @param baseUrl Content path.
+   * @param headerMap Map containing response headers.
+   */
+  std::vector<std::string> getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const;
+
   std::string mUserAgentId = "CCDBDownloader";
   /**
    * Sets up internal UV loop.
