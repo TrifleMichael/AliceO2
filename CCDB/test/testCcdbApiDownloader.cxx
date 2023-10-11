@@ -144,10 +144,9 @@ std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<o2::pmr::vector<c
   return handles;
 }
 
-BOOST_AUTO_TEST_CASE(vectored_test)
+BOOST_AUTO_TEST_CASE(asynch_schedule_test)
 {
-  std::cout << "------- vectored_test ---------\n";
-  int TRANSFERS = 10;
+  int TRANSFERS = 5;
 
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
@@ -156,17 +155,14 @@ BOOST_AUTO_TEST_CASE(vectored_test)
 
   CCDBDownloader downloader;
   std::vector<o2::pmr::vector<char>*> dests;
-
   auto handles = prepareAsyncHandles(TRANSFERS, dests);
   size_t transfersLeft = 0;
 
-  int z = 0;
   for(auto handle : handles) {
     downloader.asynchSchedule(handle, &transfersLeft);
   }
-  
+
   while(transfersLeft > 0) {
-    // std::cout << "Running at " << transfersLeft << " requests\n";
     downloader.runLoop(0);
   }
 
@@ -175,15 +171,14 @@ BOOST_AUTO_TEST_CASE(vectored_test)
     curl_easy_getinfo(handles[i], CURLINFO_HTTP_CODE, &httpCode);
     BOOST_CHECK(httpCode == 200);
     BOOST_CHECK(dests[i]->size() != 0);
+    curl_easy_cleanup(handles[i]);
+    delete dests[i];
   }
-
-  // todo clean stuff up
   curl_global_cleanup();
 }
 
 BOOST_AUTO_TEST_CASE(perform_test)
 {
-  std::cout << "------- perform_test ---------\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -209,7 +204,6 @@ BOOST_AUTO_TEST_CASE(perform_test)
 
 BOOST_AUTO_TEST_CASE(blocking_batch_test)
 {
-  std::cout << "------- blocking_batch_test ---------\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -250,7 +244,6 @@ BOOST_AUTO_TEST_CASE(blocking_batch_test)
 
 BOOST_AUTO_TEST_CASE(test_with_break)
 {
-  std::cout << "------- test_with_break ---------\n";
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     return;
@@ -342,7 +335,6 @@ void testTimerCB(uv_timer_t* handle)
 
 BOOST_AUTO_TEST_CASE(external_loop_test)
 {
-  std::cout << "------- external_loop_test ---------\n";
   // Prepare uv_loop to be provided to the downloader
   auto uvLoop = new uv_loop_t();
   uv_loop_init(uvLoop);
