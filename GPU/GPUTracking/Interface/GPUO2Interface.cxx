@@ -77,7 +77,12 @@ int GPUO2Interface::Initialize(const GPUO2InterfaceConfiguration& config)
       mCtx.reset(nullptr);
       return 1;
     }
+  }
+  for (unsigned int i = 0; i < mNContexts; i++) {
     mCtx[i].mChain = mCtx[i].mRec->AddChain<GPUChainTracking>(mConfig->configInterface.maxTPCHits, mConfig->configInterface.maxTRDTracklets);
+    if (i) {
+      mCtx[i].mChain->SetQAFromForeignChain(mCtx[0].mChain);
+    }
     mCtx[i].mChain->mConfigDisplay = &mConfig->configDisplay;
     mCtx[i].mChain->mConfigQA = &mConfig->configQA;
     mCtx[i].mRec->SetSettings(&mConfig->configGRP, &mConfig->configReconstruction, &mConfig->configProcessing, &mConfig->configWorkflow);
@@ -96,7 +101,8 @@ int GPUO2Interface::Initialize(const GPUO2InterfaceConfiguration& config)
       dummy.set([](size_t size) -> void* {throw std::runtime_error("invalid output memory request, no common output buffer set"); return nullptr; });
       mCtx[i].mRec->SetOutputControl(dummy);
     }
-
+  }
+  for (unsigned int i = 0; i < mNContexts; i++) {
     if (i == 0 && mCtx[i].mRec->Init()) {
       mNContexts = 0;
       mCtx.reset(nullptr);
@@ -132,9 +138,6 @@ void GPUO2Interface::Deinitialize()
 
 void GPUO2Interface::DumpEvent(int nEvent, GPUTrackingInOutPointers* data)
 {
-  if (mConfig->configProcessing.doublePipeline) {
-    throw std::runtime_error("Cannot dump events in double pipeline mode");
-  }
   mCtx[0].mChain->ClearIOPointers();
   mCtx[0].mChain->mIOPtrs = *data;
   char fname[1024];
@@ -145,6 +148,7 @@ void GPUO2Interface::DumpEvent(int nEvent, GPUTrackingInOutPointers* data)
     if (mConfig->configProcessing.runMC) {
       mCtx[0].mChain->ForceInitQA();
       snprintf(fname, 1024, "mc.%d.dump", nEvent);
+      mCtx[0].mChain->GetQA()->UpdateChain(mCtx[0].mChain);
       mCtx[0].mChain->GetQA()->DumpO2MCData(fname);
     }
 #endif
@@ -153,30 +157,54 @@ void GPUO2Interface::DumpEvent(int nEvent, GPUTrackingInOutPointers* data)
 
 void GPUO2Interface::DumpSettings()
 {
-  if (mConfig->configProcessing.doublePipeline) {
-    throw std::runtime_error("Cannot dump events in double pipeline mode");
-  }
-  mCtx[0].mChain->DoQueuedCalibUpdates(-1);
+  mCtx[0].mChain->DoQueuedUpdates(-1);
   mCtx[0].mRec->DumpSettings();
 }
 
-int GPUO2Interface::RunTracking(GPUTrackingInOutPointers* data, GPUInterfaceOutputs* outputs, unsigned int iThread)
+int GPUO2Interface::RunTracking(GPUTrackingInOutPointers* data, GPUInterfaceOutputs* outputs, unsigned int iThread, GPUInterfaceInputUpdate* inputUpdateCallback)
 {
   if (mNContexts <= iThread) {
     return (1);
   }
 
   mCtx[iThread].mChain->mIOPtrs = *data;
-  if (mConfig->configInterface.outputToExternalBuffers) {
-    for (unsigned int i = 0; i < mCtx[iThread].mOutputRegions->count(); i++) {
-      if (outputs->asArray()[i].allocator) {
-        mCtx[iThread].mOutputRegions->asArray()[i].set(outputs->asArray()[i].allocator);
-      } else if (outputs->asArray()[i].ptrBase) {
-        mCtx[iThread].mOutputRegions->asArray()[i].set(outputs->asArray()[i].ptrBase, outputs->asArray()[i].size);
-      } else {
-        mCtx[iThread].mOutputRegions->asArray()[i].reset();
+
+  auto setOutputs = [this, iThread](GPUInterfaceOutputs* outputs) {
+    if (mConfig->configInterface.outputToExternalBuffers) {
+      for (unsigned int i = 0; i < mCtx[iThread].mOutputRegions->count(); i++) {
+        if (outputs->asArray()[i].allocator) {
+          mCtx[iThread].mOutputRegions->asArray()[i].set(outputs->asArray()[i].allocator);
+        } else if (outputs->asArray()[i].ptrBase) {
+          mCtx[iThread].mOutputRegions->asArray()[i].set(outputs->asArray()[i].ptrBase, outputs->asArray()[i].size);
+        } else {
+          mCtx[iThread].mOutputRegions->asArray()[i].reset();
+        }
       }
     }
+  };
+
+  auto inputWaitCallback = [this, iThread, inputUpdateCallback, &data, &outputs, &setOutputs]() {
+    GPUTrackingInOutPointers* updatedData;
+    GPUInterfaceOutputs* updatedOutputs;
+    if (inputUpdateCallback->callback) {
+      inputUpdateCallback->callback(updatedData, updatedOutputs);
+      mCtx[iThread].mChain->mIOPtrs = *updatedData;
+      outputs = updatedOutputs;
+      data = updatedData;
+      setOutputs(outputs);
+    }
+    if (inputUpdateCallback->notifyCallback) {
+      inputUpdateCallback->notifyCallback();
+    }
+  };
+
+  if (inputUpdateCallback) {
+    mCtx[iThread].mChain->SetFinalInputCallback(inputWaitCallback);
+  } else {
+    mCtx[iThread].mChain->SetFinalInputCallback(nullptr);
+  }
+  if (!inputUpdateCallback || !inputUpdateCallback->callback) {
+    setOutputs(outputs);
   }
 
   int retVal = mCtx[iThread].mRec->RunChains();
