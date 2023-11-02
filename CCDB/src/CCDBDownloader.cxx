@@ -393,7 +393,7 @@ std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
   }
 }
 
-std::string CCDBDownloader::perapreRedirectedURL(std::string address, std::string potentialHost)
+std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::string potentialHost)
 {
   // If it is an alien or local address it does not need preparation
   if (address.find("alien:/") != std::string::npos || address.find("file:/") != std::string::npos) {

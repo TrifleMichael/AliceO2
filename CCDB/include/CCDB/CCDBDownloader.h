@@ -211,7 +211,7 @@ class CCDBDownloader
  private:
 
   std::string trimHostUrl(std::string host);
-  std::string perapreRedirectedURL(std::string address, std::string potentialHost);
+  std::string prepareRedirectedURL(std::string address, std::string potentialHost);
 
   /**
    * Returns a vector of possible content locations based on the redirect headers.
