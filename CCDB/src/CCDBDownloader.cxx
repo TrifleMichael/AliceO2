@@ -368,25 +368,28 @@ void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newU
   }
 }
 
-std::string CCDBDownloader::trimHostUrl(std::string host)
+std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
 {
   CURLU *host_url = curl_url();
-  curl_url_set(host_url, CURLUPART_URL, host.c_str(), 0);
+  curl_url_set(host_url, CURLUPART_URL, full_host_url.c_str(), 0);
   char *scheme;
   CURLUcode host_result = curl_url_get(host_url, CURLUPART_SCHEME, &scheme, 0);
   char *host;
   CURLUcode scheme_result = curl_url_get(host_url, CURLUPART_HOST, &host, 0);
   curl_url_cleanup(host_url);
+  std::string host_name;
   if (host_result == CURLUE_OK) {
+    host_name = host;
     curl_free(host);
   } else {
     LOG(error) << "CCDBDownloader: Malformed url detected when processing redirect, could not identify the host part: " << host;
+    return "";
   }
   if (scheme_result == CURLUE_OK) {
     curl_free(scheme);
-    return scheme + std::string("://") + host;
+    return scheme + std::string("://") + host_name;
   } else {
-    return host;
+    return host_name;
   }
 }
 
