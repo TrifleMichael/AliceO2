@@ -372,20 +372,25 @@ std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
 {
   CURLU *host_url = curl_url();
   curl_url_set(host_url, CURLUPART_URL, full_host_url.c_str(), 0);
+  // Get host part
   char *host;
-  CURLUcode scheme_result = curl_url_get(host_url, CURLUPART_HOST, &host, 0);
-  curl_url_cleanup(host_url);
+  CURLUcode host_result = curl_url_get(host_url, CURLUPART_HOST, &host, 0);
   std::string host_name;
   if (host_result == CURLUE_OK) {
+    // Host part present
     host_name = host;
     curl_free(host);
   } else {
     LOG(error) << "CCDBDownloader: Malformed url detected when processing redirect, could not identify the host part: " << host;
+    curl_url_cleanup(host_url);
     return "";
   }
+  // Get scheme (protocol) part
   char *scheme;
-  CURLUcode host_result = curl_url_get(host_url, CURLUPART_SCHEME, &scheme, 0);
+  CURLUcode scheme_result = curl_url_get(host_url, CURLUPART_SCHEME, &scheme, 0);
+  curl_url_cleanup(host_url);
   if (scheme_result == CURLUE_OK) {
+    // If protocol present combine with host
     curl_free(scheme);
     return scheme + std::string("://") + host_name;
   } else {
