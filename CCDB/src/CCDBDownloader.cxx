@@ -372,8 +372,6 @@ std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
 {
   CURLU *host_url = curl_url();
   curl_url_set(host_url, CURLUPART_URL, full_host_url.c_str(), 0);
-  char *scheme;
-  CURLUcode host_result = curl_url_get(host_url, CURLUPART_SCHEME, &scheme, 0);
   char *host;
   CURLUcode scheme_result = curl_url_get(host_url, CURLUPART_HOST, &host, 0);
   curl_url_cleanup(host_url);
@@ -385,6 +383,8 @@ std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
     LOG(error) << "CCDBDownloader: Malformed url detected when processing redirect, could not identify the host part: " << host;
     return "";
   }
+  char *scheme;
+  CURLUcode host_result = curl_url_get(host_url, CURLUPART_SCHEME, &scheme, 0);
   if (scheme_result == CURLUE_OK) {
     curl_free(scheme);
     return scheme + std::string("://") + host_name;
@@ -395,8 +395,10 @@ std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
 
 std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::string potentialHost)
 {
+  std::cout << "Input: " << address << ", " << potentialHost << "\n";
   // If it is an alien or local address it does not need preparation
   if (address.find("alien:/") != std::string::npos || address.find("file:/") != std::string::npos) {
+    std::cout << "Output: " << address << "\n";
     return address;
   }
   // Check if URL contains a scheme (protocol)
@@ -408,10 +410,12 @@ std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::strin
   curl_url_cleanup(redirected_url);
   if (scheme_result == CURLUE_OK) {
     // The redirected_url contains a scheme (protocol) so there is no need for preparation
+    std::cout << "Output: " << address << "\n";
     return address;
   }
   // If the address doesn't contain a scheme it means it is a relative url. We need to append it to the trimmed host url
   // The host url must be trimmed from it's path (if it ends in one) as otherwise the redirection url would be appended after said path
+  std::cout << "Output: " << trimHostUrl(potentialHost) + address << "\n";
   return trimHostUrl(potentialHost) + address;
 }
 
