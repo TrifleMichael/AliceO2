@@ -368,10 +368,55 @@ void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newU
   }
 }
 
+std::string CCDBDownloader::trimHostUrl(std::string host)
+{
+  CURLU *host_url = curl_url();
+  curl_url_set(host_url, CURLUPART_URL, host.c_str(), 0);
+  char *scheme;
+  CURLUcode host_result = curl_url_get(host_url, CURLUPART_SCHEME, &scheme, 0);
+  char *host;
+  CURLUcode scheme_result = curl_url_get(host_url, CURLUPART_HOST, &host, 0);
+  curl_url_cleanup(host_url);
+  if (host_result == CURLUE_OK) {
+    curl_free(host);
+  } else {
+    LOG(error) << "CCDBDownloader: Malformed url detected when processing redirect, could not identify the host part: " << host;
+  }
+  if (scheme_result == CURLUE_OK) {
+    curl_free(scheme);
+    return scheme + std::string("://") + host;
+  } else {
+    return host;
+  }
+}
+
+std::string CCDBDownloader::perapreRedirectedURL(std::string address, std::string potentialHost)
+{
+  // If it is an alien or local address it does not need preparation
+  if (address.find("alien:/") != std::string::npos || address.find("file:/") != std::string::npos) {
+    return address;
+  }
+  // Check if URL contains a scheme (protocol)
+  CURLU *redirected_url = curl_url();
+  curl_url_set(redirected_url, CURLUPART_URL, address.c_str(), 0);
+  char *scheme;
+  CURLUcode scheme_result = curl_url_get(redirected_url, CURLUPART_SCHEME, &scheme, 0);
+  curl_free(scheme);
+  curl_url_cleanup(redirected_url);
+  if (scheme_result == CURLUE_OK) {
+    // The redirected_url contains a scheme (protocol) so there is no need for preparation
+    return address;
+  }
+  // If the address doesn't contain a scheme it means it is a relative url. We need to append it to the trimmed host url
+  // The host url must be trimmed from it's path (if it ends in one) as otherwise the redirection url would be appended after said path
+  return trimHostUrl(potentialHost) + address;
+}
+
 void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle)
 {
   auto requestData = performData->requestData;
-  newUrl = requestData->hosts.at(performData->hostInd) + newLocation;
+  std::string currentlyUsedHost = requestData->hosts.at(performData->hostInd);
+  newUrl = prepareRedirectedURL(newLocation, currentlyUsedHost);
   LOG(debug) << "Trying content location " << newUrl;
   curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
   mHandlesToBeAdded.push_back(easy_handle);
