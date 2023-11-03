@@ -217,7 +217,14 @@ class CCDBDownloader
    */
   std::vector<std::string> getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const;
 
+  /**
+   * Recognizes whether the address is a full url, or a partial one (like for example "/Task/Detector/1") and combines it with potentialHost if needed.
+   */
   std::string prepareRedirectedURL(std::string address, std::string potentialHost) const;
+
+  /**
+   * Leaves only the protocol and host part of the url, discrading path and metadata.
+   */
   std::string trimHostUrl(std::string full_host_url) const;
 
   std::string mUserAgentId = "CCDBDownloader";
