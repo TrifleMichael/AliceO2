@@ -217,6 +217,9 @@ class CCDBDownloader
    */
   std::vector<std::string> getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const;
 
+  std::string prepareRedirectedURL(std::string address, std::string potentialHost) const;
+  std::string trimHostUrl(std::string full_host_url) const;
+
   std::string mUserAgentId = "CCDBDownloader";
   /**
    * Sets up internal UV loop.
@@ -297,10 +300,10 @@ class CCDBDownloader
   void tryNewHost(PerformData* performData, CURL* easy_handle);
 
   // Retrieves content from either alien, cvmfs or local storage using a callback to CCDBApi.
-  void getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations);
+  void getLocalContent(PerformData* performData, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations);
 
   // Continues a transfer via a http redirect.
-  void httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle);
+  void httpRedirect(PerformData* performData, std::string& newLocation, CURL* easy_handle);
 
   // Continues a transfer via a redirect. The redirect can point to a local file, alien file or a http address.
   void followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved);
