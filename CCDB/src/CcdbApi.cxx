@@ -1666,6 +1666,8 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
   std::vector<int> fromSnapshots(requestContexts.size());
   size_t requestCounter = 0;
 
+  std::cout << "A\n";
+
   // Get files from snapshots and schedule downloads
   for (int i = 0; i < requestContexts.size(); i++) {
     // navigateSourcesAndLoadFile either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
@@ -1675,22 +1677,25 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
                fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
 
+  std::cout << "B\n";
   // Download the rest
   while (requestCounter > 0) {
     mDownloader->runLoop(0);
   }
 
+  std::cout << "C\n";
   // Save snapshots
   for (int i = 0; i < requestContexts.size(); i++) {
     auto& requestContext = requestContexts.at(i);
     if (!requestContext.dest.empty()) {
       if (requestContext.considerSnapshot && fromSnapshots.at(i) != 2) {
         saveSnapshot(requestContext);
-      }
+    }
     } else {
       LOG(error) << "Did not receive content for " << requestContext.path << "\n";
     }
   }
+  std::cout << "D\n";
 }
 
 bool CcdbApi::loadLocalContentToMemory(o2::pmr::vector<char>& dest, std::string& url) const

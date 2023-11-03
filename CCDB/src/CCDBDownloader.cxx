@@ -354,10 +354,10 @@ void CCDBDownloader::tryNewHost(PerformData* performData, CURL* easy_handle)
   mHandlesToBeAdded.push_back(easy_handle);
 }
 
-void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations)
+void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations)
 {
   auto requestData = performData->requestData;
-  newUrl = newLocation;
+  std::string newUrl = newLocation;
   LOG(debug) << "Redirecting to local content " << newUrl << "\n";
   if (requestData->localContentCallback(newUrl)) {
     contentRetrieved = true;
@@ -368,7 +368,7 @@ void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newU
   }
 }
 
-std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
+std::string CCDBDownloader::trimHostUrl(std::string full_host_url) const
 {
   CURLU *host_url = curl_url();
   curl_url_set(host_url, CURLUPART_URL, full_host_url.c_str(), 0);
@@ -398,12 +398,10 @@ std::string CCDBDownloader::trimHostUrl(std::string full_host_url)
   }
 }
 
-std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::string potentialHost)
+std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::string potentialHost) const
 {
-  std::cout << "Input: " << address << ", " << potentialHost << "\n";
   // If it is an alien or local address it does not need preparation
   if (address.find("alien:/") != std::string::npos || address.find("file:/") != std::string::npos) {
-    std::cout << "Output: " << address << "\n";
     return address;
   }
   // Check if URL contains a scheme (protocol)
@@ -415,34 +413,32 @@ std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::strin
   curl_url_cleanup(redirected_url);
   if (scheme_result == CURLUE_OK) {
     // The redirected_url contains a scheme (protocol) so there is no need for preparation
-    std::cout << "Output: " << address << "\n";
     return address;
   }
   // If the address doesn't contain a scheme it means it is a relative url. We need to append it to the trimmed host url
   // The host url must be trimmed from it's path (if it ends in one) as otherwise the redirection url would be appended after said path
-  std::cout << "Output: " << trimHostUrl(potentialHost) + address << "\n";
   return trimHostUrl(potentialHost) + address;
 }
 
-void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle)
+void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newLocation, CURL* easy_handle)
 {
   auto requestData = performData->requestData;
-  std::string currentlyUsedHost = requestData->hosts.at(performData->hostInd);
-  newUrl = prepareRedirectedURL(newLocation, currentlyUsedHost);
-  LOG(debug) << "Trying content location " << newUrl;
-  curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+  LOG(debug) << "Trying content location " << newLocation;
+  curl_easy_setopt(easy_handle, CURLOPT_URL, newLocation.c_str());
+  std::cout << "SCHEDULING TRANSFER: " << newLocation << "\n";
   mHandlesToBeAdded.push_back(easy_handle);
 }
 
 void CCDBDownloader::followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved)
 {
+  std::cout << "performData->locInd " << performData->locInd << "\n";
   std::string newLocation = locations.at(performData->locInd++);
-  std::string newUrl;
+  std::cout << "New location for redirect: " << newLocation << "\n";
   if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
-    getLocalContent(performData, newUrl, newLocation, contentRetrieved, locations);
+    getLocalContent(performData, newLocation, contentRetrieved, locations);
   }
   if (!contentRetrieved && newLocation != "") {
-    httpRedirect(performData, newUrl, newLocation, easy_handle);
+    httpRedirect(performData, newLocation, easy_handle);
     rescheduled = true;
   }
 }
@@ -454,6 +450,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
   curlEasyErrorCheck(curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &performData));
 
   curlMultiErrorCheck(curl_multi_remove_handle(mCurlMultiHandle, easy_handle));
+  std::cout << "HANDLE REMOVED\n";
   *performData->codeDestination = curlCode;
 
   bool rescheduled = false;
@@ -481,6 +478,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       char* url;
       curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
       LOG(debug) << "Transfer for " << url << " finished with code " << httpCode << "\n";
+      std::cout << "Transfer for " << url << " finished with code " << httpCode << "\n";
 
       // Get alternative locations for the same host
       auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header));
@@ -492,6 +490,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
         LOGP(debug, "Object exists but I am not serving it since it's already in your possession");
         contentRetrieved = true;
       } else if (300 <= httpCode && httpCode < 400 && performData->locInd < locations.size()) {
+        std::cout << "Following redirect\n";
         followRedirect(performData, easy_handle, locations, rescheduled, contentRetrieved);
       } else if (200 <= httpCode && httpCode < 300) {
         contentRetrieved = true;
@@ -606,15 +605,15 @@ CURLcode CCDBDownloader::perform(CURL* handle)
   return batchBlockingPerform(handleVector).back();
 }
 
+// TODO some error is made here
 std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const
 {
   std::vector<std::string> locs;
   auto iter = headerMap->find("Location");
   if (iter != headerMap->end()) {
     if (iter->second.find("/", 0) != std::string::npos) {
-      locs.push_back(iter->second);
-    } else {
-      locs.push_back(baseUrl + iter->second);
+      locs.push_back(prepareRedirectedURL(iter->second, baseUrl));
+      std::cout << "Got location: " << prepareRedirectedURL(iter->second, baseUrl) << "\n";
     }
   }
   // add alternative locations (not yet included)
@@ -623,11 +622,8 @@ std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::
     auto range = headerMap->equal_range("Content-Location");
     for (auto it = range.first; it != range.second; ++it) {
       if (std::find(locs.begin(), locs.end(), it->second) == locs.end()) {
-        if (it->second.find("alien", 0) != std::string::npos) {
-          locs.push_back(it->second);
-        } else {
-          locs.push_back(baseUrl + it->second);
-        }
+        locs.push_back(prepareRedirectedURL(iter->second, baseUrl));
+        std::cout << "Got location: " << prepareRedirectedURL(iter->second, baseUrl) << "\n";
       }
     }
   }
@@ -685,6 +681,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   // Prepare handle and schedule download
   setHandleOptions(handle, data);
   mHandlesToBeAdded.push_back(handle);
+  std::cout << "HANDLE ADDED\n";
 
   checkHandleQueue();
 
