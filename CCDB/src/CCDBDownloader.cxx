@@ -435,6 +435,7 @@ void CCDBDownloader::followRedirect(PerformData* performData, CURL* easy_handle,
   std::string newUrl = prepareRedirectedURL(newLocation, currentHost);
   std::cout << "Following redirect to " << newUrl << "\n";
   if (newUrl.find("alien:/", 0) != std::string::npos || newUrl.find("file:/", 0) != std::string::npos) {
+    std::cout << "Getting local content at " << newUrl << "\n";
     getLocalContent(performData, newUrl, contentRetrieved, locations);
   }
   if (!contentRetrieved && newUrl != "") {
