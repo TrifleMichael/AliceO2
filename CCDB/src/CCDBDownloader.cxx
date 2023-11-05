@@ -419,8 +419,7 @@ std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::strin
   return trimHostUrl(potentialHost) + address;
 }
 
-// TODO remove perform data
-void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newLocation, CURL* easy_handle)
+void CCDBDownloader::httpRedirect(std::string& newLocation, CURL* easy_handle)
 {
   LOG(debug) << "Trying content location " << newLocation;
   curl_easy_setopt(easy_handle, CURLOPT_URL, newLocation.c_str());
@@ -439,7 +438,7 @@ void CCDBDownloader::followRedirect(PerformData* performData, CURL* easy_handle,
     getLocalContent(performData, newUrl, contentRetrieved, locations);
   }
   if (!contentRetrieved && newUrl != "") {
-    httpRedirect(performData, newUrl, easy_handle);
+    httpRedirect(newUrl, easy_handle);
     rescheduled = true;
   }
 }

@@ -310,7 +310,7 @@ class CCDBDownloader
   void getLocalContent(PerformData* performData, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations);
 
   // Continues a transfer via a http redirect.
-  void httpRedirect(PerformData* performData, std::string& newLocation, CURL* easy_handle);
+  void httpRedirect(std::string& newLocation, CURL* easy_handle);
 
   // Continues a transfer via a redirect. The redirect can point to a local file, alien file or a http address.
   void followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved);
