@@ -212,7 +212,6 @@ class CCDBDownloader
 
   std::string trimHostUrl(std::string full_host_url) const;
   std::string prepareRedirectedURL(std::string address, std::string potentialHost) const;
-  std::string getNewLocation(PerformData* performData, std::vector<std::string>& locations) const;
 
   /**
    * Returns a vector of possible content locations based on the redirect headers.
@@ -289,6 +288,7 @@ class CCDBDownloader
   } PerformData;
 #endif
 
+
   /**
    * Called by CURL in order to close a socket. It will be called by CURL even if a timeout timer closed the socket beforehand.
    *
@@ -298,6 +298,9 @@ class CCDBDownloader
   static void closesocketCallback(void* clientp, curl_socket_t item);
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
+  // TODO comment
+  std::string getNewLocation(PerformData* performData, std::vector<std::string>& locations) const;
+
   // Reschedules the transfer to be performed with a different host.
   void tryNewHost(PerformData* performData, CURL* easy_handle);
 
