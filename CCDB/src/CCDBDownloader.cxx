@@ -363,8 +363,20 @@ void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newU
     contentRetrieved = true;
   } else {
     // Prepare next redirect url
-    newLocation = (performData->locInd < locations.size()) ? locations.at(performData->locInd) : "";
-    performData->locInd++;
+    newLocation = getNewLocation(performData, locations);
+  }
+}
+
+std::string CCDBDownloader::getNewLocation(PerformData* performData, std::vector<std::string>& locations) const;
+{
+  auto requestData = performData->requestData;
+  if (performData->locInd < locations.size()) {
+    std::string newLocation = locations.at(performData->locInd++);
+    std::string hostUrl = requestData->hosts.at(performData->hostInd);
+    std::string newUrl = prepareRedirectedURL(newLocation, hostUrl);
+    return newUrl;
+  } else {
+    return "";
   }
 }
 
@@ -379,8 +391,7 @@ void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newUrl,
 
 void CCDBDownloader::followRedirect(PerformData* performData, CURL* easy_handle, std::vector<std::string>& locations, bool& rescheduled, bool& contentRetrieved)
 {
-  std::string newLocation = locations.at(performData->locInd++);
-  std::string newUrl;
+  std::string newLocation = getNewLocation(performData, locations);
   if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
     getLocalContent(performData, newUrl, newLocation, contentRetrieved, locations);
   }
@@ -388,6 +399,58 @@ void CCDBDownloader::followRedirect(PerformData* performData, CURL* easy_handle,
     httpRedirect(performData, newUrl, newLocation, easy_handle);
     rescheduled = true;
   }
+}
+
+std::string CCDBDownloader::trimHostUrl(std::string full_host_url) const
+{
+  CURLU *host_url = curl_url();
+  curl_url_set(host_url, CURLUPART_URL, full_host_url.c_str(), 0);
+  // Get host part
+  char *host;
+  CURLUcode host_result = curl_url_get(host_url, CURLUPART_HOST, &host, 0);
+  std::string host_name;
+  if (host_result == CURLUE_OK) {
+    // Host part present
+    host_name = host;
+    curl_free(host);
+  } else {
+    LOG(error) << "CCDBDownloader: Malformed url detected when processing redirect, could not identify the host part: " << host;
+    curl_url_cleanup(host_url);
+    return "";
+  }
+  // Get scheme (protocol) part
+  char *scheme;
+  CURLUcode scheme_result = curl_url_get(host_url, CURLUPART_SCHEME, &scheme, 0);
+  curl_url_cleanup(host_url);
+  if (scheme_result == CURLUE_OK) {
+    // If protocol present combine with host
+    curl_free(scheme);
+    return scheme + std::string("://") + host_name;
+  } else {
+    return host_name;
+  }
+}
+
+std::string CCDBDownloader::prepareRedirectedURL(std::string address, std::string potentialHost) const
+{
+  // If it is an alien or local address it does not need preparation
+  if (address.find("alien:/") != std::string::npos || address.find("file:/") != std::string::npos) {
+    return address;
+  }
+  // Check if URL contains a scheme (protocol)
+  CURLU *redirected_url = curl_url();
+  curl_url_set(redirected_url, CURLUPART_URL, address.c_str(), 0);
+  char *scheme;
+  CURLUcode scheme_result = curl_url_get(redirected_url, CURLUPART_SCHEME, &scheme, 0);
+  curl_free(scheme);
+  curl_url_cleanup(redirected_url);
+  if (scheme_result == CURLUE_OK) {
+    // The redirected_url contains a scheme (protocol) so there is no need for preparation
+    return address;
+  }
+  // If the address doesn't contain a scheme it means it is a relative url. We need to append it to the trimmed host url
+  // The host url must be trimmed from it's path (if it ends in one) as otherwise the redirection url would be appended after said path
+  return trimHostUrl(potentialHost) + address;
 }
 
 void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
@@ -426,7 +489,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       LOG(debug) << "Transfer for " << url << " finished with code " << httpCode << "\n";
 
       // Get alternative locations for the same host
-      auto locations = getLocations(requestData->hosts.at(performData->hostInd), &(requestData->hoPair.header));
+      auto locations = getLocations(, &(requestData->hoPair.header)); // TODO remove host name
 
       // React to received http code
       if (404 == httpCode) {
@@ -554,11 +617,7 @@ std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::
   std::vector<std::string> locs;
   auto iter = headerMap->find("Location");
   if (iter != headerMap->end()) {
-    if (iter->second.find("/", 0) != std::string::npos) {
-      locs.push_back(iter->second);
-    } else {
-      locs.push_back(baseUrl + iter->second);
-    }
+    locs.push_back(iter->second);
   }
   // add alternative locations (not yet included)
   auto iter2 = headerMap->find("Content-Location");
@@ -566,11 +625,7 @@ std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::
     auto range = headerMap->equal_range("Content-Location");
     for (auto it = range.first; it != range.second; ++it) {
       if (std::find(locs.begin(), locs.end(), it->second) == locs.end()) {
-        if (it->second.find("alien", 0) != std::string::npos) {
-          locs.push_back(it->second);
-        } else {
-          locs.push_back(baseUrl + it->second);
-        }
+        locs.push_back(it->second);
       }
     }
   }

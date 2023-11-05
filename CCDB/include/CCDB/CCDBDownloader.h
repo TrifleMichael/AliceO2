@@ -209,6 +209,11 @@ class CCDBDownloader
   void runLoop(bool noWait);
 
  private:
+
+  std::string trimHostUrl(std::string full_host_url) const;
+  std::string prepareRedirectedURL(std::string address, std::string potentialHost) const;
+  std::string getNewLocation(PerformData* performData, std::vector<std::string>& locations) const;
+
   /**
    * Returns a vector of possible content locations based on the redirect headers.
    *
