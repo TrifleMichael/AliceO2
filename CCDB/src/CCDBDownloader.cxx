@@ -487,7 +487,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       LOG(debug) << "Transfer for " << url << " finished with code " << httpCode << "\n";
 
       // Get alternative locations for the same host
-      auto locations = getLocations(, &(requestData->hoPair.header)); // TODO remove host name
+      auto locations = getLocations(&(requestData->hoPair.header));
 
       // React to received http code
       if (404 == httpCode) {
@@ -610,7 +610,7 @@ CURLcode CCDBDownloader::perform(CURL* handle)
   return batchBlockingPerform(handleVector).back();
 }
 
-std::vector<std::string> CCDBDownloader::getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const
+std::vector<std::string> CCDBDownloader::getLocations(std::multimap<std::string, std::string>* headerMap) const
 {
   std::vector<std::string> locs;
   auto iter = headerMap->find("Location");

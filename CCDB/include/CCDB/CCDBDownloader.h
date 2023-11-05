@@ -219,7 +219,7 @@ class CCDBDownloader
    * @param baseUrl Content path.
    * @param headerMap Map containing response headers.
    */
-  std::vector<std::string> getLocations(std::string baseUrl, std::multimap<std::string, std::string>* headerMap) const;
+  std::vector<std::string> getLocations(std::multimap<std::string, std::string>* headerMap) const;
 
   std::string mUserAgentId = "CCDBDownloader";
   /**
