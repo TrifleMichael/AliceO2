@@ -209,8 +209,14 @@ class CCDBDownloader
   void runLoop(bool noWait);
 
  private:
-
+  /**
+   * Leaves only the protocol and host part of the url, discrading path and metadata.
+   */
   std::string trimHostUrl(std::string full_host_url) const;
+
+  /**
+   * Recognizes whether the address is a full url, or a partial one (like for example "/Task/Detector/1") and combines it with potentialHost if needed.
+   */
   std::string prepareRedirectedURL(std::string address, std::string potentialHost) const;
 
   /**
@@ -298,7 +304,7 @@ class CCDBDownloader
   static void closesocketCallback(void* clientp, curl_socket_t item);
 
 #if !defined(__CINT__) && !defined(__MAKECINT__) && !defined(__ROOTCLING__) && !defined(__CLING__)
-  // TODO comment
+  // Returns a new location string or an empty string if all locations under current host have been accessedd
   std::string getNewLocation(PerformData* performData, std::vector<std::string>& locations) const;
 
   // Reschedules the transfer to be performed with a different host.
