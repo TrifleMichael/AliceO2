@@ -354,12 +354,11 @@ void CCDBDownloader::tryNewHost(PerformData* performData, CURL* easy_handle)
   mHandlesToBeAdded.push_back(easy_handle);
 }
 
-void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newUrl, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations)
+void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newLocation, bool& contentRetrieved, std::vector<std::string>& locations)
 {
   auto requestData = performData->requestData;
-  newUrl = newLocation;
-  LOG(debug) << "Redirecting to local content " << newUrl << "\n";
-  if (requestData->localContentCallback(newUrl)) {
+  LOG(debug) << "Redirecting to local content " << newLocation << "\n";
+  if (requestData->localContentCallback(newLocation)) {
     contentRetrieved = true;
   } else {
     // Prepare next redirect url
@@ -367,7 +366,7 @@ void CCDBDownloader::getLocalContent(PerformData* performData, std::string& newU
   }
 }
 
-std::string CCDBDownloader::getNewLocation(PerformData* performData, std::vector<std::string>& locations) const;
+std::string CCDBDownloader::getNewLocation(PerformData* performData, std::vector<std::string>& locations) const
 {
   auto requestData = performData->requestData;
   if (performData->locInd < locations.size()) {
@@ -380,12 +379,11 @@ std::string CCDBDownloader::getNewLocation(PerformData* performData, std::vector
   }
 }
 
-void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newUrl, std::string& newLocation, CURL* easy_handle)
+void CCDBDownloader::httpRedirect(PerformData* performData, std::string& newLocation, CURL* easy_handle)
 {
   auto requestData = performData->requestData;
-  newUrl = requestData->hosts.at(performData->hostInd) + newLocation;
-  LOG(debug) << "Trying content location " << newUrl;
-  curl_easy_setopt(easy_handle, CURLOPT_URL, newUrl.c_str());
+  LOG(debug) << "Trying content location " << newLocation;
+  curl_easy_setopt(easy_handle, CURLOPT_URL, newLocation.c_str());
   mHandlesToBeAdded.push_back(easy_handle);
 }
 
@@ -393,10 +391,10 @@ void CCDBDownloader::followRedirect(PerformData* performData, CURL* easy_handle,
 {
   std::string newLocation = getNewLocation(performData, locations);
   if (newLocation.find("alien:/", 0) != std::string::npos || newLocation.find("file:/", 0) != std::string::npos) {
-    getLocalContent(performData, newUrl, newLocation, contentRetrieved, locations);
+    getLocalContent(performData, newLocation, contentRetrieved, locations);
   }
   if (!contentRetrieved && newLocation != "") {
-    httpRedirect(performData, newUrl, newLocation, easy_handle);
+    httpRedirect(performData, newLocation, easy_handle);
     rescheduled = true;
   }
 }
