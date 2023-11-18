@@ -477,11 +477,22 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
     case ASYNCHRONOUS: {
       DownloaderRequestData* requestData = performData->requestData;
 
+      std::cout << "SHOWING HEADERS\n";
+      std::cout << "requestData->headers\n";
+      for (auto& el : requestData->headers) {
+        std::cout << el.first << ":. " << el.second << "\n";
+      }
+      std::cout << "requestData->hoPair.header\n";
+      for (auto& el : requestData->hoPair.header) {
+        std::cout << el.first << ":. " << el.second << "\n";
+      }
+
       if (requestData->headers) {
         for (auto& p : requestData->hoPair.header) {
           (*requestData->headers)[p.first] = p.second;
         }
       }
+
       if (requestData->errorflag && requestData->headers) {
         (*requestData->headers)["Error"] = "An error occurred during retrieval";
       }
