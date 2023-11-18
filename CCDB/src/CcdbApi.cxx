@@ -1676,8 +1676,7 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
   }
 
 
-  auto& requestContext = requestContexts.at(i);
-  std::cout << "HEADER POINTER VAL 3: " << &(requestData->hoPair.header) << "\n";
+  std::cout << "HEADER POINTER VAL 3: " << &(requestContexts.at(0).headers) << "\n";
   // Download the rest
   while (requestCounter > 0) {
     mDownloader->runLoop(0);
