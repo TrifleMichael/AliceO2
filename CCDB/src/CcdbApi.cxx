@@ -1798,6 +1798,7 @@ void CcdbApi::checkMetadataKeys(std::map<std::string, std::string> const& metada
 
 void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::string, std::string>* headers, const std::string& comment) const
 {
+  std::cout << "Coming in: " << path << " aaa " << ts << " aaa " << comment << "\n";
   std::string upath{path};
   if (headers) {
     auto ent = headers->find("Valid-From");
@@ -1810,6 +1811,8 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
     }
   }
   upath.erase(remove(upath.begin(), upath.end(), '\"'), upath.end());
+  std::cout << "Upath: " << upath << "\n";
+  std::cout << "mUrl: " << upath << "\n";
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
