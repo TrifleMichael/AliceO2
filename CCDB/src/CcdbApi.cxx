@@ -1671,12 +1671,10 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
     // navigateSourcesAndLoadFile either retrieves file from snapshot immediately, or schedules it to be downloaded when mDownloader->runLoop is ran at a later time
     auto& requestContext = requestContexts.at(i);
     navigateSourcesAndLoadFile(requestContext, fromSnapshots.at(i), &requestCounter);
-    logReading(requestContext.path, requestContext.timestamp, &requestContext.headers,
-               fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
 
 
-  std::cout << "HEADER POINTER VAL 3: " << &(requestContexts.at(0).headers) << "\n";
+  // std::cout << "HEADER POINTER VAL 3: " << &(requestContexts.at(0).headers) << "\n";
   // Download the rest
   while (requestCounter > 0) {
     mDownloader->runLoop(0);
@@ -1689,6 +1687,8 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
   // Save snapshots
   for (int i = 0; i < requestContexts.size(); i++) {
     auto& requestContext = requestContexts.at(i);
+    logReading(requestContext.path, requestContext.timestamp, &requestContext.headers,
+               fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
     if (!requestContext.dest.empty()) {
       if (requestContext.considerSnapshot && fromSnapshots.at(i) != 2) {
         saveSnapshot(requestContext);
@@ -1804,12 +1804,12 @@ void CcdbApi::checkMetadataKeys(std::map<std::string, std::string> const& metada
 
 void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::string, std::string>* headers, const std::string& comment) const
 {
-  std::cout << "Listing headers elements: \n";
-  for(auto& el : *headers) {
-    std::cout << el.first << ":. " << el.second << "\n";
-  }
+  // std::cout << "Listing headers elements: \n";
+  // for(auto& el : *headers) {
+  //   std::cout << el.first << ":. " << el.second << "\n";
+  // }
 
-  std::cout << "Coming in: " << path << " aaa " << ts << " aaa " << comment << "\n";
+  // std::cout << "Coming in: " << path << " aaa " << ts << " aaa " << comment << "\n";
   std::string upath{path};
   if (headers) {
     auto ent = headers->find("Valid-From");
@@ -1822,8 +1822,8 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
     }
   }
   upath.erase(remove(upath.begin(), upath.end(), '\"'), upath.end());
-  std::cout << "Upath: " << upath << "\n";
-  std::cout << "mUrl: " << upath << "\n";
+  // std::cout << "Upath: " << upath << "\n";
+  // std::cout << "mUrl: " << upath << "\n";
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
