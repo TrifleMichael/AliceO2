@@ -1797,6 +1797,11 @@ void CcdbApi::checkMetadataKeys(std::map<std::string, std::string> const& metada
 
 void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::string, std::string>* headers, const std::string& comment) const
 {
+  std::cout << "Listing headers elements: \n";
+  for(auto& el : *headers) {
+    std::cout << el.first << ":. " << el.second << "\n";
+  }
+
   std::cout << "Coming in: " << path << " aaa " << ts << " aaa " << comment << "\n";
   std::string upath{path};
   if (headers) {
@@ -1811,7 +1816,7 @@ void CcdbApi::logReading(const std::string& path, long ts, const std::map<std::s
   }
   upath.erase(remove(upath.begin(), upath.end(), '\"'), upath.end());
   std::cout << "Upath: " << upath << "\n";
-  std::cout << "mUrl: " << upath << "\n";
+  std::cout << "mUrl: " << mUrl << "\n";
   LOGP(info, "ccdb reads {}{}{} for {} ({}, agent_id: {}), ", mUrl, mUrl.back() == '/' ? "" : "/", upath, ts < 0 ? getCurrentTimestamp() : ts, comment, mUniqueAgentID);
 }
 
