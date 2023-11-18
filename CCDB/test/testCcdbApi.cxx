@@ -59,8 +59,9 @@ BOOST_AUTO_TEST_CASE(test)
   std::string path = "ACO/Align";
   long timestamp = 1687172665912;
   o2::pmr::vector<char> dst;
-  api.loadFileToMemory(dst, path, metadata, timestap, &headers, "", "", "");
+  api.loadFileToMemory(dst, path, metadata, timestamp, &headers, "", "", "");
   std::cout << "HELLO\n";
+  std::cout << dst.size() << "\n";
   BOOST_CHECK(1 == 2);
 }
 
