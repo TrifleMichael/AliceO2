@@ -479,7 +479,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
       std::cout << "SHOWING HEADERS\n";
       std::cout << "requestData->headers\n";
-      for (auto& el : requestData->headers) {
+      for (auto& el : *requestData->headers) {
         std::cout << el.first << ":. " << el.second << "\n";
       }
       std::cout << "requestData->hoPair.header\n";
