@@ -1675,10 +1675,17 @@ void CcdbApi::vectoredLoadFileToMemory(std::vector<RequestContext>& requestConte
                fmt::format("{}{}", requestContext.considerSnapshot ? "load to memory" : "retrieve", fromSnapshots.at(i) ? " from snapshot" : ""));
   }
 
+
+  auto& requestContext = requestContexts.at(i);
+  std::cout << "HEADER POINTER VAL 3: " << &(requestData->hoPair.header) << "\n";
   // Download the rest
   while (requestCounter > 0) {
     mDownloader->runLoop(0);
   }
+  // std::cout << "AFTER requestContext.headers\n";
+  // for (auto& el : requestContext.headers) {
+  //   std::cout << el.first << ":. " << el.second << "\n";
+  // }
 
   // Save snapshots
   for (int i = 0; i < requestContexts.size(); i++) {

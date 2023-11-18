@@ -477,6 +477,9 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
     case ASYNCHRONOUS: {
       DownloaderRequestData* requestData = performData->requestData;
 
+      std::cout << "HEADER POINTER VAL 1: " << requestData->headers << "\n";
+      std::cout << "HEADER POINTER VAL 2: " << &(requestData->hoPair.header) << "\n";
+
       std::cout << "SHOWING HEADERS\n";
       std::cout << "requestData->headers\n";
       for (auto& el : *requestData->headers) {
@@ -534,6 +537,7 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
 
       if (!rescheduled) {
         // No more transfers will be done for this request, do cleanup specific for ASYNCHRONOUS calls
+        std::cout << "ABOUT TO DELETE HEADER AT POINTER " << performData->requestData->headers << "\n";
         --(*performData->requestsLeft);
         delete requestData;
         delete performData->codeDestination;
