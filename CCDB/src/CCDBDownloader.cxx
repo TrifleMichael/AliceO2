@@ -477,6 +477,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
     case ASYNCHRONOUS: {
       DownloaderRequestData* requestData = performData->requestData;
 
+      std::string currentHost = requestData->hosts[performData->hostInd];
+      std::string loggingMessage = prepareLogMessage(currentHost, requestData->userAgent, requestData->path, requestData->timestamp, requestData->hoPair.header);
+      std::cout << "LOGGING MESSAGE " << loggingMessage << "\n";
+
       if (requestData->headers) {
         for (auto& p : requestData->hoPair.header) {
           (*requestData->headers)[p.first] = p.second;
@@ -692,6 +696,23 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   checkHandleQueue();
 
   // return codeVector;
+}
+
+std::string CCDBDownloader::prepareLogMessage(std::string host_url, std::string userAgent, const std::string& path, long ts, const std::map<std::string, std::string>* headers) const
+{
+  std::string upath{path};
+  if (headers) {
+    auto ent = headers->find("Valid-From");
+    if (ent != headers->end()) {
+      upath += "/" + ent->second;
+    }
+    ent = headers->find("ETag");
+    if (ent != headers->end()) {
+      upath += "/" + ent->second;
+    }
+  }
+  upath.erase(remove(upath.begin(), upath.end(), '\"'), upath.end());
+  return "ccdb reads {}{}{} for {} ({}, agent_id: {}), " + host_url + (host_url.back() == '/') ? "" : "/" + upath + (ts < 0) ? getCurrentTimestamp() : ts + userAgent;
 }
 
 } // namespace o2

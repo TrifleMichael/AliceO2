@@ -51,6 +51,7 @@ typedef struct DownloaderRequestData {
   long timestamp;
   HeaderObjectPair_t hoPair;
   std::map<std::string, std::string>* headers;
+  std::string userAgent;
 
   std::function<bool(std::string)> localContentCallback;
   bool errorflag = false;
@@ -209,6 +210,9 @@ class CCDBDownloader
   void runLoop(bool noWait);
 
  private:
+  // TODO COMMENT
+  std::string prepareLogMessage(std::string host_url, std::string userAgent, const std::string& path, long ts, const std::map<std::string, std::string>* headers) const;
+
   /**
    * Leaves only the protocol and host part of the url, discrading path and metadata.
    */
