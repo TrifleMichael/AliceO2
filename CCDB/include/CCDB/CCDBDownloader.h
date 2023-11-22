@@ -211,7 +211,7 @@ class CCDBDownloader
 
  private:
   // TODO COMMENT
-  std::string prepareLogMessage(std::string host_url, std::string userAgent, const std::string& path, long ts, const std::map<std::string, std::string>* headers) const;
+  std::string prepareLogMessage(std::string host_url, std::string userAgent, const std::string& path, long ts, const std::map<std::string, std::string>* headers, long httpCode) const;
 
   /**
    * Leaves only the protocol and host part of the url, discrading path and metadata.

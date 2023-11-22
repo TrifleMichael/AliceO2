@@ -477,10 +477,6 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
     case ASYNCHRONOUS: {
       DownloaderRequestData* requestData = performData->requestData;
 
-      std::string currentHost = requestData->hosts[performData->hostInd];
-      std::string loggingMessage = prepareLogMessage(currentHost, requestData->userAgent, requestData->path, requestData->timestamp, requestData->hoPair.header);
-      std::cout << "LOGGING MESSAGE " << loggingMessage << "\n";
-
       if (requestData->headers) {
         for (auto& p : requestData->hoPair.header) {
           (*requestData->headers)[p.first] = p.second;
@@ -496,6 +492,10 @@ void CCDBDownloader::transferFinished(CURL* easy_handle, CURLcode curlCode)
       char* url;
       curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
       LOG(debug) << "Transfer for " << url << " finished with code " << httpCode << "\n";
+
+      std::string currentHost = requestData->hosts[performData->hostInd];
+      std::string loggingMessage = prepareLogMessage(currentHost, requestData->userAgent, requestData->path, requestData->timestamp, requestData->hoPair.header, httpCode);
+      std::cout << "LOGGING MESSAGE " << loggingMessage << "\n";
 
       // Get alternative locations for the same host
       auto locations = getLocations(&(requestData->hoPair.header));
@@ -698,7 +698,7 @@ void CCDBDownloader::asynchSchedule(CURL* handle, size_t* requestCounter)
   // return codeVector;
 }
 
-std::string CCDBDownloader::prepareLogMessage(std::string host_url, std::string userAgent, const std::string& path, long ts, const std::map<std::string, std::string>* headers) const
+std::string CCDBDownloader::prepareLogMessage(std::string host_url, std::string userAgent, const std::string& path, long ts, const std::map<std::string, std::string>* headers, long httpCode) const
 {
   std::string upath{path};
   if (headers) {
@@ -712,7 +712,8 @@ std::string CCDBDownloader::prepareLogMessage(std::string host_url, std::string 
     }
   }
   upath.erase(remove(upath.begin(), upath.end(), '\"'), upath.end());
-  return "ccdb reads {}{}{} for {} ({}, agent_id: {}), " + host_url + (host_url.back() == '/') ? "" : "/" + upath + (ts < 0) ? getCurrentTimestamp() : ts + userAgent;
+  // return "CcdbDownloader finished transfer " + host_url + (host_url.back() == '/') ? "" : "/" + upath + " for " + (ts < 0) ? getCurrentTimestamp() : ts + " (agent_id: " + userAgent + ") with http code: " + httpCode;
+  return std::format("CcdbDownloader finished transfer {}{}{} for {} (agent_id: {}) with http code: {}", host_url, (host_url.back() == '/') ? "" : "/", upath, (ts < 0) ? getCurrentTimestamp() : ts, userAgent, httpCode);
 }
 
 } // namespace o2
