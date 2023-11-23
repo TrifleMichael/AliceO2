@@ -210,7 +210,9 @@ class CCDBDownloader
   void runLoop(bool noWait);
 
  private:
-  // TODO COMMENT
+  /**
+   * Returns a message describing the transfer an it's result.
+   */
   std::string prepareLogMessage(std::string host_url, std::string userAgent, const std::string& path, long ts, const std::map<std::string, std::string>* headers, long httpCode) const;
 
   /**
