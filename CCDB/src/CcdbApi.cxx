@@ -94,6 +94,7 @@ static SemaphoreRegistry gSemaRegistry;
 
 CcdbApi::CcdbApi()
 {
+  std::cout << "I DO BE WORKING (ccdbapi)\n";
   using namespace o2::framework;
   setUniqueAgentID();
 
@@ -1457,6 +1458,7 @@ bool CcdbApi::getCCDBEntryHeaders(std::string const& url, std::string const& eta
   curlSetSSLOptions(curl);
 
   /* Perform the request */
+  std::cout << "I DO BE WORKING (static)\n";
   curl_easy_perform(curl);
   long http_code = 404;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
@@ -1997,6 +1999,7 @@ void CcdbApi::asynchPerform(CURL* handle, size_t* requestCounter) const
 
 CURLcode CcdbApi::CURL_perform(CURL* handle) const
 {
+  std::cout << "I DO BE WORKING\n";
   if (mIsCCDBDownloaderPreferred) {
     return mDownloader->perform(handle);
   }

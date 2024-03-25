@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <fairlogger/Logger.h>
 #include <boost/asio/ip/host_name.hpp>
+#include <iostream>
 
 namespace o2::ccdb
 {
@@ -71,6 +72,7 @@ std::string uniqueAgentID()
 CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
   : mUserAgentId(uniqueAgentID())
 {
+  std::cout << "I DO BE WORKING (downloader)\n";
   if (uv_loop) {
     mExternalLoop = true;
     mUVLoop = uv_loop;
