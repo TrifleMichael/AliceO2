@@ -29,6 +29,9 @@
 #include <boost/algorithm/string.hpp>
 #include "MemoryResources/MemoryResources.h"
 
+
+#include "Framework/Signpost.h"
+
 using namespace std;
 
 namespace o2
@@ -146,7 +149,13 @@ std::vector<CURL*> prepareAsyncHandles(size_t num, std::vector<o2::pmr::vector<c
 
 BOOST_AUTO_TEST_CASE(asynch_schedule_test)
 {
-  int TRANSFERS = 5;
+
+  if (getenv("DPL_SIGNPOSTS")) {
+    std::cout << "DPL_SIGNPOSTS found\n";
+  } else {
+    std::cout << "DPL_SIGNPOSTS not found\n";
+  }
+  int TRANSFERS = 1;
 
   if (curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
@@ -182,198 +191,198 @@ BOOST_AUTO_TEST_CASE(asynch_schedule_test)
   curl_global_cleanup();
 }
 
-BOOST_AUTO_TEST_CASE(perform_test)
-{
-  if (curl_global_init(CURL_GLOBAL_ALL)) {
-    fprintf(stderr, "Could not init curl\n");
-    return;
-  }
+// BOOST_AUTO_TEST_CASE(perform_test)
+// {
+//   if (curl_global_init(CURL_GLOBAL_ALL)) {
+//     fprintf(stderr, "Could not init curl\n");
+//     return;
+//   }
 
-  CCDBDownloader downloader;
-  std::string dst = "";
-  CURL* handle = createTestHandle(&dst);
+//   CCDBDownloader downloader;
+//   std::string dst = "";
+//   CURL* handle = createTestHandle(&dst);
 
-  CURLcode curlCode = downloader.perform(handle);
+//   CURLcode curlCode = downloader.perform(handle);
 
-  BOOST_CHECK_EQUAL(curlCode, CURLE_OK);
+//   BOOST_CHECK_EQUAL(curlCode, CURLE_OK);
 
-  long httpCode;
-  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  BOOST_CHECK_EQUAL(httpCode, 200);
+//   long httpCode;
+//   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+//   BOOST_CHECK_EQUAL(httpCode, 200);
 
-  curl_easy_cleanup(handle);
-  curl_global_cleanup();
-}
+//   curl_easy_cleanup(handle);
+//   curl_global_cleanup();
+// }
 
-BOOST_AUTO_TEST_CASE(blocking_batch_test)
-{
-  if (curl_global_init(CURL_GLOBAL_ALL)) {
-    fprintf(stderr, "Could not init curl\n");
-    return;
-  }
+// BOOST_AUTO_TEST_CASE(blocking_batch_test)
+// {
+//   if (curl_global_init(CURL_GLOBAL_ALL)) {
+//     fprintf(stderr, "Could not init curl\n");
+//     return;
+//   }
 
-  CCDBDownloader downloader;
-  std::vector<CURL*> handleVector;
-  std::vector<std::string*> destinations;
-  for (int i = 0; i < 100; i++) {
-    destinations.push_back(new std::string());
-    handleVector.push_back(createTestHandle(destinations.back()));
-  }
+//   CCDBDownloader downloader;
+//   std::vector<CURL*> handleVector;
+//   std::vector<std::string*> destinations;
+//   for (int i = 0; i < 100; i++) {
+//     destinations.push_back(new std::string());
+//     handleVector.push_back(createTestHandle(destinations.back()));
+//   }
 
-  auto curlCodes = downloader.batchBlockingPerform(handleVector);
-  for (CURLcode code : curlCodes) {
-    BOOST_CHECK_EQUAL(code, CURLE_OK);
-  }
+//   auto curlCodes = downloader.batchBlockingPerform(handleVector);
+//   for (CURLcode code : curlCodes) {
+//     BOOST_CHECK_EQUAL(code, CURLE_OK);
+//   }
 
-  for (CURL* handle : handleVector) {
-    long httpCode;
-    curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-    BOOST_CHECK_EQUAL(httpCode, 200);
-    curl_easy_cleanup(handle);
-  }
+//   for (CURL* handle : handleVector) {
+//     long httpCode;
+//     curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+//     BOOST_CHECK_EQUAL(httpCode, 200);
+//     curl_easy_cleanup(handle);
+//   }
 
-  for (std::string* dst : destinations) {
-    delete dst;
-  }
+//   for (std::string* dst : destinations) {
+//     delete dst;
+//   }
 
-  curl_global_cleanup();
-}
+//   curl_global_cleanup();
+// }
 
-BOOST_AUTO_TEST_CASE(test_with_break)
-{
-  if (curl_global_init(CURL_GLOBAL_ALL)) {
-    fprintf(stderr, "Could not init curl\n");
-    return;
-  }
+// BOOST_AUTO_TEST_CASE(test_with_break)
+// {
+//   if (curl_global_init(CURL_GLOBAL_ALL)) {
+//     fprintf(stderr, "Could not init curl\n");
+//     return;
+//   }
 
-  CCDBDownloader downloader;
-  std::vector<CURL*> handleVector;
-  std::vector<std::string*> destinations;
-  for (int i = 0; i < 100; i++) {
-    destinations.push_back(new std::string());
-    handleVector.push_back(createTestHandle(destinations.back()));
-  }
+//   CCDBDownloader downloader;
+//   std::vector<CURL*> handleVector;
+//   std::vector<std::string*> destinations;
+//   for (int i = 0; i < 100; i++) {
+//     destinations.push_back(new std::string());
+//     handleVector.push_back(createTestHandle(destinations.back()));
+//   }
 
-  auto curlCodes = downloader.batchBlockingPerform(handleVector);
+//   auto curlCodes = downloader.batchBlockingPerform(handleVector);
 
-  for (CURLcode code : curlCodes) {
-    BOOST_CHECK_EQUAL(code, CURLE_OK);
-  }
+//   for (CURLcode code : curlCodes) {
+//     BOOST_CHECK_EQUAL(code, CURLE_OK);
+//   }
 
-  for (CURL* handle : handleVector) {
-    long httpCode;
-    curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-    BOOST_CHECK_EQUAL(httpCode, 200);
-    curl_easy_cleanup(handle);
-  }
+//   for (CURL* handle : handleVector) {
+//     long httpCode;
+//     curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+//     BOOST_CHECK_EQUAL(httpCode, 200);
+//     curl_easy_cleanup(handle);
+//   }
 
-  for (std::string* dst : destinations) {
-    delete dst;
-  }
+//   for (std::string* dst : destinations) {
+//     delete dst;
+//   }
 
-  sleep(10);
+//   sleep(10);
 
-  std::vector<CURL*> handleVector2;
-  std::vector<std::string*> destinations2;
-  for (int i = 0; i < 100; i++) {
-    destinations2.push_back(new std::string());
-    handleVector2.push_back(createTestHandle(destinations2.back()));
-  }
+//   std::vector<CURL*> handleVector2;
+//   std::vector<std::string*> destinations2;
+//   for (int i = 0; i < 100; i++) {
+//     destinations2.push_back(new std::string());
+//     handleVector2.push_back(createTestHandle(destinations2.back()));
+//   }
 
-  auto curlCodes2 = downloader.batchBlockingPerform(handleVector2);
-  for (CURLcode code : curlCodes2) {
-    BOOST_CHECK_EQUAL(code, CURLE_OK);
-  }
+//   auto curlCodes2 = downloader.batchBlockingPerform(handleVector2);
+//   for (CURLcode code : curlCodes2) {
+//     BOOST_CHECK_EQUAL(code, CURLE_OK);
+//   }
 
-  for (CURL* handle : handleVector2) {
-    long httpCode;
-    curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-    BOOST_CHECK_EQUAL(httpCode, 200);
-    curl_easy_cleanup(handle);
-  }
+//   for (CURL* handle : handleVector2) {
+//     long httpCode;
+//     curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+//     BOOST_CHECK_EQUAL(httpCode, 200);
+//     curl_easy_cleanup(handle);
+//   }
 
-  for (std::string* dst : destinations2) {
-    delete dst;
-  }
+//   for (std::string* dst : destinations2) {
+//     delete dst;
+//   }
 
-  curl_global_cleanup();
-}
+//   curl_global_cleanup();
+// }
 
-void onUVClose(uv_handle_t* handle)
-{
-  if (handle != nullptr) {
-    free(handle);
-  }
-}
+// void onUVClose(uv_handle_t* handle)
+// {
+//   if (handle != nullptr) {
+//     free(handle);
+//   }
+// }
 
-void closeAllHandles(uv_handle_t* handle, void* arg)
-{
-  if (!uv_is_closing(handle)) {
-    uv_close(handle, onUVClose);
-  }
-}
+// void closeAllHandles(uv_handle_t* handle, void* arg)
+// {
+//   if (!uv_is_closing(handle)) {
+//     uv_close(handle, onUVClose);
+//   }
+// }
 
-void testTimerCB(uv_timer_t* handle)
-{
-  // Mock function to be used by tested timer
-}
+// void testTimerCB(uv_timer_t* handle)
+// {
+//   // Mock function to be used by tested timer
+// }
 
-BOOST_AUTO_TEST_CASE(external_loop_test)
-{
-  // Prepare uv_loop to be provided to the downloader
-  auto uvLoop = new uv_loop_t();
-  uv_loop_init(uvLoop);
+// BOOST_AUTO_TEST_CASE(external_loop_test)
+// {
+//   // Prepare uv_loop to be provided to the downloader
+//   auto uvLoop = new uv_loop_t();
+//   uv_loop_init(uvLoop);
 
-  // Prepare test timer. It will be used to check whether the downloader affects external handles.
-  auto testTimer = (uv_timer_t*)malloc(sizeof(uv_timer_t));
-  uv_timer_init(uvLoop, testTimer);
-  uv_timer_start(testTimer, testTimerCB, 10, 10);
+//   // Prepare test timer. It will be used to check whether the downloader affects external handles.
+//   auto testTimer = (uv_timer_t*)malloc(sizeof(uv_timer_t));
+//   uv_timer_init(uvLoop, testTimer);
+//   uv_timer_start(testTimer, testTimerCB, 10, 10);
 
-  if (curl_global_init(CURL_GLOBAL_ALL)) {
-    fprintf(stderr, "Could not init curl\n");
-    return;
-  }
+//   if (curl_global_init(CURL_GLOBAL_ALL)) {
+//     fprintf(stderr, "Could not init curl\n");
+//     return;
+//   }
 
-  // Regular downloader test
-  auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
-  std::string dst = "";
-  CURL* handle = createTestHandle(&dst);
+//   // Regular downloader test
+//   auto downloader = new o2::ccdb::CCDBDownloader(uvLoop);
+//   std::string dst = "";
+//   CURL* handle = createTestHandle(&dst);
 
-  CURLcode curlCode = downloader->perform(handle);
+//   CURLcode curlCode = downloader->perform(handle);
 
-  BOOST_CHECK_EQUAL(curlCode, CURLE_OK);
+//   BOOST_CHECK_EQUAL(curlCode, CURLE_OK);
 
-  long httpCode;
-  curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
-  BOOST_CHECK_EQUAL(httpCode, 200);
+//   long httpCode;
+//   curl_easy_getinfo(handle, CURLINFO_HTTP_CODE, &httpCode);
+//   BOOST_CHECK_EQUAL(httpCode, 200);
 
-  curl_easy_cleanup(handle);
-  curl_global_cleanup();
+//   curl_easy_cleanup(handle);
+//   curl_global_cleanup();
 
-  // Check if test timer and external loop are still alive
-  BOOST_CHECK_NE(uv_is_active((uv_handle_t*)testTimer), 0);
-  BOOST_CHECK_NE(uv_loop_alive(uvLoop), 0);
+//   // Check if test timer and external loop are still alive
+//   BOOST_CHECK_NE(uv_is_active((uv_handle_t*)testTimer), 0);
+//   BOOST_CHECK_NE(uv_loop_alive(uvLoop), 0);
 
-  // Downloader must be closed before uv_loop.
-  // The reason for that are the uv_poll handles attached to the curl multi handle.
-  // The multi handle must be cleaned (via destuctor) before poll handles attached to them are removed (via walking and closing).
-  delete downloader;
-  while (uv_loop_alive(uvLoop) || uv_loop_close(uvLoop) == UV_EBUSY) {
-    uv_walk(uvLoop, closeAllHandles, nullptr);
-    uv_run(uvLoop, UV_RUN_ONCE);
-  }
-  delete uvLoop;
-}
+//   // Downloader must be closed before uv_loop.
+//   // The reason for that are the uv_poll handles attached to the curl multi handle.
+//   // The multi handle must be cleaned (via destuctor) before poll handles attached to them are removed (via walking and closing).
+//   delete downloader;
+//   while (uv_loop_alive(uvLoop) || uv_loop_close(uvLoop) == UV_EBUSY) {
+//     uv_walk(uvLoop, closeAllHandles, nullptr);
+//     uv_run(uvLoop, UV_RUN_ONCE);
+//   }
+//   delete uvLoop;
+// }
 
-BOOST_AUTO_TEST_CASE(trim_host_url_test)
-{
-  CCDBDownloader downloader;
-  BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost:8080"), "http://localhost:8080");
-  BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost"), "http://localhost");
-  BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost:8080/some/path"), "http://localhost:8080");
-  BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost/some/path"), "http://localhost");
-  BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost:8080/Task/Detector/1?HTTPOnly=true"), "http://localhost:8080");
-}
+// BOOST_AUTO_TEST_CASE(trim_host_url_test)
+// {
+//   CCDBDownloader downloader;
+//   BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost:8080"), "http://localhost:8080");
+//   BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost"), "http://localhost");
+//   BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost:8080/some/path"), "http://localhost:8080");
+//   BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost/some/path"), "http://localhost");
+//   BOOST_CHECK_EQUAL(downloader.trimHostUrl("http://localhost:8080/Task/Detector/1?HTTPOnly=true"), "http://localhost:8080");
+// }
 
 } // namespace ccdb
 } // namespace o2

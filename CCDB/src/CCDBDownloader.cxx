@@ -31,13 +31,14 @@
 #include <boost/asio/ip/host_name.hpp>
 
 O2_DECLARE_DYNAMIC_STACKTRACE_LOG(ccdb_downloader);
+O2_LOG_ENABLE(ccdb_downloader);
 
 namespace o2::ccdb
 {
 
 void uvErrorCheck(int code, DownloaderErrorLevel level)
 {
-  if (code != 0) {
+  // if (code != 0) {
     char buf[1000];
     uv_strerror_r(code, buf, 1000);
     O2_SIGNPOST_ID_GENERATE(sid, ccdb_downloader);
@@ -46,7 +47,7 @@ void uvErrorCheck(int code, DownloaderErrorLevel level)
     } else {
       O2_SIGNPOST_EVENT_EMIT_WARN(ccdb_downloader, sid, "CCDBDownloader", "UV minor error - %{public}s", buf);
     }
-  }
+  // }  
 }
 
 void curlEasyErrorCheck(CURLcode code)
