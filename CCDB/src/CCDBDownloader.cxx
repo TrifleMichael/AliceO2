@@ -31,7 +31,6 @@
 #include <boost/asio/ip/host_name.hpp>
 
 O2_DECLARE_DYNAMIC_STACKTRACE_LOG(ccdb_downloader);
-O2_LOG_ENABLE(ccdb_downloader);
 
 namespace o2::ccdb
 {
@@ -82,6 +81,7 @@ std::string uniqueAgentID()
 CCDBDownloader::CCDBDownloader(uv_loop_t* uv_loop)
   : mUserAgentId(uniqueAgentID())
 {
+  O2_LOG_ENABLE(ccdb_downloader);
   if (uv_loop) {
     mExternalLoop = true;
     mUVLoop = uv_loop;
