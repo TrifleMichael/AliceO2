@@ -688,7 +688,7 @@ void CCDBDownloader::updateLocations(std::multimap<std::string, std::string>* he
       }
     }
   }
-  
+
   // Insert location list at the current location index. This assures that the provided locations will be tried first.
   locations->insert(locations->begin() + (*locIndex), newLocations.begin(), newLocations.end());
 }

@@ -672,7 +672,7 @@ size_t header_map_callback(char* buffer, size_t size, size_t nitems, void* userd
     if (key == "ETag") {
       auto cl = headers->find("ETag");
       if (cl != headers->end()) {
-        insert = false;        
+        insert = false;
       }
     }
 
@@ -680,7 +680,7 @@ size_t header_map_callback(char* buffer, size_t size, size_t nitems, void* userd
     if (key == "Content-Type") {
       auto cl = headers->find("Content-Type");
       if (cl != headers->end()) {
-        insert = false;        
+        insert = false;
       }
     }
 
